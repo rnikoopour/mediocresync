@@ -28,9 +28,9 @@
 - [x] `internal/db/filestate.go` — `FileStateRepository`: `Upsert`, `Get`, `DeleteByJob`
 
 ## Phase 3 — FTPES Client
-- [ ] `internal/ftpes/dial.go` — `Dial(host, port, skipVerify)` with explicit TLS (`AUTH TLS`)
-- [ ] `internal/ftpes/walk.go` — recursive `LIST` traversal, returns flat `[]RemoteFile`
-- [ ] `internal/ftpes/client.go` — `Client` struct with `Login`, `Walk`, `Download`, `Close`; backed by interface for testability
+- [x] `internal/ftpes/dial.go` — `Dial(host, port, skipVerify)` with explicit TLS (`AUTH TLS`)
+- [x] `internal/ftpes/walk.go` — recursive `LIST` traversal, returns flat `[]RemoteFile`
+- [x] `internal/ftpes/client.go` — `Client` struct with `Login`, `Walk`, `Download`, `Close`; backed by interface for testability
 
 ## Phase 4 — Sync Engine
 - [ ] `internal/sync/fingerprint.go` — `Matches(state, remoteFile)` with 1-second mtime tolerance

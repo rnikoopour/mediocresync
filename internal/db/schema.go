@@ -26,6 +26,7 @@ var schema = []string{
 		local_dest      TEXT NOT NULL,
 		interval_value  INTEGER NOT NULL,
 		interval_unit   TEXT NOT NULL CHECK(interval_unit IN ('minutes','hours','days')),
+		concurrency     INTEGER NOT NULL DEFAULT 1,
 		enabled         INTEGER NOT NULL DEFAULT 1,
 		created_at      TEXT NOT NULL,
 		updated_at      TEXT NOT NULL

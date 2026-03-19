@@ -22,6 +22,7 @@ type SyncJob struct {
 	LocalDest     string
 	IntervalValue int
 	IntervalUnit  string // minutes | hours | days
+	Concurrency   int    // number of files to download concurrently (default 1)
 	Enabled       bool
 	CreatedAt     time.Time
 	UpdatedAt     time.Time

@@ -23,10 +23,10 @@ func (r *JobRepository) Create(j *SyncJob) error {
 	j.UpdatedAt = now
 
 	_, err := r.db.Exec(
-		`INSERT INTO sync_jobs (id, name, connection_id, remote_path, local_dest, interval_value, interval_unit, enabled, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO sync_jobs (id, name, connection_id, remote_path, local_dest, interval_value, interval_unit, concurrency, enabled, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		j.ID, j.Name, j.ConnectionID, j.RemotePath, j.LocalDest,
-		j.IntervalValue, j.IntervalUnit, boolToInt(j.Enabled),
+		j.IntervalValue, j.IntervalUnit, j.Concurrency, boolToInt(j.Enabled),
 		formatTime(j.CreatedAt), formatTime(j.UpdatedAt),
 	)
 	if err != nil {
@@ -36,16 +36,16 @@ func (r *JobRepository) Create(j *SyncJob) error {
 }
 
 func (r *JobRepository) List() ([]*SyncJob, error) {
-	return r.query(`SELECT id, name, connection_id, remote_path, local_dest, interval_value, interval_unit, enabled, created_at, updated_at FROM sync_jobs ORDER BY name`)
+	return r.query(`SELECT id, name, connection_id, remote_path, local_dest, interval_value, interval_unit, concurrency, enabled, created_at, updated_at FROM sync_jobs ORDER BY name`)
 }
 
 func (r *JobRepository) ListEnabled() ([]*SyncJob, error) {
-	return r.query(`SELECT id, name, connection_id, remote_path, local_dest, interval_value, interval_unit, enabled, created_at, updated_at FROM sync_jobs WHERE enabled = 1 ORDER BY name`)
+	return r.query(`SELECT id, name, connection_id, remote_path, local_dest, interval_value, interval_unit, concurrency, enabled, created_at, updated_at FROM sync_jobs WHERE enabled = 1 ORDER BY name`)
 }
 
 func (r *JobRepository) Get(id string) (*SyncJob, error) {
 	row := r.db.QueryRow(
-		`SELECT id, name, connection_id, remote_path, local_dest, interval_value, interval_unit, enabled, created_at, updated_at
+		`SELECT id, name, connection_id, remote_path, local_dest, interval_value, interval_unit, concurrency, enabled, created_at, updated_at
 		 FROM sync_jobs WHERE id = ?`, id,
 	)
 	j, err := scanJob(row)
@@ -58,10 +58,10 @@ func (r *JobRepository) Get(id string) (*SyncJob, error) {
 func (r *JobRepository) Update(j *SyncJob) error {
 	j.UpdatedAt = time.Now().UTC()
 	res, err := r.db.Exec(
-		`UPDATE sync_jobs SET name=?, connection_id=?, remote_path=?, local_dest=?, interval_value=?, interval_unit=?, enabled=?, updated_at=?
+		`UPDATE sync_jobs SET name=?, connection_id=?, remote_path=?, local_dest=?, interval_value=?, interval_unit=?, concurrency=?, enabled=?, updated_at=?
 		 WHERE id=?`,
 		j.Name, j.ConnectionID, j.RemotePath, j.LocalDest,
-		j.IntervalValue, j.IntervalUnit, boolToInt(j.Enabled),
+		j.IntervalValue, j.IntervalUnit, j.Concurrency, boolToInt(j.Enabled),
 		formatTime(j.UpdatedAt), j.ID,
 	)
 	if err != nil {
@@ -104,7 +104,7 @@ func scanJob(s scanner) (*SyncJob, error) {
 
 	err := s.Scan(
 		&j.ID, &j.Name, &j.ConnectionID, &j.RemotePath, &j.LocalDest,
-		&j.IntervalValue, &j.IntervalUnit, &enabled, &createdAt, &updatedAt,
+		&j.IntervalValue, &j.IntervalUnit, &j.Concurrency, &enabled, &createdAt, &updatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("scan job: %w", err)
