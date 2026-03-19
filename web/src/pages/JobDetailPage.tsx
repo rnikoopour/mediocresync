@@ -88,10 +88,10 @@ function buildRunTree(transfers: Transfer[], remotePath: string): RunTreeNode[] 
   return root.children
 }
 
-function RunFileRow({ node, liveEvents }: { node: RunTreeFile; liveEvents: Map<string, { percent: number; speed_bps: number; status: string }> }) {
+function RunFileRow({ node, liveEvents, runEnded }: { node: RunTreeFile; liveEvents: Map<string, { percent: number; speed_bps: number; status: string }>; runEnded: boolean }) {
   const t = node.transfer
   const live = liveEvents.get(t.id)
-  const status = live?.status ?? t.status
+  const status = live?.status ?? (runEnded && t.status === 'pending' ? 'not_copied' : t.status)
   const percent = live?.percent ?? (t.status === 'done' ? 100 : 0)
   const speed = live?.speed_bps
 
@@ -102,15 +102,19 @@ function RunFileRow({ node, liveEvents }: { node: RunTreeFile; liveEvents: Map<s
       style={{ paddingLeft: '12px', paddingRight: '16px' }}>
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-gray-400 dark:text-gray-500 shrink-0">📄</span>
-        {(isFailed || status === 'done') && <span className="shrink-0"><StatusBadge status={status} /></span>}
+        {(isFailed || status === 'done' || status === 'not_copied') && <span className="shrink-0"><StatusBadge status={status} /></span>}
         <span className={`font-mono text-xs flex-1 min-w-0 break-all ${isFailed ? 'text-red-500 dark:text-red-400' : 'text-gray-600 dark:text-gray-300'}`}>{node.name}</span>
         <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{formatBytes(t.size_bytes)}</span>
         {status === 'in_progress' && speed !== undefined && speed > 0 && (
           <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{formatSpeed(speed)}</span>
         )}
-        {(status === 'in_progress' || status === 'done' || isFailed) ? (
+        {(status === 'in_progress' || status === 'done' || isFailed || status === 'not_copied') ? (
           <div className="w-full sm:w-48 shrink-0">
-            <ProgressBar percent={isFailed ? 0 : percent} label={isFailed ? 'Failed' : undefined} variant={isFailed ? 'failed' : 'default'} />
+            <ProgressBar
+              percent={isFailed || status === 'not_copied' ? 0 : percent}
+              label={isFailed ? 'Failed' : status === 'not_copied' ? 'Not Copied' : undefined}
+              variant={isFailed ? 'failed' : status === 'not_copied' ? 'not_copied' : 'default'}
+            />
           </div>
         ) : (
           <span className="shrink-0"><StatusBadge status={status} /></span>
@@ -125,7 +129,7 @@ function RunFileRow({ node, liveEvents }: { node: RunTreeFile; liveEvents: Map<s
   )
 }
 
-function RunFolderNode({ node, depth, liveEvents }: { node: RunTreeFolder; depth: number; liveEvents: Map<string, { percent: number; speed_bps: number; status: string }> }) {
+function RunFolderNode({ node, depth, liveEvents, runEnded }: { node: RunTreeFolder; depth: number; liveEvents: Map<string, { percent: number; speed_bps: number; status: string }>; runEnded: boolean }) {
   const [open, setOpen] = useState(true)
   const indent = depth * 16
 
@@ -144,8 +148,8 @@ function RunFolderNode({ node, depth, liveEvents }: { node: RunTreeFolder; depth
         <div className="border-l border-blue-100 dark:border-gray-600" style={{ marginLeft: `${16 + indent + 12}px` }}>
           {node.children.map((child, i) =>
             child.type === 'folder'
-              ? <RunFolderNode key={child.name + i} node={child} depth={depth + 1} liveEvents={liveEvents} />
-              : <RunFileRow key={child.name + i} node={child} liveEvents={liveEvents} />
+              ? <RunFolderNode key={child.name + i} node={child} depth={depth + 1} liveEvents={liveEvents} runEnded={runEnded} />
+              : <RunFileRow key={child.name + i} node={child} liveEvents={liveEvents} runEnded={runEnded} />
           )}
         </div>
       )}
@@ -153,10 +157,11 @@ function RunFolderNode({ node, depth, liveEvents }: { node: RunTreeFolder; depth
   )
 }
 
-function RunTreeView({ transfers, remotePath, liveEvents }: {
+function RunTreeView({ transfers, remotePath, liveEvents, runEnded }: {
   transfers: Transfer[]
   remotePath: string
   liveEvents: Map<string, { percent: number; speed_bps: number; status: string }>
+  runEnded: boolean
 }) {
   const [tab, setTab] = useState<TreeTab>('copy')
   const filtered = tab === 'all' ? transfers : transfers.filter((t) => {
@@ -170,8 +175,8 @@ function RunTreeView({ transfers, remotePath, liveEvents }: {
       <div className="py-1 max-h-64 overflow-y-auto">
         {nodes.map((n, i) =>
           n.type === 'folder'
-            ? <RunFolderNode key={n.name + i} node={n} depth={0} liveEvents={liveEvents} />
-            : <RunFileRow key={n.name + i} node={n} liveEvents={liveEvents} />
+            ? <RunFolderNode key={n.name + i} node={n} depth={0} liveEvents={liveEvents} runEnded={runEnded} />
+            : <RunFileRow key={n.name + i} node={n} liveEvents={liveEvents} runEnded={runEnded} />
         )}
       </div>
     </div>
@@ -273,7 +278,7 @@ function RunRow({ run: initialRun, remotePath, jobId }: { run: Run; remotePath: 
             No transfers recorded.
           </p>
         ) : (
-          <RunTreeView transfers={transfers} remotePath={remotePath} liveEvents={liveEvents} />
+          <RunTreeView transfers={transfers} remotePath={remotePath} liveEvents={liveEvents} runEnded={!isRunning} />
         )
       )}
     </div>

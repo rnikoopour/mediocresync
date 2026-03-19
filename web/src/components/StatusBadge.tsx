@@ -1,4 +1,4 @@
-type Status = 'running' | 'completed' | 'failed' | 'canceled' | 'server_stopped' | 'pending' | 'in_progress' | 'done' | 'skipped'
+type Status = 'running' | 'completed' | 'failed' | 'canceled' | 'server_stopped' | 'pending' | 'in_progress' | 'done' | 'skipped' | 'not_copied'
 
 const styles: Record<Status, string> = {
   running:        'bg-blue-100 text-blue-800 dark:bg-gray-600 dark:text-gray-100',
@@ -10,6 +10,7 @@ const styles: Record<Status, string> = {
   server_stopped: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300',
   pending:        'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
   skipped:        'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300',
+  not_copied:     'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400',
 }
 
 const labels: Record<Status, string> = {
@@ -22,6 +23,7 @@ const labels: Record<Status, string> = {
   server_stopped: 'Server Stopped',
   pending:        'Pending',
   skipped:        'Skipped',
+  not_copied:     'Not Copied',
 }
 
 export function StatusBadge({ status }: { status: string }) {

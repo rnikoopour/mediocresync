@@ -1,12 +1,12 @@
 interface Props {
   percent: number   // 0–100
   label?: string    // overrides the percentage text
-  variant?: 'default' | 'failed'
+  variant?: 'default' | 'failed' | 'not_copied'
 }
 
 export function ProgressBar({ percent, label, variant = 'default' }: Props) {
   const pct = Math.min(100, Math.max(0, percent))
-  const fillColor = variant === 'failed' ? 'bg-red-500' : 'bg-blue-500'
+  const fillColor = variant === 'failed' ? 'bg-red-500' : variant === 'not_copied' ? 'bg-gray-400 dark:bg-gray-500' : 'bg-blue-500'
   return (
     <div className="relative bg-gray-200 dark:bg-gray-600 rounded h-5 overflow-hidden">
       <div
