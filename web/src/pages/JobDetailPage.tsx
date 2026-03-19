@@ -55,12 +55,12 @@ function FolderNode({ node, depth }: { node: TreeFolder; depth: number }) {
     <div>
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-2 py-1.5 hover:bg-blue-50 dark:hover:bg-gray-700/60 text-left"
+        className="w-full flex items-center gap-2 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700/60 text-left"
         style={{ paddingLeft: `${16 + indent}px`, paddingRight: '16px' }}
       >
-        <span className="text-blue-400 text-xs w-3 shrink-0">{open ? '▾' : '▸'}</span>
-        <span className="text-blue-500 shrink-0">📁</span>
-        <span className="font-mono text-xs font-semibold text-blue-700 dark:text-gray-200">{node.name}</span>
+        <span className="text-gray-400 dark:text-violet-500 text-xs w-3 shrink-0">{open ? '▾' : '▸'}</span>
+        <span className="shrink-0">📁</span>
+        <span className="font-mono text-xs font-semibold text-gray-700 dark:text-violet-300">{node.name}</span>
       </button>
       {open && (
         <div className="border-l border-blue-100 dark:border-gray-600" style={{ marginLeft: `${16 + indent + 12}px` }}>
