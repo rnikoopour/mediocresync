@@ -1,9 +1,11 @@
 import { NavLink, Outlet, useMatch } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
+import { useDarkMode } from '../hooks/useDarkMode'
 
 export function Layout() {
   const jobsActive = useMatch('/jobs/*')
+  const [dark, toggleDark] = useDarkMode()
 
   const { data: jobs = [] } = useQuery({
     queryKey: ['jobs'],
@@ -11,10 +13,10 @@ export function Layout() {
   })
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      <nav className="w-52 bg-white border-r border-gray-200 flex flex-col">
-        <div className="px-4 py-5 border-b border-gray-200">
-          <span className="font-semibold text-gray-900 text-sm">go-ftpes</span>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
+      <nav className="w-52 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col">
+        <div className="px-4 py-5 border-b border-gray-200 dark:border-gray-700">
+          <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm">go-ftpes</span>
         </div>
         <ul className="flex-1 py-3 space-y-0.5">
           <li>
@@ -22,7 +24,9 @@ export function Layout() {
               to="/connections"
               className={({ isActive }) =>
                 `block px-4 py-2 text-sm rounded-md mx-2 ${
-                  isActive ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-100'
+                  isActive
+                    ? 'bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 font-medium'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`
               }
             >
@@ -35,7 +39,9 @@ export function Layout() {
               end
               className={({ isActive }) =>
                 `block px-4 py-2 text-sm rounded-md mx-2 ${
-                  isActive ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-100'
+                  isActive
+                    ? 'bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 font-medium'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`
               }
             >
@@ -48,7 +54,9 @@ export function Layout() {
                 to={`/jobs/${job.id}`}
                 className={({ isActive }) =>
                   `block pl-7 pr-4 py-1.5 text-xs rounded-md mx-2 truncate ${
-                    isActive ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-500 hover:bg-gray-100'
+                    isActive
+                      ? 'bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 font-medium'
+                      : 'text-gray-500 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
                   }`
                 }
                 title={job.name}
@@ -58,6 +66,14 @@ export function Layout() {
             </li>
           ))}
         </ul>
+        <div className="px-3 py-3 border-t border-gray-200 dark:border-gray-700">
+          <button
+            onClick={toggleDark}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
+          >
+            {dark ? '☀ Light mode' : '☾ Dark mode'}
+          </button>
+        </div>
       </nav>
       <main className="flex-1 p-8 overflow-auto">
         <Outlet />

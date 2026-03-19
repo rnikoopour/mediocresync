@@ -57,24 +57,24 @@ export function JobsPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-semibold text-gray-900">Sync Jobs</h1>
+        <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Sync Jobs</h1>
         <button onClick={openCreate} className="btn-primary">Add Job</button>
       </div>
 
-      {isLoading && <p className="text-gray-500 text-sm">Loading…</p>}
+      {isLoading && <p className="text-gray-500 dark:text-gray-400 text-sm">Loading…</p>}
       {!isLoading && jobs.length === 0 && (
-        <p className="text-gray-400 text-sm">No jobs yet. Add one to get started.</p>
+        <p className="text-gray-400 dark:text-gray-500 text-sm">No jobs yet. Add one to get started.</p>
       )}
 
       <div className="space-y-2">
         {jobs.map((j) => (
-          <div key={j.id} className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex items-center gap-4">
+          <div key={j.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-3 flex items-center gap-4">
             <div className="flex-1 min-w-0">
-              <Link to={`/jobs/${j.id}`} className="font-medium text-gray-900 text-sm hover:text-blue-600">
+              <Link to={`/jobs/${j.id}`} className="font-medium text-gray-900 dark:text-gray-100 text-sm hover:text-blue-600 dark:hover:text-blue-400">
                 {j.name}
               </Link>
-              <p className="text-xs text-gray-500">{j.remote_path} → {j.local_dest}</p>
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-gray-500 dark:text-gray-400">{j.remote_path} → {j.local_dest}</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500">
                 Every {j.interval_value} {j.interval_unit} · {j.concurrency} concurrent · autosync {j.enabled ? 'enabled' : 'disabled'}
               </p>
             </div>
@@ -99,16 +99,16 @@ export function JobsPage() {
 
       {modal.open && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 shrink-0">
-              <h2 className="font-semibold text-gray-900">{modal.editing ? 'Edit Job' : 'Add Job'}</h2>
-              <button onClick={closeModal} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
+              <h2 className="font-semibold text-gray-900 dark:text-gray-100">{modal.editing ? 'Edit Job' : 'Add Job'}</h2>
+              <button onClick={closeModal} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">&times;</button>
             </div>
 
             <form onSubmit={(e) => { e.preventDefault(); save.mutate(form) }} className="flex flex-1 min-h-0">
               {/* Sidebar tabs */}
-              <nav className="w-36 border-r border-gray-200 py-3 shrink-0">
+              <nav className="w-36 border-r border-gray-200 dark:border-gray-700 py-3 shrink-0">
                 {(['general', 'filters'] as const).map((tab) => (
                   <button
                     key={tab}
@@ -116,8 +116,8 @@ export function JobsPage() {
                     onClick={() => setActiveTab(tab)}
                     className={`w-full text-left px-4 py-2 text-sm capitalize ${
                       activeTab === tab
-                        ? 'bg-blue-50 text-blue-700 font-medium border-r-2 border-blue-600'
-                        : 'text-gray-600 hover:bg-gray-50'
+                        ? 'bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 font-medium border-r-2 border-blue-600'
+                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
                     }`}
                   >
                     {tab}
@@ -180,7 +180,7 @@ export function JobsPage() {
                           <input className="input" type="number" min={1} max={20} value={form.concurrency} onChange={(e) => setForm({ ...form, concurrency: Number(e.target.value) })} required />
                         </Field>
                       </div>
-                      <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                      <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
                         <input type="checkbox" checked={form.enabled} onChange={(e) => setForm({ ...form, enabled: e.target.checked })} />
                         Enabled
                       </label>
@@ -190,10 +190,10 @@ export function JobsPage() {
                   {activeTab === 'filters' && (
                     <>
                       <Field label="Filters">
-                        <p className="text-xs text-gray-400 mb-2">
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">
                           Only sync files matching at least one filter. Empty = include everything.<br />
-                          <code className="bg-gray-100 px-1 rounded">path: alpha</code> — include files under the <em>alpha</em> subdirectory.<br />
-                          <code className="bg-gray-100 px-1 rounded">name: *.dat</code> — include files whose name matches the glob (<code>*</code> and <code>?</code>, does not cross <code>/</code>).
+                          <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">path: alpha</code> — include files under the <em>alpha</em> subdirectory.<br />
+                          <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">name: *.dat</code> — include files whose name matches the glob (<code>*</code> and <code>?</code>, does not cross <code>/</code>).
                         </p>
                         <FilterList
                           values={form.filters}
@@ -206,8 +206,8 @@ export function JobsPage() {
                 </div>
 
                 {/* Footer */}
-                <div className="px-6 py-4 border-t border-gray-200 shrink-0">
-                  {save.isError && <p className="text-red-600 text-sm mb-3">{(save.error as Error).message}</p>}
+                <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 shrink-0">
+                  {save.isError && <p className="text-red-600 dark:text-red-400 text-sm mb-3">{(save.error as Error).message}</p>}
                   <div className="flex justify-end gap-2">
                     <button type="button" onClick={closeModal} className="btn-secondary">Cancel</button>
                     <button type="submit" disabled={save.isPending} className="btn-primary">
@@ -260,9 +260,9 @@ function FilterList({ values, onChange, placeholder }: {
   return (
     <div className="space-y-1">
       {values.map((v, i) => (
-        <div key={i} className="flex items-center gap-2 bg-gray-50 rounded px-2 py-1">
-          <span className="flex-1 font-mono text-xs text-gray-700">{v}</span>
-          <button type="button" onClick={() => remove(i)} className="text-gray-400 hover:text-red-500 text-xs leading-none">
+        <div key={i} className="flex items-center gap-2 bg-gray-50 dark:bg-gray-700 rounded px-2 py-1">
+          <span className="flex-1 font-mono text-xs text-gray-700 dark:text-gray-300">{v}</span>
+          <button type="button" onClick={() => remove(i)} className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 text-xs leading-none">
             &times;
           </button>
         </div>
@@ -284,7 +284,7 @@ function FilterList({ values, onChange, placeholder }: {
 function Field({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
   return (
     <div className={className}>
-      <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{label}</label>
       {children}
     </div>
   )

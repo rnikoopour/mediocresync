@@ -53,15 +53,15 @@ function FolderNode({ node, depth }: { node: TreeFolder; depth: number }) {
     <div>
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-2 py-1.5 hover:bg-blue-50 text-left group"
+        className="w-full flex items-center gap-2 py-1.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-left"
         style={{ paddingLeft: `${16 + indent}px`, paddingRight: '16px' }}
       >
         <span className="text-blue-400 text-xs w-3 shrink-0">{open ? '▾' : '▸'}</span>
         <span className="text-blue-500 shrink-0">📁</span>
-        <span className="font-mono text-xs font-semibold text-blue-700">{node.name}</span>
+        <span className="font-mono text-xs font-semibold text-blue-700 dark:text-blue-400">{node.name}</span>
       </button>
       {open && (
-        <div className="border-l border-blue-100 ml-6" style={{ marginLeft: `${16 + indent + 12}px` }}>
+        <div className="border-l border-blue-100 dark:border-blue-800" style={{ marginLeft: `${16 + indent + 12}px` }}>
           {node.children.map((child, i) =>
             child.type === 'folder'
               ? <FolderNode key={child.name + i} node={child} depth={depth + 1} />
@@ -76,12 +76,12 @@ function FolderNode({ node, depth }: { node: TreeFolder; depth: number }) {
 function FileRow({ node }: { node: TreeFile; depth: number }) {
   return (
     <div
-      className="flex items-center gap-4 py-1 hover:bg-gray-50"
+      className="flex items-center gap-4 py-1 hover:bg-gray-50 dark:hover:bg-gray-700/50"
       style={{ paddingLeft: '12px', paddingRight: '16px' }}
     >
-      <span className="text-gray-400 shrink-0">📄</span>
-      <span className="font-mono text-xs text-gray-600 flex-1 truncate">{node.name}</span>
-      <span className="text-xs text-gray-400 shrink-0">{formatBytes(node.size_bytes)}</span>
+      <span className="text-gray-400 dark:text-gray-500 shrink-0">📄</span>
+      <span className="font-mono text-xs text-gray-600 dark:text-gray-300 flex-1 truncate">{node.name}</span>
+      <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{formatBytes(node.size_bytes)}</span>
       <span className="shrink-0"><StatusBadge status={node.action === 'copy' ? 'pending' : 'skipped'} /></span>
     </div>
   )
@@ -90,7 +90,7 @@ function FileRow({ node }: { node: TreeFile; depth: number }) {
 function PlanTreeView({ files, remotePath }: { files: PlanFile[]; remotePath: string }) {
   const nodes = buildTree(files, remotePath)
   return (
-    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden py-1">
+    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden py-1">
       {nodes.map((n, i) =>
         n.type === 'folder'
           ? <FolderNode key={n.name + i} node={n} depth={0} />
@@ -120,17 +120,17 @@ export function JobDetailPage() {
 
   return (
     <div>
-      <div className="flex items-center gap-2 text-sm text-gray-500 mb-6">
-        <Link to="/jobs" className="hover:text-gray-700">Jobs</Link>
+      <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-6">
+        <Link to="/jobs" className="hover:text-gray-700 dark:hover:text-gray-300">Jobs</Link>
         <span>/</span>
-        <span className="text-gray-900 font-medium">{job?.name ?? '…'}</span>
+        <span className="text-gray-900 dark:text-gray-100 font-medium">{job?.name ?? '…'}</span>
       </div>
 
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">{job?.name}</h1>
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">{job?.name}</h1>
           {job && (
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               {job.remote_path} → {job.local_dest} · every {job.interval_value} {job.interval_unit}
             </p>
           )}
@@ -154,22 +154,22 @@ export function JobDetailPage() {
       </div>
 
       {trigger.isError && (
-        <p className="text-red-600 text-sm mb-4">{(trigger.error as Error).message}</p>
+        <p className="text-red-600 dark:text-red-400 text-sm mb-4">{(trigger.error as Error).message}</p>
       )}
       {planMutation.isError && (
-        <p className="text-red-600 text-sm mb-4">{(planMutation.error as Error).message}</p>
+        <p className="text-red-600 dark:text-red-400 text-sm mb-4">{(planMutation.error as Error).message}</p>
       )}
 
       {plan && (
         <div className="mb-8">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-medium text-gray-700">
+            <h2 className="text-sm font-medium text-gray-700 dark:text-gray-300">
               Plan Result
-              <span className="ml-2 font-normal text-gray-400">
+              <span className="ml-2 font-normal text-gray-400 dark:text-gray-500">
                 {plan.to_copy} to copy · {plan.to_skip} to skip · {plan.files.length} total
               </span>
             </h2>
-            <button onClick={() => setPlan(null)} className="text-xs text-gray-400 hover:text-gray-600">
+            <button onClick={() => setPlan(null)} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
               Dismiss
             </button>
           </div>
@@ -177,11 +177,11 @@ export function JobDetailPage() {
         </div>
       )}
 
-      <h2 className="text-sm font-medium text-gray-700 mb-3">Run History</h2>
+      <h2 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Run History</h2>
 
-      {isLoading && <p className="text-gray-500 text-sm">Loading…</p>}
+      {isLoading && <p className="text-gray-500 dark:text-gray-400 text-sm">Loading…</p>}
       {!isLoading && runs.length === 0 && (
-        <p className="text-gray-400 text-sm">No runs yet.</p>
+        <p className="text-gray-400 dark:text-gray-500 text-sm">No runs yet.</p>
       )}
 
       <div className="space-y-2">
@@ -189,21 +189,21 @@ export function JobDetailPage() {
           <Link
             key={run.id}
             to={`/runs/${run.id}`}
-            className="block bg-white border border-gray-200 rounded-lg px-4 py-3 hover:border-blue-300 transition-colors"
+            className="block bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-3 hover:border-blue-300 dark:hover:border-blue-600 transition-colors"
           >
             <div className="flex items-center gap-4">
               <StatusBadge status={run.status} />
               <div className="flex-1 min-w-0">
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
                   Started {new Date(run.started_at).toLocaleString()}
                   {run.finished_at && ` · Finished ${new Date(run.finished_at).toLocaleString()}`}
                 </p>
               </div>
-              <div className="flex gap-4 text-xs text-gray-500">
+              <div className="flex gap-4 text-xs text-gray-500 dark:text-gray-400">
                 <span>{run.total_files} total</span>
-                <span className="text-green-600">{run.copied_files} copied</span>
-                <span className="text-yellow-600">{run.skipped_files} skipped</span>
-                {run.failed_files > 0 && <span className="text-red-600">{run.failed_files} failed</span>}
+                <span className="text-green-600 dark:text-green-400">{run.copied_files} copied</span>
+                <span className="text-yellow-600 dark:text-yellow-400">{run.skipped_files} skipped</span>
+                {run.failed_files > 0 && <span className="text-red-600 dark:text-red-400">{run.failed_files} failed</span>}
               </div>
             </div>
           </Link>

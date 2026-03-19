@@ -42,22 +42,22 @@ export function ConnectionsPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-semibold text-gray-900">Connections</h1>
+        <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Connections</h1>
         <button onClick={openCreate} className="btn-primary">Add Connection</button>
       </div>
 
-      {isLoading && <p className="text-gray-500 text-sm">Loading…</p>}
+      {isLoading && <p className="text-gray-500 dark:text-gray-400 text-sm">Loading…</p>}
 
       {!isLoading && connections.length === 0 && (
-        <p className="text-gray-400 text-sm">No connections yet. Add one to get started.</p>
+        <p className="text-gray-400 dark:text-gray-500 text-sm">No connections yet. Add one to get started.</p>
       )}
 
       <div className="space-y-2">
         {connections.map((c) => (
-          <div key={c.id} className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex items-center gap-4">
+          <div key={c.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-3 flex items-center gap-4">
             <div className="flex-1 min-w-0">
-              <p className="font-medium text-gray-900 text-sm">{c.name}</p>
-              <p className="text-xs text-gray-500">{c.username}@{c.host}:{c.port}</p>
+              <p className="font-medium text-gray-900 dark:text-gray-100 text-sm">{c.name}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{c.username}@{c.host}:{c.port}</p>
             </div>
             {testResult?.id === c.id && (
               <StatusBadge status={testResult.ok ? 'done' : 'failed'} />
@@ -103,11 +103,11 @@ export function ConnectionsPage() {
             <Field label={modal.editing ? 'Password (leave blank to keep current)' : 'Password'}>
               <input className="input" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required={!modal.editing} />
             </Field>
-            <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
               <input type="checkbox" checked={form.skip_tls_verify} onChange={(e) => setForm({ ...form, skip_tls_verify: e.target.checked })} />
               Skip TLS certificate verification
             </label>
-            {save.isError && <p className="text-red-600 text-sm">{(save.error as Error).message}</p>}
+            {save.isError && <p className="text-red-600 dark:text-red-400 text-sm">{(save.error as Error).message}</p>}
             <div className="flex justify-end gap-2 pt-2">
               <button type="button" onClick={closeModal} className="btn-secondary">Cancel</button>
               <button type="submit" disabled={save.isPending} className="btn-primary">
@@ -124,10 +124,10 @@ export function ConnectionsPage() {
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md mx-4 p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-gray-900">{title}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+          <h2 className="font-semibold text-gray-900 dark:text-gray-100">{title}</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">&times;</button>
         </div>
         {children}
       </div>
@@ -138,7 +138,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 function Field({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
   return (
     <div className={className}>
-      <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{label}</label>
       {children}
     </div>
   )
