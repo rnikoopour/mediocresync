@@ -35,16 +35,16 @@ func (c *client) Walk(remotePath string) ([]RemoteFile, error) {
 	return files, nil
 }
 
-func (c *client) WalkWithProgress(remotePath string, progress func(files, dirs int)) ([]RemoteFile, error) {
+func (c *client) WalkWithProgress(remotePath string, shouldDescend func(dir string) bool, progress func(files, dirs int)) ([]RemoteFile, error) {
 	var result []RemoteFile
 	var nFiles, nDirs int
-	if err := c.walkProgress(remotePath, &result, &nFiles, &nDirs, progress); err != nil {
+	if err := c.walkProgress(remotePath, shouldDescend, &result, &nFiles, &nDirs, progress); err != nil {
 		return nil, err
 	}
 	return result, nil
 }
 
-func (c *client) walkProgress(dir string, files *[]RemoteFile, nFiles, nDirs *int, progress func(files, dirs int)) error {
+func (c *client) walkProgress(dir string, shouldDescend func(dir string) bool, files *[]RemoteFile, nFiles, nDirs *int, progress func(files, dirs int)) error {
 	entries, err := c.conn.List(dir)
 	if err != nil {
 		return fmt.Errorf("LIST %s: %w", dir, err)
@@ -69,8 +69,10 @@ func (c *client) walkProgress(dir string, files *[]RemoteFile, nFiles, nDirs *in
 		case ftp.EntryTypeFolder:
 			*nDirs++
 			progress(*nFiles, *nDirs)
-			if err := c.walkProgress(fullPath, files, nFiles, nDirs, progress); err != nil {
-				return err
+			if shouldDescend == nil || shouldDescend(fullPath) {
+				if err := c.walkProgress(fullPath, shouldDescend, files, nFiles, nDirs, progress); err != nil {
+					return err
+				}
 			}
 		}
 	}

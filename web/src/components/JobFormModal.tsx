@@ -15,7 +15,8 @@ const empty: JobRequest = {
   name: '', connection_id: '', remote_path: '/', local_dest: '',
   interval_value: 60, interval_unit: 'minutes', concurrency: 1,
   retry_attempts: 3, retry_delay_seconds: 2, enabled: true,
-  include_filters: [], exclude_filters: [],
+  include_path_filters: [], include_name_filters: [],
+  exclude_path_filters: [], exclude_name_filters: [],
 }
 
 function jobToForm(j: SyncJob): JobRequest {
@@ -24,8 +25,10 @@ function jobToForm(j: SyncJob): JobRequest {
     local_dest: j.local_dest, interval_value: j.interval_value, interval_unit: j.interval_unit,
     concurrency: j.concurrency, retry_attempts: j.retry_attempts, retry_delay_seconds: j.retry_delay_seconds,
     enabled: j.enabled,
-    include_filters: j.include_filters ?? [],
-    exclude_filters: j.exclude_filters ?? [],
+    include_path_filters: j.include_path_filters ?? [],
+    include_name_filters: j.include_name_filters ?? [],
+    exclude_path_filters: j.exclude_path_filters ?? [],
+    exclude_name_filters: j.exclude_name_filters ?? [],
   }
 }
 
@@ -151,22 +154,38 @@ export function JobFormModal({ editing, onClose }: Props) {
                 {activeTab === 'filters' && (
                   <>
                     <p className="text-xs text-gray-400 dark:text-gray-500">
-                      Supports <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">path: alpha</code> (subdirectory) and <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">name: *.dat</code> (basename glob).
+                      Path filters scope which directories are searched. Name filters scope which files within those directories are included. Both groups must match (AND logic).
                     </p>
-                    <Field label="Include Filters">
-                      <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Only sync files matching at least one entry. Empty = include all.</p>
+                    <Field label="Include Path Filters">
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Only descend into these subdirectories. Empty = search all directories.</p>
                       <FilterList
-                        values={form.include_filters}
-                        onChange={(v) => setForm({ ...form, include_filters: v })}
-                        placeholder="e.g. path: alpha  or  name: *.dat"
+                        values={form.include_path_filters}
+                        onChange={(v) => setForm({ ...form, include_path_filters: v })}
+                        placeholder="e.g. alpha  or  projects/work"
                       />
                     </Field>
-                    <Field label="Exclude Filters">
-                      <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Skip files matching any entry. Applied after include filters.</p>
+                    <Field label="Include Name Filters">
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Only include files whose basename matches. Empty = include all filenames.</p>
                       <FilterList
-                        values={form.exclude_filters}
-                        onChange={(v) => setForm({ ...form, exclude_filters: v })}
-                        placeholder="e.g. path: tmp  or  name: *.tmp"
+                        values={form.include_name_filters}
+                        onChange={(v) => setForm({ ...form, include_name_filters: v })}
+                        placeholder="e.g. *.dat  or  *.bin"
+                      />
+                    </Field>
+                    <Field label="Exclude Path Filters">
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Skip files under these subdirectories.</p>
+                      <FilterList
+                        values={form.exclude_path_filters}
+                        onChange={(v) => setForm({ ...form, exclude_path_filters: v })}
+                        placeholder="e.g. tmp  or  misc"
+                      />
+                    </Field>
+                    <Field label="Exclude Name Filters">
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Skip files whose basename matches any of these patterns.</p>
+                      <FilterList
+                        values={form.exclude_name_filters}
+                        onChange={(v) => setForm({ ...form, exclude_name_filters: v })}
+                        placeholder="e.g. *.tmp  or  *.cfg"
                       />
                     </Field>
                   </>

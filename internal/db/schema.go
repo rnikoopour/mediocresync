@@ -8,6 +8,10 @@ var alterations = []string{
 	`ALTER TABLE runs ADD COLUMN total_size_bytes INTEGER NOT NULL DEFAULT 0`,
 	`ALTER TABLE sync_jobs ADD COLUMN retry_attempts INTEGER NOT NULL DEFAULT 3`,
 	`ALTER TABLE sync_jobs ADD COLUMN retry_delay_seconds INTEGER NOT NULL DEFAULT 2`,
+	`ALTER TABLE sync_jobs ADD COLUMN include_path_filters TEXT NOT NULL DEFAULT '[]'`,
+	`ALTER TABLE sync_jobs ADD COLUMN include_name_filters TEXT NOT NULL DEFAULT '[]'`,
+	`ALTER TABLE sync_jobs ADD COLUMN exclude_path_filters TEXT NOT NULL DEFAULT '[]'`,
+	`ALTER TABLE sync_jobs ADD COLUMN exclude_name_filters TEXT NOT NULL DEFAULT '[]'`,
 }
 
 var schema = []string{

@@ -13,55 +13,61 @@ import (
 )
 
 type jobRequest struct {
-	Name              string   `json:"name"`
-	ConnectionID      string   `json:"connection_id"`
-	RemotePath        string   `json:"remote_path"`
-	LocalDest         string   `json:"local_dest"`
-	IntervalValue     int      `json:"interval_value"`
-	IntervalUnit      string   `json:"interval_unit"`
-	Concurrency       int      `json:"concurrency"`
-	RetryAttempts     int      `json:"retry_attempts"`
-	RetryDelaySeconds int      `json:"retry_delay_seconds"`
-	Enabled           bool     `json:"enabled"`
-	IncludeFilters    []string `json:"include_filters"`
-	ExcludeFilters    []string `json:"exclude_filters"`
+	Name               string   `json:"name"`
+	ConnectionID       string   `json:"connection_id"`
+	RemotePath         string   `json:"remote_path"`
+	LocalDest          string   `json:"local_dest"`
+	IntervalValue      int      `json:"interval_value"`
+	IntervalUnit       string   `json:"interval_unit"`
+	Concurrency        int      `json:"concurrency"`
+	RetryAttempts      int      `json:"retry_attempts"`
+	RetryDelaySeconds  int      `json:"retry_delay_seconds"`
+	Enabled            bool     `json:"enabled"`
+	IncludePathFilters []string `json:"include_path_filters"`
+	IncludeNameFilters []string `json:"include_name_filters"`
+	ExcludePathFilters []string `json:"exclude_path_filters"`
+	ExcludeNameFilters []string `json:"exclude_name_filters"`
 }
 
 type jobResponse struct {
-	ID                string   `json:"id"`
-	Name              string   `json:"name"`
-	ConnectionID      string   `json:"connection_id"`
-	RemotePath        string   `json:"remote_path"`
-	LocalDest         string   `json:"local_dest"`
-	IntervalValue     int      `json:"interval_value"`
-	IntervalUnit      string   `json:"interval_unit"`
-	Concurrency       int      `json:"concurrency"`
-	RetryAttempts     int      `json:"retry_attempts"`
-	RetryDelaySeconds int      `json:"retry_delay_seconds"`
-	Enabled           bool     `json:"enabled"`
-	IncludeFilters    []string `json:"include_filters"`
-	ExcludeFilters    []string `json:"exclude_filters"`
-	CreatedAt         string   `json:"created_at"`
-	UpdatedAt         string   `json:"updated_at"`
+	ID                 string   `json:"id"`
+	Name               string   `json:"name"`
+	ConnectionID       string   `json:"connection_id"`
+	RemotePath         string   `json:"remote_path"`
+	LocalDest          string   `json:"local_dest"`
+	IntervalValue      int      `json:"interval_value"`
+	IntervalUnit       string   `json:"interval_unit"`
+	Concurrency        int      `json:"concurrency"`
+	RetryAttempts      int      `json:"retry_attempts"`
+	RetryDelaySeconds  int      `json:"retry_delay_seconds"`
+	Enabled            bool     `json:"enabled"`
+	IncludePathFilters []string `json:"include_path_filters"`
+	IncludeNameFilters []string `json:"include_name_filters"`
+	ExcludePathFilters []string `json:"exclude_path_filters"`
+	ExcludeNameFilters []string `json:"exclude_name_filters"`
+	CreatedAt          string   `json:"created_at"`
+	UpdatedAt          string   `json:"updated_at"`
 }
 
 func toJobResponse(j *db.SyncJob) jobResponse {
 	return jobResponse{
-		ID:                j.ID,
-		Name:              j.Name,
-		ConnectionID:      j.ConnectionID,
-		RemotePath:        j.RemotePath,
-		LocalDest:         j.LocalDest,
-		IntervalValue:     j.IntervalValue,
-		IntervalUnit:      j.IntervalUnit,
-		Concurrency:       j.Concurrency,
-		RetryAttempts:     j.RetryAttempts,
-		RetryDelaySeconds: j.RetryDelaySeconds,
-		Enabled:           j.Enabled,
-		IncludeFilters:    j.IncludeFilters,
-		ExcludeFilters:    j.ExcludeFilters,
-		CreatedAt:         j.CreatedAt.Format("2006-01-02T15:04:05Z"),
-		UpdatedAt:         j.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+		ID:                 j.ID,
+		Name:               j.Name,
+		ConnectionID:       j.ConnectionID,
+		RemotePath:         j.RemotePath,
+		LocalDest:          j.LocalDest,
+		IntervalValue:      j.IntervalValue,
+		IntervalUnit:       j.IntervalUnit,
+		Concurrency:        j.Concurrency,
+		RetryAttempts:      j.RetryAttempts,
+		RetryDelaySeconds:  j.RetryDelaySeconds,
+		Enabled:            j.Enabled,
+		IncludePathFilters: j.IncludePathFilters,
+		IncludeNameFilters: j.IncludeNameFilters,
+		ExcludePathFilters: j.ExcludePathFilters,
+		ExcludeNameFilters: j.ExcludeNameFilters,
+		CreatedAt:          j.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		UpdatedAt:          j.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 	}
 }
 
@@ -110,18 +116,20 @@ func (h *jobsHandler) create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	job := &db.SyncJob{
-		Name:              req.Name,
-		ConnectionID:      req.ConnectionID,
-		RemotePath:        req.RemotePath,
-		LocalDest:         req.LocalDest,
-		IntervalValue:     req.IntervalValue,
-		IntervalUnit:      req.IntervalUnit,
-		Concurrency:       req.Concurrency,
-		RetryAttempts:     req.RetryAttempts,
-		RetryDelaySeconds: req.RetryDelaySeconds,
-		Enabled:           req.Enabled,
-		IncludeFilters:    req.IncludeFilters,
-		ExcludeFilters:    req.ExcludeFilters,
+		Name:               req.Name,
+		ConnectionID:       req.ConnectionID,
+		RemotePath:         req.RemotePath,
+		LocalDest:          req.LocalDest,
+		IntervalValue:      req.IntervalValue,
+		IntervalUnit:       req.IntervalUnit,
+		Concurrency:        req.Concurrency,
+		RetryAttempts:      req.RetryAttempts,
+		RetryDelaySeconds:  req.RetryDelaySeconds,
+		Enabled:            req.Enabled,
+		IncludePathFilters: req.IncludePathFilters,
+		IncludeNameFilters: req.IncludeNameFilters,
+		ExcludePathFilters: req.ExcludePathFilters,
+		ExcludeNameFilters: req.ExcludeNameFilters,
 	}
 	if err := h.repo.Create(job); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to create job")
@@ -166,8 +174,10 @@ func (h *jobsHandler) update(w http.ResponseWriter, r *http.Request) {
 	job.RetryAttempts = max(req.RetryAttempts, 1)
 	job.RetryDelaySeconds = max(req.RetryDelaySeconds, 0)
 	job.Enabled = req.Enabled
-	job.IncludeFilters = req.IncludeFilters
-	job.ExcludeFilters = req.ExcludeFilters
+	job.IncludePathFilters = req.IncludePathFilters
+	job.IncludeNameFilters = req.IncludeNameFilters
+	job.ExcludePathFilters = req.ExcludePathFilters
+	job.ExcludeNameFilters = req.ExcludeNameFilters
 
 	if err := h.repo.Update(job); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to update job")

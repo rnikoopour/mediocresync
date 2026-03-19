@@ -32,8 +32,10 @@ export interface SyncJob {
   retry_attempts: number
   retry_delay_seconds: number
   enabled: boolean
-  include_filters: string[]
-  exclude_filters: string[]
+  include_path_filters: string[]
+  include_name_filters: string[]
+  exclude_path_filters: string[]
+  exclude_name_filters: string[]
   created_at: string
   updated_at: string
 }
@@ -49,8 +51,10 @@ export interface JobRequest {
   retry_attempts: number
   retry_delay_seconds: number
   enabled: boolean
-  include_filters: string[]
-  exclude_filters: string[]
+  include_path_filters: string[]
+  include_name_filters: string[]
+  exclude_path_filters: string[]
+  exclude_name_filters: string[]
 }
 
 export interface Run {

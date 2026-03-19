@@ -5,69 +5,52 @@ import (
 	"strings"
 )
 
-// applyFilters reports whether a remote file should be included in a sync run.
+// applyFilters reports whether a remote file at filePath should be included.
 //
-// Supported keywords (same syntax for both include and exclude lists):
+// Include groups are ANDed: a non-empty includePathFilters requires the file
+// to be under at least one listed subdirectory; a non-empty includeNameFilters
+// requires the basename to match at least one glob pattern.
 //
-//	path: <subdir>   Match files under <jobRemotePath>/<subdir>/ at any depth.
-//	name: <pattern>  Match files whose base name matches the glob pattern.
-//	                 Uses standard single-segment globbing: * matches any
-//	                 sequence of non-/ characters, ? matches one non-/ character.
-//
-// Rules:
-//   - If includeFilters is non-empty, the file must match at least one entry.
-//   - If excludeFilters is non-empty, the file must not match any entry.
-//   - Both conditions must be satisfied for the file to be included.
-//   - Unrecognised keywords are silently ignored.
-func applyFilters(filePath, jobRemotePath string, includeFilters, excludeFilters []string) bool {
+// Exclude groups are ORed: the file is excluded if it is under any
+// excludePathFilter subdirectory OR if its basename matches any excludeNameFilter.
+func applyFilters(
+	filePath, jobRemotePath string,
+	includePathFilters, includeNameFilters,
+	excludePathFilters, excludeNameFilters []string,
+) bool {
 	base := strings.TrimSuffix(jobRemotePath, "/")
 
-	if len(includeFilters) > 0 && !matchesAny(filePath, base, includeFilters) {
+	if len(includePathFilters) > 0 && !matchesAnyPath(filePath, base, includePathFilters) {
 		return false
 	}
-	if len(excludeFilters) > 0 && matchesAny(filePath, base, excludeFilters) {
+	if len(includeNameFilters) > 0 && !matchesAnyName(filePath, includeNameFilters) {
+		return false
+	}
+	if matchesAnyPath(filePath, base, excludePathFilters) {
+		return false
+	}
+	if matchesAnyName(filePath, excludeNameFilters) {
 		return false
 	}
 	return true
 }
 
-// matchesAny reports whether filePath matches at least one filter in the list.
-func matchesAny(filePath, base string, filters []string) bool {
-	for _, f := range filters {
-		f = strings.TrimSpace(f)
-
-		if subdir, ok := parsePathFilter(f); ok {
-			prefix := base + "/" + strings.Trim(subdir, "/")
-			if strings.HasPrefix(filePath, prefix+"/") || filePath == prefix {
-				return true
-			}
-			continue
-		}
-
-		if pattern, ok := parseNameFilter(f); ok {
-			if matched, _ := path.Match(pattern, path.Base(filePath)); matched {
-				return true
-			}
-			continue
+func matchesAnyPath(filePath, base string, subdirs []string) bool {
+	for _, subdir := range subdirs {
+		prefix := base + "/" + strings.Trim(subdir, "/")
+		if strings.HasPrefix(filePath, prefix+"/") || filePath == prefix {
+			return true
 		}
 	}
 	return false
 }
 
-// parsePathFilter extracts the subdir from a "path: <subdir>" filter.
-func parsePathFilter(filter string) (subdir string, ok bool) {
-	rest, found := strings.CutPrefix(filter, "path:")
-	if !found {
-		return "", false
+func matchesAnyName(filePath string, patterns []string) bool {
+	name := path.Base(filePath)
+	for _, pattern := range patterns {
+		if matched, _ := path.Match(pattern, name); matched {
+			return true
+		}
 	}
-	return strings.TrimSpace(rest), true
-}
-
-// parseNameFilter extracts the glob pattern from a "name: <pattern>" filter.
-func parseNameFilter(filter string) (pattern string, ok bool) {
-	rest, found := strings.CutPrefix(filter, "name:")
-	if !found {
-		return "", false
-	}
-	return strings.TrimSpace(rest), true
+	return false
 }

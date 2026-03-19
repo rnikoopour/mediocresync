@@ -27,7 +27,9 @@ type Client interface {
 	Login(user, pass string) error
 	List(remotePath string) ([]DirEntry, error)
 	Walk(remotePath string) ([]RemoteFile, error)
-	WalkWithProgress(remotePath string, progress func(files, dirs int)) ([]RemoteFile, error)
+	// WalkWithProgress walks remotePath recursively. shouldDescend, if non-nil,
+	// is called before descending into each subdirectory; returning false skips it.
+	WalkWithProgress(remotePath string, shouldDescend func(dir string) bool, progress func(files, dirs int)) ([]RemoteFile, error)
 	Download(ctx context.Context, remotePath string, dst io.Writer, offset int64) error
 	Close() error
 }

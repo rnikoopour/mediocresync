@@ -141,7 +141,9 @@ func (e *Engine) PlanJobStream(ctx context.Context, jobID string, progress func(
 	if cb == nil {
 		cb = func(_, _ int) {}
 	}
-	remoteFiles, err := client.WalkWithProgress(job.RemotePath, cb)
+	base := strings.TrimSuffix(job.RemotePath, "/")
+	pruner := makePruner(base, job.IncludePathFilters)
+	remoteFiles, err := client.WalkWithProgress(job.RemotePath, pruner, cb)
 	if err != nil {
 		return nil, fmt.Errorf("walk %s: %w", job.RemotePath, err)
 	}
@@ -151,7 +153,7 @@ func (e *Engine) PlanJobStream(ctx context.Context, jobID string, progress func(
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
-		if !applyFilters(f.Path, job.RemotePath, job.IncludeFilters, job.ExcludeFilters) {
+		if !applyFilters(f.Path, job.RemotePath, job.IncludePathFilters, job.IncludeNameFilters, job.ExcludePathFilters, job.ExcludeNameFilters) {
 			continue
 		}
 		state, _ := e.fileState.Get(jobID, f.Path)
@@ -432,6 +434,32 @@ func sortPlanFiles(files []PlanFile, remotePath string) []PlanFile {
 		return len(segsI) < len(segsJ)
 	})
 	return out
+}
+
+// makePruner returns a shouldDescend callback for WalkWithProgress that skips
+// directories that cannot contain files matching any include path filter.
+// Returns nil (visit everything) when includePathFilters is empty.
+func makePruner(base string, includePathFilters []string) func(string) bool {
+	if len(includePathFilters) == 0 {
+		return nil
+	}
+	prefixes := make([]string, len(includePathFilters))
+	for i, subdir := range includePathFilters {
+		prefixes[i] = base + "/" + strings.Trim(subdir, "/")
+	}
+	return func(dir string) bool {
+		for _, prefix := range prefixes {
+			// dir is an ancestor: need to pass through to reach the target
+			if strings.HasPrefix(prefix, dir+"/") || prefix == dir {
+				return true
+			}
+			// dir is inside the target: all contents are relevant
+			if strings.HasPrefix(dir, prefix+"/") {
+				return true
+			}
+		}
+		return false
+	}
 }
 
 func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Connection, run *db.Run, plan *PlanResult) error {

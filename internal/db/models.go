@@ -27,8 +27,10 @@ type SyncJob struct {
 	RetryAttempts    int    // number of attempts per file (1 = no retry)
 	RetryDelaySeconds int   // seconds to wait between attempts
 	Enabled          bool
-	IncludeFilters   []string // "path: <subdir>" or "name: <glob>" entries; empty = include all
-	ExcludeFilters   []string // same syntax; file is excluded if it matches any entry
+	IncludePathFilters []string // subdirectory names; file must be under at least one (if non-empty)
+	IncludeNameFilters []string // basename glob patterns; file basename must match at least one (if non-empty)
+	ExcludePathFilters []string // file excluded if under any of these
+	ExcludeNameFilters []string // file excluded if basename matches any of these
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 }
