@@ -70,7 +70,7 @@ export function JobsPage() {
               </Link>
               <p className="text-xs text-gray-500">{j.remote_path} → {j.local_dest}</p>
               <p className="text-xs text-gray-400">
-                Every {j.interval_value} {j.interval_unit} · {j.concurrency} concurrent · {j.enabled ? 'enabled' : 'disabled'}
+                Every {j.interval_value} {j.interval_unit} · {j.concurrency} concurrent · autosync {j.enabled ? 'enabled' : 'disabled'}
               </p>
             </div>
             <StatusBadge status={j.enabled ? 'done' : 'skipped'} />
