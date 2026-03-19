@@ -94,20 +94,32 @@ function RunFileRow({ node, liveEvents }: { node: RunTreeFile; liveEvents: Map<s
   const percent = live?.percent ?? (t.status === 'done' ? 100 : 0)
   const speed = live?.speed_bps
 
+  const isFailed = status === 'failed'
+
   return (
-    <div className="flex items-center gap-4 py-1 hover:bg-gray-50 dark:hover:bg-gray-700/50"
+    <div className="py-1 hover:bg-gray-50 dark:hover:bg-gray-700/50"
       style={{ paddingLeft: '12px', paddingRight: '16px' }}>
-      <span className="text-gray-400 dark:text-gray-500 shrink-0">📄</span>
-      <span className="font-mono text-xs text-gray-600 dark:text-gray-300 flex-1 truncate">{node.name}</span>
-      <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{formatBytes(t.size_bytes)}</span>
-      {(status === 'in_progress' || status === 'done') ? (
-        <div className="w-32 shrink-0">
-          <ProgressBar percent={percent} speedBps={status === 'in_progress' ? speed : undefined} />
-        </div>
-      ) : (
-        <span className="shrink-0"><StatusBadge status={status} /></span>
+      <div className="flex items-center gap-4">
+        <span className="text-gray-400 dark:text-gray-500 shrink-0">📄</span>
+        {(isFailed || status === 'done') && <span className="shrink-0"><StatusBadge status={status} /></span>}
+        <span className={`font-mono text-xs flex-1 truncate ${isFailed ? 'text-red-500 dark:text-red-400' : 'text-gray-600 dark:text-gray-300'}`}>{node.name}</span>
+        <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{formatBytes(t.size_bytes)}</span>
+        {status === 'in_progress' && speed !== undefined && speed > 0 && (
+          <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 w-16 text-right">{formatSpeed(speed)}</span>
+        )}
+        {(status === 'in_progress' || status === 'done' || isFailed) ? (
+          <div className="w-48 shrink-0">
+            <ProgressBar percent={isFailed ? 0 : percent} label={isFailed ? 'Failed' : undefined} variant={isFailed ? 'failed' : 'default'} />
+          </div>
+        ) : (
+          <span className="shrink-0"><StatusBadge status={status} /></span>
+        )}
+      </div>
+      {isFailed && t.error_msg && (
+        <p className="font-mono text-xs text-red-400 dark:text-red-500 break-all mt-0.5" style={{ paddingLeft: '28px' }}>
+          {t.error_msg}
+        </p>
       )}
-      {t.error_msg && <span className="text-xs text-red-500 truncate shrink-0" title={t.error_msg}>{t.error_msg}</span>}
     </div>
   )
 }

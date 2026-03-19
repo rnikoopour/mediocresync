@@ -1,28 +1,21 @@
 interface Props {
   percent: number   // 0–100
-  speedBps?: number
+  label?: string    // overrides the percentage text
+  variant?: 'default' | 'failed'
 }
 
-function formatSpeed(bps: number): string {
-  if (bps >= 1_000_000) return `${(bps / 1_000_000).toFixed(1)} MB/s`
-  if (bps >= 1_000)     return `${(bps / 1_000).toFixed(1)} KB/s`
-  return `${Math.round(bps)} B/s`
-}
-
-export function ProgressBar({ percent, speedBps }: Props) {
+export function ProgressBar({ percent, label, variant = 'default' }: Props) {
   const pct = Math.min(100, Math.max(0, percent))
+  const fillColor = variant === 'failed' ? 'bg-red-500' : 'bg-blue-500'
   return (
-    <div className="flex items-center gap-2">
-      <div className="flex-1 bg-gray-200 dark:bg-gray-600 rounded-full h-2 overflow-hidden">
-        <div
-          className="bg-blue-500 h-2 rounded-full transition-all duration-200"
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <span className="text-xs text-gray-500 dark:text-gray-400 w-10 text-right">{Math.round(pct)}%</span>
-      {speedBps !== undefined && speedBps > 0 && (
-        <span className="text-xs text-gray-400 dark:text-gray-500 w-20 text-right">{formatSpeed(speedBps)}</span>
-      )}
+    <div className="relative bg-gray-200 dark:bg-gray-600 rounded h-5 overflow-hidden">
+      <div
+        className={`absolute inset-y-0 left-0 ${fillColor} transition-all duration-200`}
+        style={{ width: `${pct}%` }}
+      />
+      <span className="absolute inset-0 flex items-center justify-center text-xs font-medium text-white">
+        {label ?? `${Math.round(pct)}%`}
+      </span>
     </div>
   )
 }

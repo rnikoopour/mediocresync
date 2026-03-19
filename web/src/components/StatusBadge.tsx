@@ -16,7 +16,7 @@ const labels: Record<Status, string> = {
   running:        'Running',
   in_progress:    'In Progress',
   completed:      'Completed',
-  done:           'Done',
+  done:           'Copied',
   failed:         'Failed',
   canceled:       'Canceled',
   server_stopped: 'Server Stopped',

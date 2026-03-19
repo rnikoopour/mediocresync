@@ -14,6 +14,12 @@ function formatBytes(b: number): string {
   return `${b} B`
 }
 
+function formatSpeed(bps: number): string {
+  if (bps >= 1_000_000) return `${(bps / 1_000_000).toFixed(1)} MB/s`
+  if (bps >= 1_000)     return `${(bps / 1_000).toFixed(1)} KB/s`
+  return `${Math.round(bps)} B/s`
+}
+
 function TransferRow({ transfer, liveEvent }: {
   transfer: Transfer
   liveEvent?: { percent: number; speed_bps: number; bytes_xferred: number; status: string }
@@ -28,9 +34,12 @@ function TransferRow({ transfer, liveEvent }: {
         {transfer.remote_path}
       </td>
       <td className="px-4 py-1.5 text-xs text-gray-500 dark:text-gray-400 w-24">{formatBytes(transfer.size_bytes)}</td>
+      <td className="px-4 py-1.5 text-xs text-gray-400 dark:text-gray-500 text-right w-16">
+        {status === 'in_progress' && speed !== undefined && speed > 0 ? formatSpeed(speed) : null}
+      </td>
       <td className="px-4 py-1.5 w-48">
         {(status === 'in_progress' || status === 'done') ? (
-          <ProgressBar percent={percent} speedBps={status === 'in_progress' ? speed : undefined} />
+          <ProgressBar percent={percent} />
         ) : (
           <span className="text-xs text-gray-400 dark:text-gray-500">—</span>
         )}
