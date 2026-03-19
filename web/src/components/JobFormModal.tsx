@@ -181,6 +181,7 @@ export function JobFormModal({ editing, onClose }: Props) {
       {browserOpen && form.connection_id && (
         <RemoteBrowser
           connectionId={form.connection_id}
+          initialPath={form.remote_path || '/'}
           onSelect={(path) => setForm({ ...form, remote_path: path })}
           onClose={() => setBrowserOpen(false)}
         />
@@ -188,6 +189,7 @@ export function JobFormModal({ editing, onClose }: Props) {
 
       {localBrowserOpen && (
         <LocalBrowser
+          initialPath={form.local_dest || '/'}
           onSelect={(path) => setForm({ ...form, local_dest: path })}
           onClose={() => setLocalBrowserOpen(false)}
         />

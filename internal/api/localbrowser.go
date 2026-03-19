@@ -36,7 +36,8 @@ func localBrowse(w http.ResponseWriter, r *http.Request) {
 		IsDir bool   `json:"is_dir"`
 	}
 
-	var dirs, files []entry
+	dirs := make([]entry, 0)
+	var files []entry
 	for _, e := range entries {
 		// Skip hidden entries.
 		if len(e.Name()) > 0 && e.Name()[0] == '.' {

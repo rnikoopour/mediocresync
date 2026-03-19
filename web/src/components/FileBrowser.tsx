@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import type { BrowseEntry } from '../api/types'
 
@@ -18,6 +18,15 @@ export function FileBrowser({ title, initialPath, queryKey, fetcher, onSelect, o
     queryKey: [...queryKey, currentPath],
     queryFn: () => fetcher(currentPath),
   })
+
+  // If the configured path doesn't exist, walk up to the nearest valid parent.
+  // Guard on !isLoading so we don't cascade while the parent query is still in-flight.
+  useEffect(() => {
+    if (!isError || isLoading || currentPath === '/') return
+    const parts = currentPath.replace(/\\/g, '/').split('/').filter(Boolean)
+    const parent = '/' + parts.slice(0, -1).join('/')
+    setCurrentPath(parent || '/')
+  }, [isError, isLoading, currentPath])
 
   const segments = currentPath.replace(/\\/g, '/').split('/').filter(Boolean)
 
@@ -40,12 +49,12 @@ export function FileBrowser({ title, initialPath, queryKey, fetcher, onSelect, o
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
           <h2 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">{title}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">&times;</button>
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">&times;</button>
         </div>
 
         {/* Breadcrumb */}
         <div className="flex items-center gap-1 px-4 py-2 border-b border-gray-100 dark:border-gray-700 text-xs overflow-x-auto whitespace-nowrap">
-          <button onClick={() => navigate('/')} className="text-blue-600 dark:text-gray-300 hover:underline font-medium">/</button>
+          <button type="button" onClick={() => navigate('/')} className="text-blue-600 dark:text-gray-300 hover:underline font-medium">/</button>
           {segments.map((seg, i) => {
             const path = '/' + segments.slice(0, i + 1).join('/')
             const isLast = i === segments.length - 1
@@ -55,7 +64,7 @@ export function FileBrowser({ title, initialPath, queryKey, fetcher, onSelect, o
                 {isLast ? (
                   <span className="text-gray-700 dark:text-gray-200 font-medium">{seg}</span>
                 ) : (
-                  <button onClick={() => navigate(path)} className="text-blue-600 dark:text-gray-300 hover:underline">{seg}</button>
+                  <button type="button" onClick={() => navigate(path)} className="text-blue-600 dark:text-gray-300 hover:underline">{seg}</button>
                 )}
               </span>
             )
@@ -71,6 +80,7 @@ export function FileBrowser({ title, initialPath, queryKey, fetcher, onSelect, o
               {segments.length > 0 && (
                 <li>
                   <button
+                    type="button"
                     onClick={navigateUp}
                     className="w-full flex items-center gap-2 px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 text-sm text-gray-500 dark:text-gray-400"
                   >
@@ -82,6 +92,7 @@ export function FileBrowser({ title, initialPath, queryKey, fetcher, onSelect, o
               {dirs.map((e) => (
                 <li key={e.path}>
                   <button
+                    type="button"
                     onClick={() => navigate(e.path)}
                     className="w-full flex items-center gap-2 px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 text-sm text-gray-700 dark:text-gray-200 text-left"
                   >
