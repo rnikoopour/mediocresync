@@ -557,6 +557,9 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Conne
 			}
 
 			if lastErr != nil {
+				// All retries exhausted (or job cancelled) — remove the staging
+				// file that was preserved across retries for resume.
+				os.Remove(stagingPath(job.LocalDest, ent.remote.Path))
 				slog.Error("transfer failed", "path", ent.remote.Path, "err", lastErr)
 				errMsg := lastErr.Error()
 				if errors.Is(lastErr, errTransferStalled) {
@@ -606,20 +609,47 @@ func (e *Engine) downloadFile(
 ) error {
 	stage := stagingPath(job.LocalDest, remote.Path)
 
-	f, err := os.Create(stage)
+	// Check for a partial staging file from a previous stalled attempt and
+	// resume from where it left off. The offset is only trusted when:
+	//   (a) the file exists and closes cleanly (os.Stat after f.Close guarantees
+	//       the OS has flushed all buffers), and
+	//   (b) the offset is strictly less than the remote size — if it equals or
+	//       exceeds the remote size the staging file is stale or from a
+	//       different file with the same basename, so we discard it.
+	var resumeOffset int64
+	if fi, err := os.Stat(stage); err == nil && fi.Size() > 0 && fi.Size() < remote.Size {
+		resumeOffset = fi.Size()
+	}
+
+	var f *os.File
+	var err error
+	if resumeOffset > 0 {
+		f, err = os.OpenFile(stage, os.O_WRONLY|os.O_APPEND, 0o644)
+		if err != nil {
+			resumeOffset = 0 // fall back to fresh download if we can't open
+		} else {
+			slog.Info("resuming partial download", "path", remote.Path, "offset", resumeOffset, "size", remote.Size)
+		}
+	}
+	if f == nil {
+		f, err = os.Create(stage)
+	}
 	if err != nil {
-		return fmt.Errorf("create staging file: %w", err)
+		return fmt.Errorf("open staging file: %w", err)
 	}
 
 	start := time.Now()
 
 	pr2, pw := newPipe()
 	pr := newProgressReader(pr2, remote.Size, func(bytesRead int64) {
-		_ = e.transfers.UpdateProgress(t.ID, bytesRead)
+		// bytesRead counts bytes read in this attempt only; add resumeOffset
+		// to report total bytes transferred across all attempts.
+		total := resumeOffset + bytesRead
+		_ = e.transfers.UpdateProgress(t.ID, total)
 
 		var pct float64
 		if remote.Size > 0 {
-			pct = float64(bytesRead) / float64(remote.Size) * 100
+			pct = float64(total) / float64(remote.Size) * 100
 		}
 		elapsed := time.Since(start).Seconds()
 		var speed float64
@@ -630,7 +660,7 @@ func (e *Engine) downloadFile(
 			RunID: runID, TransferID: t.ID,
 			RemotePath:   remote.Path,
 			SizeBytes:    remote.Size,
-			BytesXferred: bytesRead,
+			BytesXferred: total,
 			Percent:      pct,
 			SpeedBPS:     speed,
 			Status:       "in_progress",
@@ -666,7 +696,8 @@ func (e *Engine) downloadFile(
 	go func() {
 		// stallCtx is passed so Download closes the FTP response when stall
 		// (or cancellation) is detected, unblocking the internal r.Read().
-		dlDone <- client.Download(stallCtx, remote.Path, pw)
+		// resumeOffset tells Download to seek the server to that position via REST.
+		dlDone <- client.Download(stallCtx, remote.Path, pw, resumeOffset)
 		pw.Close()
 	}()
 
@@ -693,7 +724,9 @@ func (e *Engine) downloadFile(
 	}
 
 	if downloadErr != nil {
-		os.Remove(stage)
+		// Do NOT remove the staging file here — a stall-caused retry will
+		// pick it up and resume. executeRun cleans it up after all retries
+		// are exhausted or the job is cancelled.
 		return downloadErr
 	}
 

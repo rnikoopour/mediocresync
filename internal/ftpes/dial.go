@@ -40,8 +40,14 @@ func (c *client) Login(user, pass string) error {
 	return c.conn.Login(user, pass)
 }
 
-func (c *client) Download(ctx context.Context, remotePath string, dst io.Writer) error {
-	r, err := c.conn.Retr(remotePath)
+func (c *client) Download(ctx context.Context, remotePath string, dst io.Writer, offset int64) error {
+	var r *ftp.Response
+	var err error
+	if offset > 0 {
+		r, err = c.conn.RetrFrom(remotePath, uint64(offset))
+	} else {
+		r, err = c.conn.Retr(remotePath)
+	}
 	if err != nil {
 		return fmt.Errorf("RETR %s: %w", remotePath, err)
 	}
