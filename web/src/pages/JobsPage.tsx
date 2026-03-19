@@ -3,7 +3,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import type { SyncJob } from '../api/types'
-import { StatusBadge } from '../components/StatusBadge'
 import { JobFormModal } from '../components/JobFormModal'
 
 export function JobsPage() {
@@ -51,7 +50,6 @@ export function JobsPage() {
                 Every {j.interval_value} {j.interval_unit} · {j.concurrency} concurrent · autosync {j.enabled ? 'enabled' : 'disabled'}
               </p>
             </div>
-            <StatusBadge status={j.enabled ? 'done' : 'skipped'} />
             <button onClick={() => openEdit(j)} className="btn-secondary text-xs">Edit</button>
             <button
               onClick={() => trigger.mutate(j.id)}
