@@ -163,15 +163,20 @@ function RunTreeView({ transfers, remotePath, liveEvents, runEnded }: {
   liveEvents: Map<string, { percent: number; speed_bps: number; status: string }>
   runEnded: boolean
 }) {
-  const [tab, setTab] = useState<TreeTab>('copy')
+  const [tab, setTab] = useState<RunTab>('all')
   const filtered = tab === 'all' ? transfers : transfers.filter((t) => {
-    const status = liveEvents.get(t.id)?.status ?? t.status
-    return tab === 'skip' ? status === 'skipped' : status !== 'skipped'
+    const raw = liveEvents.get(t.id)?.status ?? t.status
+    const status = runEnded && raw === 'pending' ? 'not_copied' : raw
+    if (tab === 'in_progress') return status === 'in_progress'
+    if (tab === 'copied')      return status === 'done'
+    if (tab === 'not_copied')  return status === 'not_copied' || status === 'pending'
+    if (tab === 'failed')      return status === 'failed'
+    return true
   })
   const nodes = buildRunTree(filtered, remotePath)
   return (
     <div className="border-t border-gray-100 dark:border-gray-700">
-      <TreeTabBar tab={tab} onTab={setTab} />
+      <RunTabBar tab={tab} onTab={setTab} />
       <div className="py-1 max-h-64 overflow-y-auto">
         {nodes.map((n, i) =>
           n.type === 'folder'
@@ -395,13 +400,14 @@ function FileRow({ node, onUnskip }: { node: TreeFile; depth: number; onUnskip?:
 }
 
 type TreeTab = 'all' | 'copy' | 'skip'
+type RunTab = 'all' | 'in_progress' | 'copied' | 'not_copied' | 'failed'
 
-function TreeTabBar({ tab, onTab }: { tab: TreeTab; onTab: (t: TreeTab) => void }) {
-  const btn = (t: TreeTab, label: string) => (
+function TabBtn<T extends string>({ value, current, label, onTab }: { value: T; current: T; label: string; onTab: (t: T) => void }) {
+  return (
     <button
-      onClick={() => onTab(t)}
+      onClick={() => onTab(value)}
       className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-        tab === t
+        current === value
           ? 'bg-gray-200 dark:bg-gray-600 text-gray-900 dark:text-gray-100'
           : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
       }`}
@@ -409,11 +415,26 @@ function TreeTabBar({ tab, onTab }: { tab: TreeTab; onTab: (t: TreeTab) => void 
       {label}
     </button>
   )
+}
+
+function TreeTabBar({ tab, onTab }: { tab: TreeTab; onTab: (t: TreeTab) => void }) {
   return (
     <div className="flex items-center gap-1 px-3 py-2 border-b border-gray-100 dark:border-gray-700">
-      {btn('copy', 'To Copy')}
-      {btn('skip', 'Skipped')}
-      {btn('all', 'All')}
+      <TabBtn value="copy" current={tab} label="To Copy" onTab={onTab} />
+      <TabBtn value="skip" current={tab} label="Skipped" onTab={onTab} />
+      <TabBtn value="all"  current={tab} label="All"     onTab={onTab} />
+    </div>
+  )
+}
+
+function RunTabBar({ tab, onTab }: { tab: RunTab; onTab: (t: RunTab) => void }) {
+  return (
+    <div className="flex flex-wrap items-center gap-1 px-3 py-2 border-b border-gray-100 dark:border-gray-700">
+      <TabBtn value="all"         current={tab} label="All"         onTab={onTab} />
+      <TabBtn value="in_progress" current={tab} label="In Progress" onTab={onTab} />
+      <TabBtn value="copied"      current={tab} label="Copied"      onTab={onTab} />
+      <TabBtn value="not_copied"  current={tab} label="Not Copied"  onTab={onTab} />
+      <TabBtn value="failed"      current={tab} label="Failed"      onTab={onTab} />
     </div>
   )
 }
