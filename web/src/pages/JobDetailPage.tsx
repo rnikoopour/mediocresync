@@ -1,20 +1,32 @@
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../api/client'
+import type { PlanResult } from '../api/types'
 import { StatusBadge } from '../components/StatusBadge'
+
+function formatBytes(b: number): string {
+  if (b >= 1_000_000) return `${(b / 1_000_000).toFixed(1)} MB`
+  if (b >= 1_000)     return `${(b / 1_000).toFixed(1)} KB`
+  return `${b} B`
+}
 
 export function JobDetailPage() {
   const { id } = useParams<{ id: string }>()
   const qc = useQueryClient()
+  const [plan, setPlan] = useState<PlanResult | null>(null)
 
   const { data: job } = useQuery({ queryKey: ['jobs', id], queryFn: () => api.jobs.get(id!) })
   const { data: runs = [], isLoading } = useQuery({ queryKey: ['runs', id], queryFn: () => api.jobs.listRuns(id!) })
 
   const trigger = useMutation({
     mutationFn: () => api.jobs.trigger(id!),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['runs', id] })
-    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['runs', id] }),
+  })
+
+  const planMutation = useMutation({
+    mutationFn: () => api.jobs.plan(id!),
+    onSuccess: (result) => setPlan(result),
   })
 
   return (
@@ -34,17 +46,69 @@ export function JobDetailPage() {
             </p>
           )}
         </div>
-        <button
-          onClick={() => trigger.mutate()}
-          disabled={trigger.isPending}
-          className="btn-primary"
-        >
-          {trigger.isPending ? 'Starting…' : 'Run Now'}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => { setPlan(null); planMutation.mutate() }}
+            disabled={planMutation.isPending}
+            className="btn-secondary"
+          >
+            {planMutation.isPending ? 'Planning…' : 'Plan'}
+          </button>
+          <button
+            onClick={() => trigger.mutate()}
+            disabled={trigger.isPending}
+            className="btn-primary"
+          >
+            {trigger.isPending ? 'Starting…' : 'Run Now'}
+          </button>
+        </div>
       </div>
 
       {trigger.isError && (
         <p className="text-red-600 text-sm mb-4">{(trigger.error as Error).message}</p>
+      )}
+      {planMutation.isError && (
+        <p className="text-red-600 text-sm mb-4">{(planMutation.error as Error).message}</p>
+      )}
+
+      {plan && (
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-medium text-gray-700">
+              Plan Result
+              <span className="ml-2 font-normal text-gray-400">
+                {plan.to_copy} to copy · {plan.to_skip} to skip · {plan.files.length} total
+              </span>
+            </h2>
+            <button onClick={() => setPlan(null)} className="text-xs text-gray-400 hover:text-gray-600">
+              Dismiss
+            </button>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200 bg-gray-50">
+                  <th className="text-left px-4 py-2 font-medium text-gray-600 text-xs">File</th>
+                  <th className="text-left px-4 py-2 font-medium text-gray-600 text-xs w-28">Size</th>
+                  <th className="text-left px-4 py-2 font-medium text-gray-600 text-xs w-24">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {plan.files.map((f) => (
+                  <tr key={f.remote_path} className="hover:bg-gray-50">
+                    <td className="px-4 py-2 font-mono text-xs text-gray-700 truncate max-w-xs" title={f.remote_path}>
+                      {f.remote_path}
+                    </td>
+                    <td className="px-4 py-2 text-xs text-gray-500">{formatBytes(f.size_bytes)}</td>
+                    <td className="px-4 py-2">
+                      <StatusBadge status={f.action === 'copy' ? 'pending' : 'skipped'} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
 
       <h2 className="text-sm font-medium text-gray-700 mb-3">Run History</h2>

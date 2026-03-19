@@ -51,6 +51,79 @@ func NewEngine(
 	}
 }
 
+// PlanFile describes what would happen to a single remote file if the job ran.
+type PlanFile struct {
+	RemotePath string    `json:"remote_path"`
+	LocalPath  string    `json:"local_path"`
+	SizeBytes  int64     `json:"size_bytes"`
+	MTime      time.Time `json:"mtime"`
+	Action     string    `json:"action"` // "copy" | "skip"
+}
+
+// PlanResult is the full output of a dry-run plan.
+type PlanResult struct {
+	Files    []PlanFile `json:"files"`
+	ToCopy   int        `json:"to_copy"`
+	ToSkip   int        `json:"to_skip"`
+}
+
+// PlanJob connects to the FTPES server, walks the remote tree, and returns
+// which files would be copied or skipped — without downloading anything.
+func (e *Engine) PlanJob(ctx context.Context, jobID string) (*PlanResult, error) {
+	job, err := e.jobs.Get(jobID)
+	if err != nil || job == nil {
+		return nil, fmt.Errorf("load job %s: %w", jobID, err)
+	}
+
+	conn, err := e.connections.Get(job.ConnectionID)
+	if err != nil || conn == nil {
+		return nil, fmt.Errorf("load connection %s: %w", job.ConnectionID, err)
+	}
+
+	password, err := crypto.Decrypt(e.encKey, conn.Password)
+	if err != nil {
+		return nil, fmt.Errorf("decrypt password: %w", err)
+	}
+
+	client, err := ftpes.Dial(conn.Host, conn.Port, conn.SkipTLSVerify)
+	if err != nil {
+		return nil, fmt.Errorf("dial: %w", err)
+	}
+	defer client.Close()
+
+	if err := client.Login(conn.Username, password); err != nil {
+		return nil, fmt.Errorf("login: %w", err)
+	}
+
+	remoteFiles, err := client.Walk(job.RemotePath)
+	if err != nil {
+		return nil, fmt.Errorf("walk %s: %w", job.RemotePath, err)
+	}
+
+	result := &PlanResult{Files: make([]PlanFile, 0, len(remoteFiles))}
+	for _, f := range remoteFiles {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		state, _ := e.fileState.Get(jobID, f.Path)
+		action := "copy"
+		if Matches(state, f) {
+			action = "skip"
+			result.ToSkip++
+		} else {
+			result.ToCopy++
+		}
+		result.Files = append(result.Files, PlanFile{
+			RemotePath: f.Path,
+			LocalPath:  finalPath(job.LocalDest, job.RemotePath, f.Path),
+			SizeBytes:  f.Size,
+			MTime:      f.MTime,
+			Action:     action,
+		})
+	}
+	return result, nil
+}
+
 // IsRunning reports whether a run for the given job is currently active.
 func (e *Engine) IsRunning(jobID string) bool {
 	e.mu.Lock()

@@ -1,7 +1,7 @@
 import type {
   Connection, ConnectionRequest,
   SyncJob, JobRequest,
-  Run, TestResult,
+  Run, TestResult, PlanResult,
 } from './types'
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -36,6 +36,7 @@ export const api = {
     update: (id: string, body: Partial<JobRequest>) => request<SyncJob>('PUT', `/jobs/${id}`, body),
     delete: (id: string) => request<void>('DELETE', `/jobs/${id}`),
     trigger: (id: string) => request<void>('POST', `/jobs/${id}/run`),
+    plan: (id: string) => request<PlanResult>('POST', `/jobs/${id}/plan`),
     listRuns: (id: string) => request<Run[]>('GET', `/jobs/${id}/runs`),
   },
 

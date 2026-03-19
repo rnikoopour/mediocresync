@@ -85,3 +85,17 @@ export interface TestResult {
   ok: boolean
   error?: string
 }
+
+export interface PlanFile {
+  remote_path: string
+  local_path: string
+  size_bytes: number
+  mtime: string
+  action: 'copy' | 'skip'
+}
+
+export interface PlanResult {
+  files: PlanFile[]
+  to_copy: number
+  to_skip: number
+}

@@ -180,3 +180,21 @@ func (h *jobsHandler) triggerRun(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusAccepted)
 }
+
+func (h *jobsHandler) plan(w http.ResponseWriter, r *http.Request) {
+	jobID := chi.URLParam(r, "id")
+
+	job, err := h.repo.Get(jobID)
+	if err != nil || job == nil {
+		writeError(w, http.StatusNotFound, "job not found")
+		return
+	}
+
+	result, err := h.engine.PlanJob(r.Context(), jobID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, result)
+}

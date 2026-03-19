@@ -55,6 +55,7 @@ func NewRouter(
 			r.Put("/{id}", jobsH.update)
 			r.Delete("/{id}", jobsH.delete)
 			r.Post("/{id}/run", jobsH.triggerRun)
+			r.Post("/{id}/plan", jobsH.plan)
 			r.Get("/{id}/runs", runsH.listByJob)
 		})
 
