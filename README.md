@@ -14,7 +14,7 @@ All configuration is via environment variables:
 | Variable      | Required | Default      | Description |
 |---------------|----------|--------------|-------------|
 | `LISTEN_ADDR` | No       | `:8080`      | Address and port the server listens on |
-| `DB_PATH`     | No       | `./mediocresync.db` | Path to the SQLite database file |
+| `DB_PATH`     | No       | `~/.go-ftpes/mediocresync.db` | Path to the SQLite database file |
 | `DEV_MODE`    | No       | `false`      | Enables CORS headers for local frontend development |
 
 On first startup the server generates a random AES-256 encryption key and stores it in the database. Stored FTPES passwords are encrypted with that key. Deleting or replacing the database will make existing credentials unreadable.

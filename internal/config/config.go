@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 )
 
 type Config struct {
@@ -18,7 +19,11 @@ func Load() *Config {
 
 	dbPath := os.Getenv("DB_PATH")
 	if dbPath == "" {
-		dbPath = "./mediocresync.db"
+		home, err := os.UserHomeDir()
+		if err != nil {
+			home = "."
+		}
+		dbPath = filepath.Join(home, ".go-ftpes", "mediocresync.db")
 	}
 
 	return &Config{
