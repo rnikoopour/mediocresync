@@ -2,15 +2,106 @@ import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../api/client'
-import type { PlanFile } from '../api/types'
+import type { PlanFile, Run, Transfer } from '../api/types'
 import { StatusBadge } from '../components/StatusBadge'
+import { ProgressBar } from '../components/ProgressBar'
 import { JobFormModal } from '../components/JobFormModal'
 import { usePlan } from '../context/PlanContext'
+import { useSSE } from '../hooks/useSSE'
 
 function formatBytes(b: number): string {
   if (b >= 1_000_000) return `${(b / 1_000_000).toFixed(1)} MB`
   if (b >= 1_000)     return `${(b / 1_000).toFixed(1)} KB`
   return `${b} B`
+}
+
+// ── Run row (expandable) ─────────────────────────────────────────────────────
+
+function RunTransferRow({ transfer, liveEvent }: {
+  transfer: Transfer
+  liveEvent?: { percent: number; speed_bps: number; status: string } | undefined
+}) {
+  const status = liveEvent?.status ?? transfer.status
+  const percent = liveEvent?.percent ?? (transfer.status === 'done' ? 100 : 0)
+  const speed = liveEvent?.speed_bps
+
+  return (
+    <tr className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+      <td className="px-4 py-1.5 font-mono text-xs text-gray-700 dark:text-gray-300 truncate max-w-xs" title={transfer.remote_path}>
+        {transfer.remote_path}
+      </td>
+      <td className="px-4 py-1.5 text-xs text-gray-500 dark:text-gray-400 w-24">{formatBytes(transfer.size_bytes)}</td>
+      <td className="px-4 py-1.5 w-48">
+        {(status === 'in_progress' || status === 'done') ? (
+          <ProgressBar percent={percent} speedBps={status === 'in_progress' ? speed : undefined} />
+        ) : (
+          <span className="text-xs text-gray-400 dark:text-gray-500">—</span>
+        )}
+      </td>
+      <td className="px-4 py-1.5 w-20">
+        <StatusBadge status={status} />
+        {transfer.error_msg && (
+          <p className="text-xs text-red-500 mt-0.5 truncate" title={transfer.error_msg}>{transfer.error_msg}</p>
+        )}
+      </td>
+    </tr>
+  )
+}
+
+function RunRow({ run: initialRun }: { run: Run }) {
+  const [open, setOpen] = useState(initialRun.status === 'running')
+
+  const { data: run = initialRun } = useQuery({
+    queryKey: ['run', initialRun.id],
+    queryFn: () => api.runs.get(initialRun.id),
+    enabled: open,
+    refetchInterval: (q) => q.state.data?.status === 'running' ? 3000 : false,
+  })
+
+  const liveEvents = useSSE(open && run.status === 'running' ? run.id : null)
+  const transfers = run.transfers ?? []
+
+  return (
+    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center gap-4 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors text-left"
+      >
+        <StatusBadge status={run.status} />
+        <div className="flex-1 min-w-0">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Started {new Date(run.started_at).toLocaleString()}
+            {run.finished_at && ` · Finished ${new Date(run.finished_at).toLocaleString()}`}
+          </p>
+        </div>
+        <div className="flex gap-4 text-xs text-gray-500 dark:text-gray-400">
+          <span>{run.total_files} total</span>
+          <span className="text-green-600 dark:text-green-400">{run.copied_files} copied</span>
+          <span className="text-yellow-600 dark:text-yellow-400">{run.skipped_files} skipped</span>
+          {run.failed_files > 0 && <span className="text-red-600 dark:text-red-400">{run.failed_files} failed</span>}
+        </div>
+        <span className="text-gray-400 dark:text-gray-500 text-xs w-3 shrink-0">{open ? '▾' : '▸'}</span>
+      </button>
+
+      {open && (
+        <div className="border-t border-gray-100 dark:border-gray-700 max-h-64 overflow-y-auto">
+          {transfers.length === 0 ? (
+            <p className="px-4 py-4 text-xs text-center text-gray-400 dark:text-gray-500">
+              {run.status === 'running' ? 'Enumerating files…' : 'No transfers recorded.'}
+            </p>
+          ) : (
+            <table className="w-full text-sm">
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                {transfers.map((t) => (
+                  <RunTransferRow key={t.id} transfer={t} liveEvent={liveEvents.get(t.id)} />
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ── Plan tree ────────────────────────────────────────────────────────────────
@@ -243,27 +334,7 @@ export function JobDetailPage() {
 
       <div className="space-y-2">
         {runs.map((run) => (
-          <Link
-            key={run.id}
-            to={`/runs/${run.id}`}
-            className="block bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-3 hover:border-blue-300 dark:hover:border-gray-500 transition-colors"
-          >
-            <div className="flex items-center gap-4">
-              <StatusBadge status={run.status} />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Started {new Date(run.started_at).toLocaleString()}
-                  {run.finished_at && ` · Finished ${new Date(run.finished_at).toLocaleString()}`}
-                </p>
-              </div>
-              <div className="flex gap-4 text-xs text-gray-500 dark:text-gray-400">
-                <span>{run.total_files} total</span>
-                <span className="text-green-600 dark:text-green-400">{run.copied_files} copied</span>
-                <span className="text-yellow-600 dark:text-yellow-400">{run.skipped_files} skipped</span>
-                {run.failed_files > 0 && <span className="text-red-600 dark:text-red-400">{run.failed_files} failed</span>}
-              </div>
-            </div>
-          </Link>
+          <RunRow key={run.id} run={run} />
         ))}
       </div>
 
