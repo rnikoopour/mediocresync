@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -23,12 +24,13 @@ func (r *JobRepository) Create(j *SyncJob) error {
 	j.CreatedAt = now
 	j.UpdatedAt = now
 
+	inc, exc := marshalFilters(j.IncludeFilters), marshalFilters(j.ExcludeFilters)
 	_, err := r.db.Exec(
-		`INSERT INTO sync_jobs (id, name, connection_id, remote_path, local_dest, interval_value, interval_unit, concurrency, enabled, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO sync_jobs (id, name, connection_id, remote_path, local_dest, interval_value, interval_unit, concurrency, enabled, include_filters, exclude_filters, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		j.ID, j.Name, j.ConnectionID, j.RemotePath, j.LocalDest,
 		j.IntervalValue, j.IntervalUnit, j.Concurrency, boolToInt(j.Enabled),
-		formatTime(j.CreatedAt), formatTime(j.UpdatedAt),
+		inc, exc, formatTime(j.CreatedAt), formatTime(j.UpdatedAt),
 	)
 	if err != nil {
 		return fmt.Errorf("insert sync job: %w", err)
@@ -36,19 +38,18 @@ func (r *JobRepository) Create(j *SyncJob) error {
 	return nil
 }
 
+const jobColumns = `id, name, connection_id, remote_path, local_dest, interval_value, interval_unit, concurrency, enabled, include_filters, exclude_filters, created_at, updated_at`
+
 func (r *JobRepository) List() ([]*SyncJob, error) {
-	return r.query(`SELECT id, name, connection_id, remote_path, local_dest, interval_value, interval_unit, concurrency, enabled, created_at, updated_at FROM sync_jobs ORDER BY name`)
+	return r.query(`SELECT ` + jobColumns + ` FROM sync_jobs ORDER BY name`)
 }
 
 func (r *JobRepository) ListEnabled() ([]*SyncJob, error) {
-	return r.query(`SELECT id, name, connection_id, remote_path, local_dest, interval_value, interval_unit, concurrency, enabled, created_at, updated_at FROM sync_jobs WHERE enabled = 1 ORDER BY name`)
+	return r.query(`SELECT ` + jobColumns + ` FROM sync_jobs WHERE enabled = 1 ORDER BY name`)
 }
 
 func (r *JobRepository) Get(id string) (*SyncJob, error) {
-	row := r.db.QueryRow(
-		`SELECT id, name, connection_id, remote_path, local_dest, interval_value, interval_unit, concurrency, enabled, created_at, updated_at
-		 FROM sync_jobs WHERE id = ?`, id,
-	)
+	row := r.db.QueryRow(`SELECT `+jobColumns+` FROM sync_jobs WHERE id = ?`, id)
 	j, err := scanJob(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
@@ -58,12 +59,13 @@ func (r *JobRepository) Get(id string) (*SyncJob, error) {
 
 func (r *JobRepository) Update(j *SyncJob) error {
 	j.UpdatedAt = time.Now().UTC()
+	inc, exc := marshalFilters(j.IncludeFilters), marshalFilters(j.ExcludeFilters)
 	res, err := r.db.Exec(
-		`UPDATE sync_jobs SET name=?, connection_id=?, remote_path=?, local_dest=?, interval_value=?, interval_unit=?, concurrency=?, enabled=?, updated_at=?
+		`UPDATE sync_jobs SET name=?, connection_id=?, remote_path=?, local_dest=?, interval_value=?, interval_unit=?, concurrency=?, enabled=?, include_filters=?, exclude_filters=?, updated_at=?
 		 WHERE id=?`,
 		j.Name, j.ConnectionID, j.RemotePath, j.LocalDest,
 		j.IntervalValue, j.IntervalUnit, j.Concurrency, boolToInt(j.Enabled),
-		formatTime(j.UpdatedAt), j.ID,
+		inc, exc, formatTime(j.UpdatedAt), j.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("update sync job: %w", err)
@@ -78,6 +80,23 @@ func (r *JobRepository) Update(j *SyncJob) error {
 func (r *JobRepository) Delete(id string) error {
 	_, err := r.db.Exec(`DELETE FROM sync_jobs WHERE id = ?`, id)
 	return err
+}
+
+func marshalFilters(f []string) string {
+	if len(f) == 0 {
+		return "[]"
+	}
+	b, _ := json.Marshal(f)
+	return string(b)
+}
+
+func unmarshalFilters(s string) []string {
+	var f []string
+	_ = json.Unmarshal([]byte(s), &f)
+	if f == nil {
+		return []string{}
+	}
+	return f
 }
 
 func (r *JobRepository) query(q string) ([]*SyncJob, error) {
@@ -101,17 +120,21 @@ func (r *JobRepository) query(q string) ([]*SyncJob, error) {
 func scanJob(s scanner) (*SyncJob, error) {
 	var j SyncJob
 	var enabled int
+	var includeFilters, excludeFilters string
 	var createdAt, updatedAt string
 
 	err := s.Scan(
 		&j.ID, &j.Name, &j.ConnectionID, &j.RemotePath, &j.LocalDest,
-		&j.IntervalValue, &j.IntervalUnit, &j.Concurrency, &enabled, &createdAt, &updatedAt,
+		&j.IntervalValue, &j.IntervalUnit, &j.Concurrency, &enabled,
+		&includeFilters, &excludeFilters, &createdAt, &updatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("scan job: %w", err)
 	}
 
 	j.Enabled = enabled == 1
+	j.IncludeFilters = unmarshalFilters(includeFilters)
+	j.ExcludeFilters = unmarshalFilters(excludeFilters)
 	j.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
 	j.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
 	return &j, nil

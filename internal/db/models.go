@@ -15,17 +15,19 @@ type Connection struct {
 }
 
 type SyncJob struct {
-	ID            string
-	Name          string
-	ConnectionID  string
-	RemotePath    string
-	LocalDest     string
-	IntervalValue int
-	IntervalUnit  string // minutes | hours | days
-	Concurrency   int    // number of files to download concurrently (default 1)
-	Enabled       bool
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	ID             string
+	Name           string
+	ConnectionID   string
+	RemotePath     string
+	LocalDest      string
+	IntervalValue  int
+	IntervalUnit   string // minutes | hours | days
+	Concurrency    int    // number of files to download concurrently (default 1)
+	Enabled        bool
+	IncludeFilters []string // glob patterns; empty = include all
+	ExcludeFilters []string // glob patterns; empty = exclude nothing
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
 type Run struct {

@@ -28,6 +28,8 @@ export interface SyncJob {
   interval_unit: 'minutes' | 'hours' | 'days'
   concurrency: number
   enabled: boolean
+  include_filters: string[]
+  exclude_filters: string[]
   created_at: string
   updated_at: string
 }
@@ -41,6 +43,8 @@ export interface JobRequest {
   interval_unit: 'minutes' | 'hours' | 'days'
   concurrency: number
   enabled: boolean
+  include_filters: string[]
+  exclude_filters: string[]
 }
 
 export interface Run {

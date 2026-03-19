@@ -1,5 +1,11 @@
 package db
 
+// alterations are run after schema and are idempotent — duplicate column errors are ignored.
+var alterations = []string{
+	`ALTER TABLE sync_jobs ADD COLUMN include_filters TEXT NOT NULL DEFAULT '[]'`,
+	`ALTER TABLE sync_jobs ADD COLUMN exclude_filters TEXT NOT NULL DEFAULT '[]'`,
+}
+
 var schema = []string{
 	`CREATE TABLE IF NOT EXISTS _meta (
 		key   TEXT PRIMARY KEY,

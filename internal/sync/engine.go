@@ -105,6 +105,9 @@ func (e *Engine) PlanJob(ctx context.Context, jobID string) (*PlanResult, error)
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
+		if !applyFilters(f.Path, job.IncludeFilters, job.ExcludeFilters) {
+			continue
+		}
 		state, _ := e.fileState.Get(jobID, f.Path)
 		action := "copy"
 		if Matches(state, f) {
@@ -201,7 +204,15 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Conne
 		return fmt.Errorf("staging dir: %w", err)
 	}
 
-	// Create transfer records for all files upfront.
+	// Apply include/exclude filters, then create transfer records for all remaining files.
+	filtered := remoteFiles[:0]
+	for _, f := range remoteFiles {
+		if applyFilters(f.Path, job.IncludeFilters, job.ExcludeFilters) {
+			filtered = append(filtered, f)
+		}
+	}
+	remoteFiles = filtered
+
 	transfers := make([]*db.Transfer, len(remoteFiles))
 	for i, f := range remoteFiles {
 		t := &db.Transfer{
