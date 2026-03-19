@@ -5,6 +5,7 @@ import { api } from '../api/client'
 import type { SyncJob, JobRequest } from '../api/types'
 import { StatusBadge } from '../components/StatusBadge'
 import { RemoteBrowser } from '../components/RemoteBrowser'
+import { LocalBrowser } from '../components/LocalBrowser'
 
 const empty: JobRequest = {
   name: '', connection_id: '', remote_path: '/', local_dest: '',
@@ -15,6 +16,7 @@ export function JobsPage() {
   const qc = useQueryClient()
   const [modal, setModal] = useState<{ open: boolean; editing: SyncJob | null }>({ open: false, editing: null })
   const [browserOpen, setBrowserOpen] = useState(false)
+  const [localBrowserOpen, setLocalBrowserOpen] = useState(false)
   const [form, setForm] = useState<JobRequest>(empty)
 
   const { data: jobs = [], isLoading } = useQuery({ queryKey: ['jobs'], queryFn: api.jobs.list })
@@ -122,7 +124,16 @@ export function JobsPage() {
                 </div>
               </Field>
               <Field label="Local Destination">
-                <input className="input" value={form.local_dest} onChange={(e) => setForm({ ...form, local_dest: e.target.value })} required />
+                <div className="flex gap-2">
+                  <input className="input flex-1" value={form.local_dest} onChange={(e) => setForm({ ...form, local_dest: e.target.value })} required />
+                  <button
+                    type="button"
+                    onClick={() => setLocalBrowserOpen(true)}
+                    className="btn-secondary text-xs shrink-0"
+                  >
+                    Browse
+                  </button>
+                </div>
               </Field>
               <div className="flex gap-2">
                 <Field label="Every" className="w-24">
@@ -160,6 +171,13 @@ export function JobsPage() {
           connectionId={form.connection_id}
           onSelect={(path) => setForm({ ...form, remote_path: path })}
           onClose={() => setBrowserOpen(false)}
+        />
+      )}
+
+      {localBrowserOpen && (
+        <LocalBrowser
+          onSelect={(path) => setForm({ ...form, local_dest: path })}
+          onClose={() => setLocalBrowserOpen(false)}
         />
       )}
     </div>

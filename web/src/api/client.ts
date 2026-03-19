@@ -44,4 +44,8 @@ export const api = {
   runs: {
     get: (id: string) => request<Run>('GET', `/runs/${id}`),
   },
+
+  local: {
+    browse: (path: string) => request<BrowseEntry[]>('GET', `/browse/local?path=${encodeURIComponent(path)}`),
+  },
 }

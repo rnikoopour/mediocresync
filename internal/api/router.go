@@ -60,6 +60,8 @@ func NewRouter(
 			r.Get("/{id}/runs", runsH.listByJob)
 		})
 
+		r.Get("/browse/local", localBrowse)
+
 		r.Route("/runs", func(r chi.Router) {
 			r.Get("/{id}", runsH.get)
 			r.Get("/{id}/progress", runsH.progress)
