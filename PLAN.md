@@ -76,7 +76,7 @@
 - [x] `internal/sync/staging_test.go` — `finalPath` edge cases (trailing slash, root remote path)
 - [x] `internal/sync/fingerprint_test.go` — mtime tolerance boundary cases
 - [x] `internal/sse/broker_test.go` — subscribe/publish/unsubscribe/close, non-blocking publish under full buffer
-- [ ] `internal/api/handlers_test.go` — `httptest` + mocked repos, verify status codes and JSON shapes
+- [x] `internal/api/handlers_test.go` — `httptest` + in-memory SQLite, verify status codes and JSON shapes
 
 ## Phase 11 — Packaging
 - [ ] `Dockerfile` — multi-stage: `node:20-alpine` (React build) → `golang:1.22-alpine` (Go build) → `distroless/static`
