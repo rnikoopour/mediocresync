@@ -58,17 +58,17 @@
 - [x] `cmd/server/main.go` — wire all subsystems, start scheduler, graceful shutdown on SIGINT/SIGTERM
 
 ## Phase 9 — React Frontend
-- [ ] `web/` — Vite + React + TypeScript scaffold (`npm create vite`)
-- [ ] `web/src/api/types.ts` — TypeScript interfaces matching Go API response shapes
-- [ ] `web/src/api/client.ts` — typed fetch wrappers for all REST endpoints
-- [ ] `web/src/hooks/useSSE.ts` — `EventSource` hook, merges events into `Map<transferID, Event>`
-- [ ] `web/src/components/` — `Layout`, `StatusBadge`, `ProgressBar`
-- [ ] `web/src/pages/ConnectionsPage.tsx` — list, add/edit modal, delete, test button
-- [ ] `web/src/pages/JobsPage.tsx` — list, add/edit modal, delete, last run + next run display
-- [ ] `web/src/pages/JobDetailPage.tsx` — runs list, manual trigger button
-- [ ] `web/src/pages/RunDetailPage.tsx` — transfer table with live SSE progress for active runs
-- [ ] `web/src/App.tsx` — route definitions
-- [ ] `vite.config.ts` — dev proxy `/api/*` → `http://localhost:8080`
+- [x] `web/` — Vite + React + TypeScript scaffold (`npm create vite`)
+- [x] `web/src/api/types.ts` — TypeScript interfaces matching Go API response shapes
+- [x] `web/src/api/client.ts` — typed fetch wrappers for all REST endpoints
+- [x] `web/src/hooks/useSSE.ts` — `EventSource` hook, merges events into `Map<transferID, Event>`
+- [x] `web/src/components/` — `Layout`, `StatusBadge`, `ProgressBar`
+- [x] `web/src/pages/ConnectionsPage.tsx` — list, add/edit modal, delete, test button
+- [x] `web/src/pages/JobsPage.tsx` — list, add/edit modal, delete, last run + next run display
+- [x] `web/src/pages/JobDetailPage.tsx` — runs list, manual trigger button
+- [x] `web/src/pages/RunDetailPage.tsx` — transfer table with live SSE progress for active runs
+- [x] `web/src/App.tsx` — route definitions
+- [x] `vite.config.ts` — dev proxy `/api/*` → `http://localhost:8080`
 
 ## Phase 10 — Testing
 - [ ] `internal/crypto/crypto_test.go` — encrypt/decrypt round-trip, wrong key error
