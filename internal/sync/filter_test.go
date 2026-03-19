@@ -4,254 +4,254 @@ import "testing"
 
 func TestApplyFilters(t *testing.T) {
 	tests := []struct {
-		name       string
-		remotePath string
-		include    []string
-		exclude    []string
-		want       bool
+		name          string
+		filePath      string
+		jobRemotePath string
+		filters       []string
+		want          bool
 	}{
-		// ── No filters ──────────────────────────────────────────────────────────
+		// ── No filters ───────────────────────────────────────────────────────────
 		{
-			name:       "no filters includes everything",
-			remotePath: "/data/report.pdf",
-			want:       true,
+			name:          "no filters includes everything",
+			filePath:      "/foo/bar/file.txt",
+			jobRemotePath: "/foo/bar",
+			want:          true,
 		},
 
-		// ── Include only ─────────────────────────────────────────────────────────
+		// ── path: filters ────────────────────────────────────────────────────────
 		{
-			name:       "include match by extension",
-			remotePath: "/data/report.pdf",
-			include:    []string{"*.pdf"},
-			want:       true,
+			name:          "path: matches direct child",
+			filePath:      "/foo/bar/alpha/item.dat",
+			jobRemotePath: "/foo/bar",
+			filters:       []string{"path: alpha"},
+			want:          true,
 		},
 		{
-			name:       "include no match",
-			remotePath: "/data/report.pdf",
-			include:    []string{"*.txt"},
-			want:       false,
+			name:          "path: matches deeply nested file",
+			filePath:      "/foo/bar/alpha/Category/2024/item.dat",
+			jobRemotePath: "/foo/bar",
+			filters:       []string{"path: alpha"},
+			want:          true,
 		},
 		{
-			name:       "include first of multiple patterns matches",
-			remotePath: "/data/report.pdf",
-			include:    []string{"*.pdf", "*.txt"},
-			want:       true,
+			name:          "path: does not match sibling directory",
+			filePath:      "/foo/bar/beta/record.dat",
+			jobRemotePath: "/foo/bar",
+			filters:       []string{"path: alpha"},
+			want:          false,
 		},
 		{
-			name:       "include second of multiple patterns matches",
-			remotePath: "/data/notes.txt",
-			include:    []string{"*.pdf", "*.txt"},
-			want:       true,
+			name:          "path: does not match file at remote root",
+			filePath:      "/foo/bar/file.txt",
+			jobRemotePath: "/foo/bar",
+			filters:       []string{"path: alpha"},
+			want:          false,
 		},
 		{
-			name:       "include no pattern matches",
-			remotePath: "/data/image.png",
-			include:    []string{"*.pdf", "*.txt"},
-			want:       false,
-		},
-
-		// ── Exclude only ─────────────────────────────────────────────────────────
-		{
-			name:       "exclude match",
-			remotePath: "/data/report.pdf",
-			exclude:    []string{"*.pdf"},
-			want:       false,
+			name:          "path: does not match partial prefix (alpha2 ≠ alpha)",
+			filePath:      "/foo/bar/alpha2/item.dat",
+			jobRemotePath: "/foo/bar",
+			filters:       []string{"path: alpha"},
+			want:          false,
 		},
 		{
-			name:       "exclude no match",
-			remotePath: "/data/report.pdf",
-			exclude:    []string{"*.txt"},
-			want:       true,
+			name:          "path: root remote path",
+			filePath:      "/alpha/item.dat",
+			jobRemotePath: "/",
+			filters:       []string{"path: alpha"},
+			want:          true,
 		},
 		{
-			name:       "exclude first of multiple matches",
-			remotePath: "/data/report.pdf",
-			exclude:    []string{"*.pdf", "*.txt"},
-			want:       false,
+			name:          "path: trailing slash on remote path is normalised",
+			filePath:      "/foo/bar/alpha/item.dat",
+			jobRemotePath: "/foo/bar/",
+			filters:       []string{"path: alpha"},
+			want:          true,
 		},
 		{
-			name:       "exclude second of multiple matches",
-			remotePath: "/data/notes.txt",
-			exclude:    []string{"*.pdf", "*.txt"},
-			want:       false,
-		},
-		{
-			name:       "exclude no patterns match",
-			remotePath: "/data/image.png",
-			exclude:    []string{"*.pdf", "*.txt"},
-			want:       true,
+			name:          "path: leading slash on subdir is normalised",
+			filePath:      "/foo/bar/alpha/item.dat",
+			jobRemotePath: "/foo/bar",
+			filters:       []string{"path: /alpha"},
+			want:          true,
 		},
 
-		// ── Include + Exclude combined ───────────────────────────────────────────
+		// ── name: filters ────────────────────────────────────────────────────────
 		{
-			name:       "include matches, exclude does not",
-			remotePath: "/data/report.pdf",
-			include:    []string{"*.pdf"},
-			exclude:    []string{"*.txt"},
-			want:       true,
+			name:          "name: matches extension glob",
+			filePath:      "/foo/bar/file.txt",
+			jobRemotePath: "/foo/bar",
+			filters:       []string{"name: *.txt"},
+			want:          true,
 		},
 		{
-			name:       "include matches, exclude also matches — exclude wins",
-			remotePath: "/data/report.pdf",
-			include:    []string{"*.pdf"},
-			exclude:    []string{"*.pdf"},
-			want:       false,
+			name:          "name: does not match different extension",
+			filePath:      "/foo/bar/file.pdf",
+			jobRemotePath: "/foo/bar",
+			filters:       []string{"name: *.txt"},
+			want:          false,
 		},
 		{
-			name:       "include does not match, exclude irrelevant",
-			remotePath: "/data/report.pdf",
-			include:    []string{"*.txt"},
-			exclude:    []string{"*.txt"},
-			want:       false,
+			name:          "name: matches file at any depth",
+			filePath:      "/foo/bar/deep/nested/report.pdf",
+			jobRemotePath: "/foo/bar",
+			filters:       []string{"name: *.pdf"},
+			want:          true,
 		},
 		{
-			name:       "include matches, excluded by prefix pattern",
-			remotePath: "/data/draft_report.pdf",
-			include:    []string{"*.pdf"},
-			exclude:    []string{"*/draft_*"},
-			want:       false,
-		},
-
-		// ── * crosses directory boundaries ───────────────────────────────────────
-		{
-			name:       "star matches across slashes for extension",
-			remotePath: "/deep/nested/path/file.txt",
-			include:    []string{"*.txt"},
-			want:       true,
+			name:          "name: * does not cross / — matches basename only",
+			filePath:      "/foo/bar/subdir/file.txt",
+			jobRemotePath: "/foo/bar",
+			filters:       []string{"name: subdir/*.txt"}, // * can't cross /
+			want:          false,
 		},
 		{
-			name:       "star-only pattern matches everything",
-			remotePath: "/deep/nested/anything.xyz",
-			include:    []string{"*"},
-			want:       true,
-		},
-
-		// ── Path-segment patterns (*/foo/* style) ────────────────────────────────
-		{
-			name:       "*/foo/* matches file one level inside foo",
-			remotePath: "/any/foo/file.txt",
-			include:    []string{"*/foo/*"},
-			want:       true,
+			name:          "name: ? matches single character",
+			filePath:      "/foo/bar/a.txt",
+			jobRemotePath: "/foo/bar",
+			filters:       []string{"name: ?.txt"},
+			want:          true,
 		},
 		{
-			name:       "*/foo/* matches file two levels inside foo",
-			remotePath: "/any/foo/subdir/file.txt",
-			include:    []string{"*/foo/*"},
-			want:       true,
+			name:          "name: ? does not match multiple characters",
+			filePath:      "/foo/bar/ab.txt",
+			jobRemotePath: "/foo/bar",
+			filters:       []string{"name: ?.txt"},
+			want:          false,
 		},
 		{
-			name:       "*/foo/* matches foo at any depth in the path",
-			remotePath: "/one/two/three/foo/file.txt",
-			include:    []string{"*/foo/*"},
-			want:       true,
-		},
-		{
-			name:       "*/foo/* does not match path without foo component",
-			remotePath: "/one/bar/file.txt",
-			include:    []string{"*/foo/*"},
-			want:       false,
-		},
-		{
-			name:       "*/foo/* does not match foo as a filename",
-			remotePath: "/one/bar/foo",
-			include:    []string{"*/foo/*"},
-			want:       false,
-		},
-		{
-			name:       "exclude */tmp/* removes files inside any tmp directory",
-			remotePath: "/data/tmp/scratch.txt",
-			exclude:    []string{"*/tmp/*"},
-			want:       false,
-		},
-		{
-			name:       "exclude */tmp/* does not affect files outside tmp",
-			remotePath: "/data/keep/file.txt",
-			exclude:    []string{"*/tmp/*"},
-			want:       true,
-		},
-		{
-			name:       "*/foo/* include combined with exclude in same tree",
-			remotePath: "/any/foo/draft.txt",
-			include:    []string{"*/foo/*"},
-			exclude:    []string{"*/draft*"},
-			want:       false,
+			name:          "name: dot is literal not wildcard",
+			filePath:      "/foo/bar/fileXtxt",
+			jobRemotePath: "/foo/bar",
+			filters:       []string{"name: *.txt"},
+			want:          false,
 		},
 
-		// ── ? matches single non-slash character ─────────────────────────────────
+		// ── Multiple filters (OR logic) ───────────────────────────────────────────
 		{
-			name:       "question mark matches single character",
-			remotePath: "/data/a.txt",
-			include:    []string{"*/?.txt"},
-			want:       true,
+			name:          "matches first of multiple path filters",
+			filePath:      "/foo/bar/alpha/item.dat",
+			jobRemotePath: "/foo/bar",
+			filters:       []string{"path: alpha", "path: beta"},
+			want:          true,
 		},
 		{
-			name:       "question mark matches single character deep path",
-			remotePath: "/data/sub/a.txt",
-			include:    []string{"*/?.txt"},
-			want:       true, // * covers /data/sub, ? covers a
+			name:          "matches second of multiple path filters",
+			filePath:      "/foo/bar/beta/record.dat",
+			jobRemotePath: "/foo/bar",
+			filters:       []string{"path: alpha", "path: beta"},
+			want:          true,
 		},
 		{
-			name:       "question mark does not match multiple characters",
-			remotePath: "/data/ab.txt",
-			include:    []string{"*/?.txt"},
-			want:       false,
+			name:          "does not match any filter",
+			filePath:      "/foo/bar/gamma/album.log",
+			jobRemotePath: "/foo/bar",
+			filters:       []string{"path: alpha", "path: beta"},
+			want:          false,
 		},
 		{
-			name:       "question mark does not match slash — no segment ends with single char before ext",
-			remotePath: "/data/sub/abc.txt",
-			include:    []string{"*/?.txt"},
-			want:       false,
+			name:          "path: and name: can be mixed — path matches",
+			filePath:      "/foo/bar/alpha/item.dat",
+			jobRemotePath: "/foo/bar",
+			filters:       []string{"path: alpha", "name: *.log"},
+			want:          true,
+		},
+		{
+			name:          "path: and name: can be mixed — name matches",
+			filePath:      "/foo/bar/gamma/album.log",
+			jobRemotePath: "/foo/bar",
+			filters:       []string{"path: alpha", "name: *.log"},
+			want:          true,
+		},
+		{
+			name:          "path: and name: can be mixed — neither matches",
+			filePath:      "/foo/bar/gamma/album.csv",
+			jobRemotePath: "/foo/bar",
+			filters:       []string{"path: alpha", "name: *.log"},
+			want:          false,
 		},
 
-		// ── Regexp metacharacter escaping ────────────────────────────────────────
+		// ── Whitespace and unknown keywords ───────────────────────────────────────
 		{
-			name:       "dot in pattern is literal, not regexp wildcard",
-			remotePath: "/data/fileXtxt",
-			include:    []string{"*.txt"},
-			want:       false,
+			name:          "extra whitespace is trimmed",
+			filePath:      "/foo/bar/alpha/item.dat",
+			jobRemotePath: "/foo/bar",
+			filters:       []string{"  path:   alpha  "},
+			want:          true,
 		},
 		{
-			name:       "plus sign in pattern is literal",
-			remotePath: "/data/a+b.txt",
-			include:    []string{"*a+b*"},
-			want:       true,
+			name:          "unknown keyword is ignored — no match → excluded",
+			filePath:      "/foo/bar/alpha/item.dat",
+			jobRemotePath: "/foo/bar",
+			filters:       []string{"ext: mkv"},
+			want:          false,
+		},
+		{
+			name:          "unknown keyword alongside valid filter — valid wins",
+			filePath:      "/foo/bar/alpha/item.dat",
+			jobRemotePath: "/foo/bar",
+			filters:       []string{"ext: mkv", "path: alpha"},
+			want:          true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := applyFilters(tt.remotePath, tt.include, tt.exclude)
+			got := applyFilters(tt.filePath, tt.jobRemotePath, tt.filters)
 			if got != tt.want {
-				t.Errorf("applyFilters(%q, include=%v, exclude=%v) = %v, want %v",
-					tt.remotePath, tt.include, tt.exclude, got, tt.want)
+				t.Errorf("applyFilters(%q, %q, %v) = %v, want %v",
+					tt.filePath, tt.jobRemotePath, tt.filters, got, tt.want)
 			}
 		})
 	}
 }
 
-func TestGlobToRegexp(t *testing.T) {
+func TestParsePathFilter(t *testing.T) {
 	tests := []struct {
-		pattern string
-		input   string
-		want    bool
+		input  string
+		subdir string
+		ok     bool
 	}{
-		{"*.txt", "/path/to/file.txt", true},
-		{"*.txt", "/path/to/file.pdf", false},
-		{"*/foo/*", "/any/foo/file.txt", true},
-		{"*/foo/*", "/one/two/foo/file.txt", true},
-		{"*/foo/*", "/one/bar/file.txt", false},
-		{"?.txt", "a.txt", true},
-		{"?.txt", "ab.txt", false},
-		{"?.txt", "/a.txt", false}, // ? doesn't match /
-		{"*", "/anything/at/all", true},
-		{"*.tar.gz", "/backups/archive.tar.gz", true},
-		{"*.tar.gz", "/backups/archive.tar.bz2", false},
+		{"path: alpha", "alpha", true},
+		{"path:alpha", "alpha", true},
+		{"path:  alpha  ", "alpha", true},
+		{"path: /alpha", "/alpha", true},
+		{"name: foo", "", false},
+		{"alpha", "", false},
+		{"", "", false},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.pattern+"_"+tt.input, func(t *testing.T) {
-			got := globMatch(tt.pattern, tt.input)
-			if got != tt.want {
-				t.Errorf("globMatch(%q, %q) = %v, want %v", tt.pattern, tt.input, got, tt.want)
+		t.Run(tt.input, func(t *testing.T) {
+			subdir, ok := parsePathFilter(tt.input)
+			if ok != tt.ok || subdir != tt.subdir {
+				t.Errorf("parsePathFilter(%q) = (%q, %v), want (%q, %v)",
+					tt.input, subdir, ok, tt.subdir, tt.ok)
+			}
+		})
+	}
+}
+
+func TestParseNameFilter(t *testing.T) {
+	tests := []struct {
+		input   string
+		pattern string
+		ok      bool
+	}{
+		{"name: *.txt", "*.txt", true},
+		{"name:*.txt", "*.txt", true},
+		{"name:  *.txt  ", "*.txt", true},
+		{"path: foo", "", false},
+		{"*.txt", "", false},
+		{"", "", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			pattern, ok := parseNameFilter(tt.input)
+			if ok != tt.ok || pattern != tt.pattern {
+				t.Errorf("parseNameFilter(%q) = (%q, %v), want (%q, %v)",
+					tt.input, pattern, ok, tt.pattern, tt.ok)
 			}
 		})
 	}

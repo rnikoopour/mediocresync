@@ -1,82 +1,66 @@
 package sync
 
 import (
-	"regexp"
+	"path"
 	"strings"
 )
 
-// applyFilters reports whether a remote file path should be included in a sync
-// run given the job's include and exclude glob patterns.
+// applyFilters reports whether a remote file should be included in a sync run.
+//
+// Supported keywords:
+//
+//	path: <subdir>   Include files under <jobRemotePath>/<subdir>/ at any depth.
+//	name: <pattern>  Include files whose base name matches the glob pattern.
+//	                 Uses standard single-segment globbing: * matches any
+//	                 sequence of non-/ characters, ? matches one non-/ character.
 //
 // Rules:
-//  1. If include is non-empty the file must match at least one pattern.
-//  2. If exclude is non-empty the file is dropped if it matches any pattern.
-//
-// Patterns are matched against the full remote path. Glob syntax:
-//   - "*"  matches anything, including "/" (i.e. crosses directory boundaries)
-//   - "?"  matches any single character except "/"
-//
-// Examples:
-//   - "*.txt"    matches any .txt file at any depth
-//   - "*/foo/*"  matches any file inside a directory named foo at any depth
-//   - "backup_?" matches backup_a, backup_b, etc. at any depth
-func applyFilters(remotePath string, include, exclude []string) bool {
-	if len(include) == 0 && len(exclude) == 0 {
+//   - If filters is empty, all files are included.
+//   - If filters is non-empty, a file is included when it matches at least one
+//     recognised filter (OR logic). Unrecognised keywords are silently ignored.
+func applyFilters(filePath, jobRemotePath string, filters []string) bool {
+	if len(filters) == 0 {
 		return true
 	}
 
-	matchAny := func(patterns []string) bool {
-		for _, pattern := range patterns {
-			if globMatch(pattern, remotePath) {
+	base := strings.TrimSuffix(jobRemotePath, "/")
+
+	for _, f := range filters {
+		f = strings.TrimSpace(f)
+
+		if subdir, ok := parsePathFilter(f); ok {
+			prefix := base + "/" + strings.Trim(subdir, "/")
+			if strings.HasPrefix(filePath, prefix+"/") || filePath == prefix {
 				return true
 			}
+			continue
 		}
-		return false
-	}
 
-	if len(include) > 0 && !matchAny(include) {
-		return false
-	}
-	if len(exclude) > 0 && matchAny(exclude) {
-		return false
-	}
-	return true
-}
-
-// globMatch converts a glob pattern to a regexp and tests it against s.
-// "*" matches any sequence of characters including "/".
-// "?" matches any single character except "/".
-func globMatch(pattern, s string) bool {
-	re := globToRegexp(pattern)
-	return re.MatchString(s)
-}
-
-// globToRegexp compiles a glob pattern into a regexp.
-// The result is cached in a sync.Map would be an optimisation, but for the
-// small number of patterns expected here a fresh compile per call is fine.
-func globToRegexp(pattern string) *regexp.Regexp {
-	var sb strings.Builder
-	sb.WriteByte('^')
-	for i := 0; i < len(pattern); i++ {
-		switch c := pattern[i]; c {
-		case '*':
-			sb.WriteString(".*")
-		case '?':
-			sb.WriteString("[^/]")
-		// Escape all regexp metacharacters.
-		case '.', '+', '^', '$', '{', '}', '[', ']', '(', ')', '|', '\\':
-			sb.WriteByte('\\')
-			sb.WriteByte(c)
-		default:
-			sb.WriteByte(c)
+		if pattern, ok := parseNameFilter(f); ok {
+			if matched, _ := path.Match(pattern, path.Base(filePath)); matched {
+				return true
+			}
+			continue
 		}
 	}
-	sb.WriteByte('$')
-	// Pattern syntax is controlled by us so Compile should never fail.
-	re, err := regexp.Compile(sb.String())
-	if err != nil {
-		// Return a regexp that matches nothing.
-		return regexp.MustCompile(`^\z`)
+
+	return false
+}
+
+// parsePathFilter extracts the subdir from a "path: <subdir>" filter.
+func parsePathFilter(filter string) (subdir string, ok bool) {
+	rest, found := strings.CutPrefix(filter, "path:")
+	if !found {
+		return "", false
 	}
-	return re
+	return strings.TrimSpace(rest), true
+}
+
+// parseNameFilter extracts the glob pattern from a "name: <pattern>" filter.
+func parseNameFilter(filter string) (pattern string, ok bool) {
+	rest, found := strings.CutPrefix(filter, "name:")
+	if !found {
+		return "", false
+	}
+	return strings.TrimSpace(rest), true
 }

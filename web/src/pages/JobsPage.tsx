@@ -10,7 +10,7 @@ import { LocalBrowser } from '../components/LocalBrowser'
 const empty: JobRequest = {
   name: '', connection_id: '', remote_path: '/', local_dest: '',
   interval_value: 60, interval_unit: 'minutes', concurrency: 1, enabled: true,
-  include_filters: [], exclude_filters: [],
+  filters: [],
 }
 
 export function JobsPage() {
@@ -47,8 +47,7 @@ export function JobsPage() {
       name: j.name, connection_id: j.connection_id, remote_path: j.remote_path,
       local_dest: j.local_dest, interval_value: j.interval_value, interval_unit: j.interval_unit,
       concurrency: j.concurrency, enabled: j.enabled,
-      include_filters: j.include_filters ?? [],
-      exclude_filters: j.exclude_filters ?? [],
+      filters: j.filters ?? [],
     })
     setActiveTab('general')
     setModal({ open: true, editing: j })
@@ -190,25 +189,16 @@ export function JobsPage() {
 
                   {activeTab === 'filters' && (
                     <>
-                      <Field label="Include Filters">
+                      <Field label="Filters">
                         <p className="text-xs text-gray-400 mb-2">
-                          Only sync files matching at least one pattern. Empty = include everything.
-                          Supports <code className="bg-gray-100 px-1 rounded">*</code> (any chars, crosses directories) and <code className="bg-gray-100 px-1 rounded">?</code> (single char, not /).
+                          Only sync files matching at least one filter. Empty = include everything.<br />
+                          <code className="bg-gray-100 px-1 rounded">path: alpha</code> — include files under the <em>alpha</em> subdirectory.<br />
+                          <code className="bg-gray-100 px-1 rounded">name: *.dat</code> — include files whose name matches the glob (<code>*</code> and <code>?</code>, does not cross <code>/</code>).
                         </p>
                         <FilterList
-                          values={form.include_filters}
-                          onChange={(v) => setForm({ ...form, include_filters: v })}
-                          placeholder="e.g. *.pdf or */reports/*"
-                        />
-                      </Field>
-                      <Field label="Exclude Filters">
-                        <p className="text-xs text-gray-400 mb-2">
-                          Skip files matching any pattern. Applied after include filters.
-                        </p>
-                        <FilterList
-                          values={form.exclude_filters}
-                          onChange={(v) => setForm({ ...form, exclude_filters: v })}
-                          placeholder="e.g. */tmp/* or *.tmp"
+                          values={form.filters}
+                          onChange={(v) => setForm({ ...form, filters: v })}
+                          placeholder="e.g. path: alpha  or  name: *.dat"
                         />
                       </Field>
                     </>
