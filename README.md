@@ -11,20 +11,13 @@ A web application for scheduling and monitoring incremental file copies from FTP
 
 All configuration is via environment variables:
 
-| Variable         | Required | Default      | Description |
-|------------------|----------|--------------|-------------|
-| `ENCRYPTION_KEY` | Yes      | —            | 32-byte hex string used to encrypt stored passwords |
-| `LISTEN_ADDR`    | No       | `:8080`      | Address and port the server listens on |
-| `DB_PATH`        | No       | `./mediocresync.db` | Path to the SQLite database file |
-| `DEV_MODE`       | No       | `false`      | Enables CORS headers for local frontend development |
+| Variable      | Required | Default      | Description |
+|---------------|----------|--------------|-------------|
+| `LISTEN_ADDR` | No       | `:8080`      | Address and port the server listens on |
+| `DB_PATH`     | No       | `./mediocresync.db` | Path to the SQLite database file |
+| `DEV_MODE`    | No       | `false`      | Enables CORS headers for local frontend development |
 
-Generate an encryption key:
-
-```sh
-openssl rand -hex 32
-```
-
-> **Warning:** If you change `ENCRYPTION_KEY` after connections have been saved, the stored passwords will be unreadable and connections will need to be re-entered.
+On first startup the server generates a random AES-256 encryption key and stores it in the database. Stored FTPES passwords are encrypted with that key. Deleting or replacing the database will make existing credentials unreadable.
 
 ## Building
 
@@ -37,7 +30,6 @@ This runs `npm run build` in `web/` (outputting to `ui/dist/`), then compiles th
 ## Running
 
 ```sh
-export ENCRYPTION_KEY=<your-32-byte-hex-key>
 ./bin/go-ftpes
 ```
 
@@ -48,7 +40,6 @@ Open `http://localhost:8080` in your browser.
 Start the Go server and Vite dev server concurrently:
 
 ```sh
-export ENCRYPTION_KEY=<your-32-byte-hex-key>
 export DEV_MODE=true
 make dev
 ```

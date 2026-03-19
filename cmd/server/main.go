@@ -20,11 +20,7 @@ import (
 )
 
 func main() {
-	cfg, err := config.Load()
-	if err != nil {
-		slog.Error("load config", "err", err)
-		os.Exit(1)
-	}
+	cfg := config.Load()
 
 	database, err := db.Open(cfg.DBPath)
 	if err != nil {
@@ -32,6 +28,12 @@ func main() {
 		os.Exit(1)
 	}
 	defer database.Close()
+
+	encKey, err := db.GetOrCreateEncryptionKey(database)
+	if err != nil {
+		slog.Error("load encryption key", "err", err)
+		os.Exit(1)
+	}
 
 	connections := db.NewConnectionRepository(database)
 	jobs := db.NewJobRepository(database)
@@ -47,7 +49,7 @@ func main() {
 		runs,
 		transfers,
 		fileState,
-		cfg.EncryptionKey,
+		encKey,
 		broker,
 	)
 
@@ -61,7 +63,7 @@ func main() {
 		fileState,
 		engine,
 		broker,
-		cfg.EncryptionKey,
+		encKey,
 		cfg.DevMode,
 		ui.FS(),
 	)
