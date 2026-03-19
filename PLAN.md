@@ -43,7 +43,7 @@
 - [x] `internal/sse/broker.go` — `Broker` with `Subscribe(runID)`, `Publish(runID, event)`, `Close(runID)`; non-blocking publish via buffered channels
 
 ## Phase 6 — Scheduler
-- [ ] `internal/scheduler/scheduler.go` — `Scheduler` with 1-minute tick, `active` map for overlap prevention, `Start`, `Stop`, `TriggerNow`
+- [x] `internal/scheduler/scheduler.go` — `Scheduler` with 1-minute tick, `active` map for overlap prevention, `Start`, `Stop`, `TriggerNow`
 
 ## Phase 7 — REST API Handlers
 - [ ] `internal/api/response.go` — shared helpers: `writeJSON`, `writeError`, `readJSON`
