@@ -46,6 +46,9 @@ func main() {
 		slog.Error("cancel stale runs", "err", err)
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	broker := sse.NewBroker()
 
 	engine := internalsync.NewEngine(
@@ -56,6 +59,7 @@ func main() {
 		fileState,
 		encKey,
 		broker,
+		ctx,
 	)
 
 	sched := scheduler.NewScheduler(jobs, runs, engine)
@@ -81,11 +85,9 @@ func main() {
 		IdleTimeout:  120 * time.Second,
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	sched.Start(ctx)
 	slog.Info("scheduler started")
+
 
 	go func() {
 		slog.Info("server listening", "addr", cfg.ListenAddr)

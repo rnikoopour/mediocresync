@@ -159,10 +159,12 @@ function RunRow({ run: initialRun, remotePath, jobId }: { run: Run; remotePath: 
     onError: () => setCancelling(false),
   })
 
-  // Reset cancelling flag once the server confirms the run is no longer running.
-  if (cancelling && run.status !== 'running') setCancelling(false)
+  const { events: liveEvents, runStatus } = useSSE(open && run.status === 'running' ? run.id : null)
+  const effectiveStatus = runStatus ?? run.status
 
-  const liveEvents = useSSE(open && run.status === 'running' ? run.id : null)
+  // Reset cancelling flag once we know the run is no longer running.
+  if (cancelling && effectiveStatus !== 'running') setCancelling(false)
+
   const transfers = run.transfers // undefined until detail fetch completes
 
   return (
@@ -172,7 +174,7 @@ function RunRow({ run: initialRun, remotePath, jobId }: { run: Run; remotePath: 
           onClick={() => setOpen((o) => !o)}
           className="flex items-center gap-4 flex-1 min-w-0 hover:opacity-80 transition-opacity text-left"
         >
-          <StatusBadge status={run.status} />
+          <StatusBadge status={effectiveStatus} />
           <div className="flex-1 min-w-0">
             <p className="text-xs text-gray-500 dark:text-gray-400">
               Started {new Date(run.started_at).toLocaleString()}
@@ -187,7 +189,7 @@ function RunRow({ run: initialRun, remotePath, jobId }: { run: Run; remotePath: 
           </div>
           <span className="text-gray-400 dark:text-gray-500 text-xs w-3 shrink-0">{open ? '▾' : '▸'}</span>
         </button>
-        {(run.status === 'running' || cancelling) && (
+        {(effectiveStatus === 'running' || cancelling) && (
           <button
             onClick={() => cancel.mutate()}
             disabled={cancelling}

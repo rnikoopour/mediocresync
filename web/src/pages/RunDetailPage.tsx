@@ -23,7 +23,7 @@ export function RunDetailPage() {
   })
 
   // Only subscribe to SSE while the run is active
-  const liveEvents = useSSE(run?.status === 'running' ? id! : null)
+  const { events: liveEvents } = useSSE(run?.status === 'running' ? id! : null)
 
   if (isLoading) return <p className="text-gray-500 dark:text-gray-400 text-sm">Loading…</p>
   if (!run) return <p className="text-red-500 text-sm">Run not found.</p>

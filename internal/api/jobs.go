@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -202,7 +201,7 @@ func (h *jobsHandler) triggerRun(w http.ResponseWriter, r *http.Request) {
 	// the handler can return 202 immediately. Progress is streamed via SSE.
 	// Errors are logged inside RunJob — ErrJobAlreadyRunning is excluded above,
 	// and all other failures are surfaced through the run's status in the DB.
-	go h.engine.RunJob(context.Background(), jobID) //nolint:errcheck
+	go h.engine.RunJob(jobID) //nolint:errcheck
 
 	w.WriteHeader(http.StatusAccepted)
 }

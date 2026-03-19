@@ -25,6 +25,7 @@ type Engine struct {
 	fileState   *db.FileStateRepository
 	encKey      []byte
 	broker      *sse.Broker
+	appCtx      context.Context // cancelled on server shutdown
 
 	mu            sync.Mutex
 	active        map[string]bool // jobID → running
@@ -42,6 +43,7 @@ func NewEngine(
 	fileState *db.FileStateRepository,
 	encKey []byte,
 	broker *sse.Broker,
+	appCtx context.Context,
 ) *Engine {
 	return &Engine{
 		connections: connections,
@@ -51,6 +53,7 @@ func NewEngine(
 		fileState:   fileState,
 		encKey:      encKey,
 		broker:      broker,
+		appCtx:      appCtx,
 		active:      make(map[string]bool),
 		cancelFuncs: make(map[string]context.CancelFunc),
 		storedPlans: make(map[string]*PlanResult),
@@ -158,7 +161,7 @@ func (e *Engine) IsRunning(jobID string) bool {
 // RunJob executes a full sync for the given job using a previously stored plan.
 // Returns an error if no plan has been computed via PlanJob/PlanJobStream first.
 // Returns ErrJobAlreadyRunning if a run for this job is already in progress.
-func (e *Engine) RunJob(ctx context.Context, jobID string) error {
+func (e *Engine) RunJob(jobID string) error {
 	e.storedPlansMu.Lock()
 	plan := e.storedPlans[jobID]
 	delete(e.storedPlans, jobID)
@@ -167,7 +170,7 @@ func (e *Engine) RunJob(ctx context.Context, jobID string) error {
 	if plan == nil {
 		return fmt.Errorf("no plan available: run Plan before running")
 	}
-	return e.runWithPlan(ctx, jobID, plan)
+	return e.runWithPlan(e.appCtx, jobID, plan)
 }
 
 // PlanThenRun plans and immediately runs the given job without user interaction.
@@ -229,7 +232,9 @@ func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanResult
 	runErr := e.executeRun(jobCtx, job, conn, run, plan)
 
 	finalStatus := "completed"
-	if jobCtx.Err() != nil {
+	if e.appCtx.Err() != nil {
+		finalStatus = "server_stopped"
+	} else if jobCtx.Err() != nil {
 		finalStatus = "canceled"
 	} else if runErr != nil {
 		finalStatus = "failed"
@@ -237,6 +242,7 @@ func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanResult
 	if err := e.runs.UpdateStatus(run.ID, finalStatus); err != nil {
 		slog.Error("update run status", "run_id", run.ID, "err", err)
 	}
+	e.broker.Publish(run.ID, sse.Event{RunID: run.ID, RunStatus: finalStatus})
 	e.broker.Close(run.ID)
 	return runErr
 }

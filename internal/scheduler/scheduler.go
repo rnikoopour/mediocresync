@@ -59,7 +59,7 @@ func (s *Scheduler) Stop() {
 // ErrJobAlreadyRunning if a run is already active.
 func (s *Scheduler) TriggerNow(ctx context.Context, jobID string) error {
 	go func() {
-		if err := s.engine.RunJob(ctx, jobID); err != nil && !errors.Is(err, internalsync.ErrJobAlreadyRunning) {
+		if err := s.engine.RunJob(jobID); err != nil && !errors.Is(err, internalsync.ErrJobAlreadyRunning) {
 			slog.Error("manual run failed", "job_id", jobID, "err", err)
 		}
 	}()

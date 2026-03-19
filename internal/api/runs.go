@@ -141,7 +141,11 @@ func (h *runsHandler) progress(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			data, _ := json.Marshal(ev)
-			fmt.Fprintf(w, "data: %s\n\n", data)
+			if ev.RunStatus != "" {
+				fmt.Fprintf(w, "event: run_status\ndata: %s\n\n", data)
+			} else {
+				fmt.Fprintf(w, "data: %s\n\n", data)
+			}
 			flusher.Flush()
 		case <-r.Context().Done():
 			return

@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -30,7 +31,7 @@ func setupRouter(t *testing.T) (http.Handler, *db.ConnectionRepository, *db.JobR
 	transfers := db.NewTransferRepository(database)
 	fileState := db.NewFileStateRepository(database)
 	broker := sse.NewBroker()
-	engine := internalsync.NewEngine(connections, jobs, runs, transfers, fileState, testEncKey, broker)
+	engine := internalsync.NewEngine(connections, jobs, runs, transfers, fileState, testEncKey, broker, context.Background())
 
 	staticFS := fstest.MapFS{"index.html": {Data: []byte("<html></html>")}}
 	router := NewRouter(connections, jobs, runs, transfers, fileState, engine, broker, testEncKey, true, staticFS)

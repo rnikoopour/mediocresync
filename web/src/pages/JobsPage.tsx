@@ -59,7 +59,7 @@ function JobRunPreview({ jobId, onDismiss }: { jobId: string; onDismiss: () => v
     refetchInterval: (q) => q.state.data?.status === 'running' ? 3000 : false,
   })
 
-  const liveEvents = useSSE(run?.status === 'running' ? runId! : null)
+  const { events: liveEvents } = useSSE(run?.status === 'running' ? runId! : null)
 
   if (!run) {
     return (
