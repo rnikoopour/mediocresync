@@ -1,4 +1,5 @@
-import { NavLink, Outlet, useMatch } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { NavLink, Outlet, useMatch, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import { useDarkMode } from '../hooks/useDarkMode'
@@ -8,6 +9,12 @@ export function Layout() {
   const jobsActive = useMatch('/jobs/*')
   const [dark, toggleDark] = useDarkMode()
   const { plans } = usePlan()
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const location = useLocation()
+
+  useEffect(() => {
+    setSidebarOpen(false)
+  }, [location.pathname])
 
   const { data: jobs = [] } = useQuery({
     queryKey: ['jobs'],
@@ -15,9 +22,37 @@ export function Layout() {
   })
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
-      <nav className="w-52 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col">
-        <div className="px-4 py-5 border-b border-gray-200 dark:border-gray-700">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col sm:flex-row">
+      {/* Mobile topbar */}
+      <div className="sm:hidden h-14 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center px-4 shrink-0">
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+          aria-label="Open menu"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+        <span className="flex-1 text-center font-semibold text-gray-900 dark:text-gray-100 text-sm">go-ftpes</span>
+        <button
+          onClick={toggleDark}
+          className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-sm"
+          aria-label="Toggle dark mode"
+        >
+          {dark ? '☀' : '☾'}
+        </button>
+      </div>
+
+      {/* Backdrop */}
+      <div
+        className={`fixed inset-0 z-40 bg-black/50 sm:hidden transition-opacity duration-200 ${sidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        onClick={() => setSidebarOpen(false)}
+      />
+
+      {/* Sidebar */}
+      <nav className={`fixed inset-y-0 left-0 z-50 w-52 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col transition-transform duration-200 ease-in-out sm:static sm:inset-auto sm:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="hidden sm:block px-4 py-5 border-b border-gray-200 dark:border-gray-700">
           <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm">go-ftpes</span>
         </div>
         <ul className="flex-1 py-3 space-y-0.5">
@@ -82,7 +117,8 @@ export function Layout() {
           </button>
         </div>
       </nav>
-      <main className="flex-1 p-8 overflow-auto">
+
+      <main className="flex-1 p-4 sm:p-8 overflow-auto">
         <Outlet />
       </main>
     </div>

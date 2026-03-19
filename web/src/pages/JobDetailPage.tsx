@@ -99,16 +99,16 @@ function RunFileRow({ node, liveEvents }: { node: RunTreeFile; liveEvents: Map<s
   return (
     <div className="py-1 hover:bg-gray-50 dark:hover:bg-gray-700/50"
       style={{ paddingLeft: '12px', paddingRight: '16px' }}>
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-2">
         <span className="text-gray-400 dark:text-gray-500 shrink-0">📄</span>
         {(isFailed || status === 'done') && <span className="shrink-0"><StatusBadge status={status} /></span>}
-        <span className={`font-mono text-xs flex-1 truncate ${isFailed ? 'text-red-500 dark:text-red-400' : 'text-gray-600 dark:text-gray-300'}`}>{node.name}</span>
+        <span className={`font-mono text-xs flex-1 min-w-0 break-all ${isFailed ? 'text-red-500 dark:text-red-400' : 'text-gray-600 dark:text-gray-300'}`}>{node.name}</span>
         <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{formatBytes(t.size_bytes)}</span>
         {status === 'in_progress' && speed !== undefined && speed > 0 && (
-          <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 w-16 text-right">{formatSpeed(speed)}</span>
+          <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{formatSpeed(speed)}</span>
         )}
         {(status === 'in_progress' || status === 'done' || isFailed) ? (
-          <div className="w-48 shrink-0">
+          <div className="w-full sm:w-48 shrink-0">
             <ProgressBar percent={isFailed ? 0 : percent} label={isFailed ? 'Failed' : undefined} variant={isFailed ? 'failed' : 'default'} />
           </div>
         ) : (
@@ -225,10 +225,10 @@ function RunRow({ run: initialRun, remotePath, jobId }: { run: Run; remotePath: 
 
   return (
     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-      <div className="flex items-center gap-4 px-4 py-3">
+      <div className="flex flex-wrap items-center gap-4 px-4 py-3">
         <button
           onClick={() => setOpen((o) => !o)}
-          className="flex items-center gap-4 flex-1 min-w-0 hover:opacity-80 transition-opacity text-left"
+          className="flex flex-wrap items-center gap-4 flex-1 min-w-0 hover:opacity-80 transition-opacity text-left"
         >
           <StatusBadge status={effectiveStatus} />
           <div className="flex-1 min-w-0">
@@ -237,7 +237,7 @@ function RunRow({ run: initialRun, remotePath, jobId }: { run: Run; remotePath: 
               {duration && ` · ${duration}`}
             </p>
           </div>
-          <div className="flex gap-4 text-xs text-gray-500 dark:text-gray-400">
+          <div className="flex flex-wrap gap-4 text-xs text-gray-500 dark:text-gray-400">
             {run.total_size_bytes > 0 && <span>{formatBytes(run.total_size_bytes)}</span>}
             {liveSpeedBps > 0 && <span className="text-blue-600 dark:text-blue-400">{formatSpeed(liveSpeedBps)}</span>}
             {avgSpeedBps !== null && <span>avg {formatSpeed(avgSpeedBps)}</span>}
@@ -364,7 +364,7 @@ function FileRow({ node, onUnskip }: { node: TreeFile; depth: number; onUnskip?:
       onContextMenu={node.action === 'skip' ? (e) => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY }) } : undefined}
     >
       <span className="text-gray-400 dark:text-gray-500 shrink-0">📄</span>
-      <span className="font-mono text-xs text-gray-600 dark:text-gray-300 flex-1 truncate">{node.name}</span>
+      <span className="font-mono text-xs text-gray-600 dark:text-gray-300 flex-1 min-w-0 break-all">{node.name}</span>
       <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{formatBytes(node.size_bytes)}</span>
       <span className="shrink-0"><StatusBadge status={node.action === 'copy' ? 'pending' : 'skipped'} /></span>
       {menu && (
@@ -471,8 +471,8 @@ export function JobDetailPage() {
         <span className="text-gray-900 dark:text-gray-100 font-medium">{job?.name ?? '…'}</span>
       </div>
 
-      <div className="flex items-center justify-between mb-6">
-        <div>
+      <div className="flex flex-wrap items-start gap-3 mb-6">
+        <div className="flex-1 min-w-0">
           <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">{job?.name}</h1>
           {job && (
             <>
@@ -485,7 +485,7 @@ export function JobDetailPage() {
             </>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button onClick={() => setEditOpen(true)} className="btn-secondary">Edit</button>
           <button
             onClick={() => id && runPlan(id)}

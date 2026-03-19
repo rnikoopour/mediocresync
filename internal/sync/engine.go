@@ -2,6 +2,7 @@ package sync
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -540,11 +541,18 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Conne
 			if lastErr != nil {
 				slog.Error("transfer failed", "path", ent.remote.Path, "err", lastErr)
 				errMsg := lastErr.Error()
+				if errors.Is(lastErr, context.Canceled) {
+					if e.appCtx.Err() != nil {
+						errMsg = "canceled by server"
+					} else {
+						errMsg = "canceled by client"
+					}
+				}
 				_ = e.transfers.UpdateStatus(ent.transfer.ID, "failed", &errMsg, nil)
 				e.broker.Publish(run.ID, sse.Event{
 					RunID: run.ID, TransferID: ent.transfer.ID,
 					RemotePath: ent.remote.Path, SizeBytes: ent.remote.Size,
-					Status: "failed", Error: lastErr.Error(),
+					Status: "failed", Error: errMsg,
 				})
 				mu.Lock()
 				failed++

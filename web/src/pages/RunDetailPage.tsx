@@ -44,13 +44,13 @@ export function RunDetailPage() {
         <span className="text-gray-900 dark:text-gray-100 font-medium">Run</span>
       </div>
 
-      <div className="flex items-center gap-4 mb-6">
+      <div className="flex flex-wrap items-center gap-4 mb-6">
         <StatusBadge status={run.status} />
         <p className="text-sm text-gray-500 dark:text-gray-400">
           Started {new Date(run.started_at).toLocaleString()}
           {run.finished_at && ` · Finished ${new Date(run.finished_at).toLocaleString()}`}
         </p>
-        <div className="ml-auto flex gap-4 text-sm text-gray-600 dark:text-gray-400">
+        <div className="flex gap-4 text-sm text-gray-600 dark:text-gray-400">
           <span>{run.total_files} total</span>
           <span className="text-green-600 dark:text-green-400">{run.copied_files} copied</span>
           <span className="text-yellow-600 dark:text-yellow-400">{run.skipped_files} skipped</span>
@@ -59,6 +59,7 @@ export function RunDetailPage() {
       </div>
 
       <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
@@ -81,6 +82,7 @@ export function RunDetailPage() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )

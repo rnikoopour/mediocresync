@@ -98,6 +98,7 @@ function JobRunPreview({ jobId, onDismiss }: { jobId: string; onDismiss: () => v
       </div>
       {transfers.length > 0 && (
         <div className="border-t border-gray-100 dark:border-gray-700 max-h-52 overflow-y-auto">
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {transfers.map((t) => (
@@ -105,6 +106,7 @@ function JobRunPreview({ jobId, onDismiss }: { jobId: string; onDismiss: () => v
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
       {transfers.length === 0 && run.status === 'running' && (
@@ -140,15 +142,17 @@ function JobRow({ job, onEdit, onDelete }: { job: SyncJob; onEdit: () => void; o
             Every {job.interval_value} {job.interval_unit} · {job.concurrency} concurrent · autosync {job.enabled ? 'enabled' : 'disabled'}
           </p>
         </div>
-        <button onClick={onEdit} className="btn-secondary text-xs">Edit</button>
-        <button
-          onClick={() => trigger.mutate()}
-          disabled={trigger.isPending}
-          className="btn-secondary text-xs"
-        >
-          {trigger.isPending ? 'Starting…' : 'Run Now'}
-        </button>
-        <button onClick={onDelete} className="btn-danger text-xs">Delete</button>
+        <div className="shrink-0 flex flex-wrap gap-2">
+          <button onClick={onEdit} className="btn-secondary text-xs">Edit</button>
+          <button
+            onClick={() => trigger.mutate()}
+            disabled={trigger.isPending}
+            className="btn-secondary text-xs"
+          >
+            {trigger.isPending ? 'Starting…' : 'Run Now'}
+          </button>
+          <button onClick={onDelete} className="btn-danger text-xs">Delete</button>
+        </div>
       </div>
       {trigger.isError && (
         <p className="text-red-600 dark:text-red-400 text-xs px-4 pb-2">{(trigger.error as Error).message}</p>
