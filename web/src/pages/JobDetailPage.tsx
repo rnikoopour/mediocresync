@@ -120,14 +120,22 @@ function RunTreeView({ transfers, remotePath, liveEvents }: {
   remotePath: string
   liveEvents: Map<string, { percent: number; speed_bps: number; status: string }>
 }) {
-  const nodes = buildRunTree(transfers, remotePath)
+  const [tab, setTab] = useState<TreeTab>('all')
+  const filtered = tab === 'all' ? transfers : transfers.filter((t) => {
+    const status = liveEvents.get(t.id)?.status ?? t.status
+    return tab === 'skip' ? status === 'skipped' : status !== 'skipped'
+  })
+  const nodes = buildRunTree(filtered, remotePath)
   return (
-    <div className="bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 py-1 max-h-64 overflow-y-auto">
-      {nodes.map((n, i) =>
-        n.type === 'folder'
-          ? <RunFolderNode key={n.name + i} node={n} depth={0} liveEvents={liveEvents} />
-          : <RunFileRow key={n.name + i} node={n} liveEvents={liveEvents} />
-      )}
+    <div className="border-t border-gray-100 dark:border-gray-700">
+      <TreeTabBar tab={tab} onTab={setTab} />
+      <div className="py-1 max-h-64 overflow-y-auto">
+        {nodes.map((n, i) =>
+          n.type === 'folder'
+            ? <RunFolderNode key={n.name + i} node={n} depth={0} liveEvents={liveEvents} />
+            : <RunFileRow key={n.name + i} node={n} liveEvents={liveEvents} />
+        )}
+      </div>
     </div>
   )
 }
@@ -289,15 +297,44 @@ function FileRow({ node, onUnskip }: { node: TreeFile; depth: number; onUnskip?:
   )
 }
 
-function PlanTreeView({ files, remotePath, onUnskip }: { files: PlanFile[]; remotePath: string; onUnskip: (remotePath: string) => void }) {
-  const nodes = buildTree(files, remotePath)
+type TreeTab = 'all' | 'copy' | 'skip'
+
+function TreeTabBar({ tab, onTab }: { tab: TreeTab; onTab: (t: TreeTab) => void }) {
+  const btn = (t: TreeTab, label: string) => (
+    <button
+      onClick={() => onTab(t)}
+      className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+        tab === t
+          ? 'bg-gray-200 dark:bg-gray-600 text-gray-900 dark:text-gray-100'
+          : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+      }`}
+    >
+      {label}
+    </button>
+  )
   return (
-    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden py-1">
-      {nodes.map((n, i) =>
-        n.type === 'folder'
-          ? <FolderNode key={n.name + i} node={n} depth={0} onUnskip={onUnskip} />
-          : <FileRow key={n.name + i} node={n} depth={0} onUnskip={onUnskip} />
-      )}
+    <div className="flex items-center gap-1 px-3 py-2 border-b border-gray-100 dark:border-gray-700">
+      {btn('all', 'All')}
+      {btn('copy', 'To Copy')}
+      {btn('skip', 'Skipped')}
+    </div>
+  )
+}
+
+function PlanTreeView({ files, remotePath, onUnskip }: { files: PlanFile[]; remotePath: string; onUnskip: (remotePath: string) => void }) {
+  const [tab, setTab] = useState<TreeTab>('all')
+  const filtered = tab === 'all' ? files : files.filter((f) => tab === 'copy' ? f.action === 'copy' : f.action === 'skip')
+  const nodes = buildTree(filtered, remotePath)
+  return (
+    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+      <TreeTabBar tab={tab} onTab={setTab} />
+      <div className="py-1">
+        {nodes.map((n, i) =>
+          n.type === 'folder'
+            ? <FolderNode key={n.name + i} node={n} depth={0} onUnskip={onUnskip} />
+            : <FileRow key={n.name + i} node={n} depth={0} onUnskip={onUnskip} />
+        )}
+      </div>
     </div>
   )
 }
