@@ -145,7 +145,7 @@ function RunTreeView({ transfers, remotePath, liveEvents }: {
   remotePath: string
   liveEvents: Map<string, { percent: number; speed_bps: number; status: string }>
 }) {
-  const [tab, setTab] = useState<TreeTab>('all')
+  const [tab, setTab] = useState<TreeTab>('copy')
   const filtered = tab === 'all' ? transfers : transfers.filter((t) => {
     const status = liveEvents.get(t.id)?.status ?? t.status
     return tab === 'skip' ? status === 'skipped' : status !== 'skipped'
@@ -393,15 +393,15 @@ function TreeTabBar({ tab, onTab }: { tab: TreeTab; onTab: (t: TreeTab) => void 
   )
   return (
     <div className="flex items-center gap-1 px-3 py-2 border-b border-gray-100 dark:border-gray-700">
-      {btn('all', 'All')}
       {btn('copy', 'To Copy')}
       {btn('skip', 'Skipped')}
+      {btn('all', 'All')}
     </div>
   )
 }
 
 function PlanTreeView({ files, remotePath, onUnskip }: { files: PlanFile[]; remotePath: string; onUnskip: (remotePath: string) => void }) {
-  const [tab, setTab] = useState<TreeTab>('all')
+  const [tab, setTab] = useState<TreeTab>('copy')
   const filtered = tab === 'all' ? files : files.filter((f) => tab === 'copy' ? f.action === 'copy' : f.action === 'skip')
   const nodes = buildTree(filtered, remotePath)
   return (
