@@ -3,12 +3,36 @@ package ftpes
 import (
 	"fmt"
 	"path"
+	"strings"
+	"time"
 
 	"github.com/jlaffaye/ftp"
 )
 
+const listMaxAttempts = 3
+const listRetryDelay = 500 * time.Millisecond
+
+// listDir wraps conn.List with retries for transient 425 data-connection errors.
+func (c *client) listDir(remotePath string) ([]*ftp.Entry, error) {
+	var lastErr error
+	for attempt := 1; attempt <= listMaxAttempts; attempt++ {
+		entries, err := c.conn.List(remotePath)
+		if err == nil {
+			return entries, nil
+		}
+		lastErr = err
+		if !strings.Contains(err.Error(), "425") {
+			break
+		}
+		if attempt < listMaxAttempts {
+			time.Sleep(listRetryDelay)
+		}
+	}
+	return nil, lastErr
+}
+
 func (c *client) List(remotePath string) ([]DirEntry, error) {
-	entries, err := c.conn.List(remotePath)
+	entries, err := c.listDir(remotePath)
 	if err != nil {
 		return nil, fmt.Errorf("LIST %s: %w", remotePath, err)
 	}
@@ -45,7 +69,7 @@ func (c *client) WalkWithProgress(remotePath string, shouldDescend func(dir stri
 }
 
 func (c *client) walkProgress(dir string, shouldDescend func(dir string) bool, files *[]RemoteFile, nFiles, nDirs *int, progress func(files, dirs int)) error {
-	entries, err := c.conn.List(dir)
+	entries, err := c.listDir(dir)
 	if err != nil {
 		return fmt.Errorf("LIST %s: %w", dir, err)
 	}
@@ -80,7 +104,7 @@ func (c *client) walkProgress(dir string, shouldDescend func(dir string) bool, f
 }
 
 func (c *client) walk(dir string, files *[]RemoteFile) error {
-	entries, err := c.conn.List(dir)
+	entries, err := c.listDir(dir)
 	if err != nil {
 		return fmt.Errorf("LIST %s: %w", dir, err)
 	}
