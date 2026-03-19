@@ -42,6 +42,7 @@ func NewRouter(
 		r.Route("/connections", func(r chi.Router) {
 			r.Get("/", conns.list)
 			r.Post("/", conns.create)
+			r.Post("/test", conns.testDirect)
 			r.Get("/{id}", conns.get)
 			r.Put("/{id}", conns.update)
 			r.Delete("/{id}", conns.delete)

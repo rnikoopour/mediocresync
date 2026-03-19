@@ -27,6 +27,7 @@ export const api = {
     update: (id: string, body: Partial<ConnectionRequest>) => request<Connection>('PUT', `/connections/${id}`, body),
     delete: (id: string) => request<void>('DELETE', `/connections/${id}`),
     test: (id: string) => request<TestResult>('POST', `/connections/${id}/test`),
+    testDirect: (body: ConnectionRequest & { fallback_id?: string }) => request<TestResult>('POST', '/connections/test', body),
     browse: (id: string, path: string) => request<BrowseEntry[]>('GET', `/connections/${id}/browse?path=${encodeURIComponent(path)}`),
   },
 

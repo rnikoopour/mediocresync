@@ -15,6 +15,7 @@ export function ConnectionsPage() {
   const [form, setForm] = useState<ConnectionRequest>(empty)
   const [activeTab, setActiveTab] = useState<'general' | 'advanced'>('general')
   const [testResult, setTestResult] = useState<{ id: string; ok: boolean; error?: string } | null>(null)
+  const [modalTestResult, setModalTestResult] = useState<{ ok: boolean; error?: string } | null>(null)
 
   const { data: connections = [], isLoading } = useQuery({ queryKey: ['connections'], queryFn: api.connections.list })
 
@@ -23,7 +24,11 @@ export function ConnectionsPage() {
       modal.editing
         ? api.connections.update(modal.editing.id, req)
         : api.connections.create(req),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['connections'] }); closeModal() },
+    onSuccess: (conn) => {
+      qc.invalidateQueries({ queryKey: ['connections'] })
+      test.mutate(conn.id)
+      closeModal()
+    },
   })
 
   const remove = useMutation({
@@ -36,14 +41,24 @@ export function ConnectionsPage() {
     onSuccess: (res, id) => setTestResult({ id, ...res }),
   })
 
+  const testDirect = useMutation({
+    mutationFn: (args: { form: typeof form; fallbackId?: string }) =>
+      api.connections.testDirect({ ...args.form, fallback_id: args.fallbackId }),
+    onSuccess: (res) => setModalTestResult(res),
+  })
+
   function openCreate() {
     setForm(empty)
     setActiveTab('general')
+    setTestResult(null)
+    setModalTestResult(null)
     setModal({ open: true, editing: null })
   }
   function openEdit(c: Connection) {
     setForm({ name: c.name, host: c.host, port: c.port, username: c.username, password: '', skip_tls_verify: c.skip_tls_verify, enable_epsv: c.enable_epsv })
     setActiveTab('general')
+    setTestResult(null)
+    setModalTestResult(null)
     setModal({ open: true, editing: c })
   }
   function closeModal() { setModal({ open: false, editing: null }); save.reset() }
@@ -166,6 +181,21 @@ export function ConnectionsPage() {
                 <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 shrink-0">
                   {save.isError && <p className="text-red-600 dark:text-red-400 text-sm mb-3">{(save.error as Error).message}</p>}
                   <div className="flex justify-end gap-2">
+                    <div className="flex items-center gap-2 mr-auto">
+                      <button
+                        type="button"
+                        onClick={() => testDirect.mutate({ form, fallbackId: modal.editing?.id })}
+                        disabled={testDirect.isPending}
+                        className="btn-secondary"
+                      >
+                        {testDirect.isPending ? 'Testing…' : 'Test'}
+                      </button>
+                      {modalTestResult && (
+                        modalTestResult.ok
+                          ? <span className="text-green-500 text-lg leading-none">✓</span>
+                          : <span className="text-red-500 text-lg leading-none" title={modalTestResult.error}>✗</span>
+                      )}
+                    </div>
                     <button type="button" onClick={closeModal} className="btn-secondary">Cancel</button>
                     <button type="submit" disabled={save.isPending} className="btn-primary">
                       {save.isPending ? 'Saving…' : 'Save'}

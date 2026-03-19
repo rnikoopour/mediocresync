@@ -232,3 +232,53 @@ func (h *connectionsHandler) test(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
+
+// testDirect tests credentials supplied in the request body without requiring a saved connection.
+// When editing, if password is omitted, the saved password for the given id is used as a fallback.
+func (h *connectionsHandler) testDirect(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		connectionRequest
+		FallbackID string `json:"fallback_id"`
+	}
+	if err := readJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	password := req.Password
+	if password == "" && req.FallbackID != "" {
+		conn, err := h.repo.Get(req.FallbackID)
+		if err != nil || conn == nil {
+			writeError(w, http.StatusNotFound, "connection not found")
+			return
+		}
+		decrypted, err := crypto.Decrypt(h.encKey, conn.Password)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to decrypt password")
+			return
+		}
+		password = decrypted
+	}
+
+	if req.Host == "" || req.Username == "" || password == "" {
+		writeError(w, http.StatusBadRequest, "host, username, and password are required")
+		return
+	}
+	if req.Port == 0 {
+		req.Port = 21
+	}
+
+	client, err := ftpes.Dial(req.Host, req.Port, req.SkipTLSVerify, req.EnableEPSV)
+	if err != nil {
+		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "error": err.Error()})
+		return
+	}
+	defer client.Close()
+
+	if err := client.Login(req.Username, password); err != nil {
+		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
