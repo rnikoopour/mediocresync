@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../api/client'
@@ -355,22 +355,39 @@ function FolderNode({ node, depth, onSkip, onUnskip }: { node: TreeFolder; depth
     return () => document.removeEventListener('mousedown', close)
   }, [menu])
 
+  useLayoutEffect(() => {
+    if (!menu || !menuRef.current) return
+    const el = menuRef.current
+    const r = el.getBoundingClientRect()
+    if (r.right  > window.innerWidth)  el.style.left = `${menu.x - r.width}px`
+    if (r.bottom > window.innerHeight) el.style.top  = `${menu.y - r.height}px`
+  }, [menu])
+
   const leaves = collectFiles(node)
   const hasCopy = leaves.some((f) => f.action === 'copy')
   const hasSkip = leaves.some((f) => f.action === 'skip')
 
   return (
     <div>
-      <button
-        onClick={() => setOpen(!open)}
-        onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setMenu({ x: e.clientX, y: e.clientY }) }}
-        className="w-full flex items-center gap-2 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700/60 text-left relative"
-        style={{ paddingLeft: `${16 + indent}px`, paddingRight: '16px' }}
-      >
-        <span className="text-gray-400 dark:text-violet-500 text-xs w-3 shrink-0">{open ? '▾' : '▸'}</span>
-        <span className="shrink-0">📁</span>
-        <span className="font-mono text-xs font-semibold text-gray-700 dark:text-violet-300">{node.name}</span>
-      </button>
+      <div className="flex items-center hover:bg-gray-100 dark:hover:bg-gray-700/60" style={{ paddingRight: '4px' }}>
+        <button
+          onClick={() => setOpen(!open)}
+          onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setMenu({ x: e.clientX, y: e.clientY }) }}
+          className="flex-1 flex items-center gap-2 py-1.5 text-left"
+          style={{ paddingLeft: `${16 + indent}px` }}
+        >
+          <span className="text-gray-400 dark:text-violet-500 text-xs w-3 shrink-0">{open ? '▾' : '▸'}</span>
+          <span className="shrink-0">📁</span>
+          <span className="font-mono text-xs font-semibold text-gray-700 dark:text-violet-300">{node.name}</span>
+        </button>
+        {(hasCopy || hasSkip) && (
+          <button
+            className="md:hidden px-2 py-1 text-gray-400 dark:text-gray-500 text-base leading-none"
+            onClick={(e) => setMenu({ x: e.clientX, y: e.clientY })}
+            aria-label="Actions"
+          >⋮</button>
+        )}
+      </div>
       {menu && (
         <div
           ref={menuRef}
@@ -421,6 +438,14 @@ function FileRow({ node, onSkip, onUnskip }: { node: TreeFile; depth: number; on
     return () => document.removeEventListener('mousedown', close)
   }, [menu])
 
+  useLayoutEffect(() => {
+    if (!menu || !menuRef.current) return
+    const el = menuRef.current
+    const r = el.getBoundingClientRect()
+    if (r.right  > window.innerWidth)  el.style.left = `${menu.x - r.width}px`
+    if (r.bottom > window.innerHeight) el.style.top  = `${menu.y - r.height}px`
+  }, [menu])
+
   return (
     <div
       className="flex items-center gap-4 py-1 hover:bg-gray-50 dark:hover:bg-gray-700/50 relative"
@@ -431,6 +456,11 @@ function FileRow({ node, onSkip, onUnskip }: { node: TreeFile; depth: number; on
       <span className="font-mono text-xs text-gray-600 dark:text-gray-300 flex-1 min-w-0 break-all">{node.name}</span>
       <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{formatBytes(node.size_bytes)}</span>
       <span className="shrink-0"><StatusBadge status={node.action === 'copy' ? 'pending' : 'skipped'} /></span>
+      <button
+        className="md:hidden px-1 py-0.5 text-gray-400 dark:text-gray-500 text-base leading-none shrink-0"
+        onClick={(e) => { e.stopPropagation(); setMenu({ x: e.clientX, y: e.clientY }) }}
+        aria-label="Actions"
+      >⋮</button>
       {menu && (
         <div
           ref={menuRef}
