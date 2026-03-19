@@ -52,7 +52,7 @@ export interface JobRequest {
 export interface Run {
   id: string
   job_id: string
-  status: 'running' | 'completed' | 'failed' | 'canceled'
+  status: 'running' | 'completed' | 'failed' | 'canceled' | 'server_stopped'
   started_at: string
   finished_at?: string
   total_files: number

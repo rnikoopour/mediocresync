@@ -67,7 +67,7 @@ func (r *RunRepository) ListByJob(jobID string) ([]*Run, error) {
 
 func (r *RunRepository) UpdateStatus(id, status string) error {
 	var finishedAt *string
-	if status == "completed" || status == "failed" || status == "canceled" {
+	if status == "completed" || status == "failed" || status == "canceled" || status == "server_stopped" {
 		s := formatTime(time.Now().UTC())
 		finishedAt = &s
 	}
@@ -78,12 +78,12 @@ func (r *RunRepository) UpdateStatus(id, status string) error {
 	return err
 }
 
-// CancelStaleRuns marks any runs still in "running" state as "canceled".
+// CancelStaleRuns marks any runs still in "running" state as "server_stopped".
 // Call this on startup to clean up runs that were interrupted by an unclean shutdown.
 func (r *RunRepository) CancelStaleRuns() error {
 	finished := formatTime(time.Now().UTC())
 	_, err := r.db.Exec(
-		`UPDATE runs SET status='canceled', finished_at=? WHERE status='running'`,
+		`UPDATE runs SET status='server_stopped', finished_at=? WHERE status='running'`,
 		finished,
 	)
 	return err
