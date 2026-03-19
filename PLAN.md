@@ -33,14 +33,14 @@
 - [x] `internal/ftpes/client.go` — `Client` struct with `Login`, `Walk`, `Download`, `Close`; backed by interface for testability
 
 ## Phase 4 — Sync Engine
-- [ ] `internal/sync/fingerprint.go` — `Matches(state, remoteFile)` with 1-second mtime tolerance
-- [ ] `internal/sync/staging.go` — `stagingDir`, `stagingPath`, `finalPath`, `atomicMove`
-- [ ] `internal/sync/progress.go` — `progressReader` wrapping `io.Reader`, rate-limited callbacks (~250ms)
-- [ ] `internal/sync/engine.go` — `Engine.RunJob(ctx, jobID)`: dial → walk → diff → stage → stream → rename → upsert state
+- [x] `internal/sync/fingerprint.go` — `Matches(state, remoteFile)` with 1-second mtime tolerance
+- [x] `internal/sync/staging.go` — `stagingDir`, `stagingPath`, `finalPath`, `atomicMove`
+- [x] `internal/sync/progress.go` — `progressReader` wrapping `io.Reader`, rate-limited callbacks (~250ms)
+- [x] `internal/sync/engine.go` — `Engine.RunJob(ctx, jobID)`: dial → walk → diff → stage → stream → rename → upsert state; enforces single-run-per-job internally
 
 ## Phase 5 — SSE Broker
-- [ ] `internal/sse/event.go` — `Event` struct (runID, transferID, path, size, bytes, percent, speed, status, error)
-- [ ] `internal/sse/broker.go` — `Broker` with `Subscribe(runID)`, `Publish(runID, event)`, `Close(runID)`; non-blocking publish via buffered channels
+- [x] `internal/sse/event.go` — `Event` struct (runID, transferID, path, size, bytes, percent, speed, status, error)
+- [x] `internal/sse/broker.go` — `Broker` with `Subscribe(runID)`, `Publish(runID, event)`, `Close(runID)`; non-blocking publish via buffered channels
 
 ## Phase 6 — Scheduler
 - [ ] `internal/scheduler/scheduler.go` — `Scheduler` with 1-minute tick, `active` map for overlap prevention, `Start`, `Stop`, `TriggerNow`
