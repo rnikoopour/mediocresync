@@ -7,24 +7,32 @@ import (
 
 // applyFilters reports whether a remote file should be included in a sync run.
 //
-// Supported keywords:
+// Supported keywords (same syntax for both include and exclude lists):
 //
-//	path: <subdir>   Include files under <jobRemotePath>/<subdir>/ at any depth.
-//	name: <pattern>  Include files whose base name matches the glob pattern.
+//	path: <subdir>   Match files under <jobRemotePath>/<subdir>/ at any depth.
+//	name: <pattern>  Match files whose base name matches the glob pattern.
 //	                 Uses standard single-segment globbing: * matches any
 //	                 sequence of non-/ characters, ? matches one non-/ character.
 //
 // Rules:
-//   - If filters is empty, all files are included.
-//   - If filters is non-empty, a file is included when it matches at least one
-//     recognised filter (OR logic). Unrecognised keywords are silently ignored.
-func applyFilters(filePath, jobRemotePath string, filters []string) bool {
-	if len(filters) == 0 {
-		return true
-	}
-
+//   - If includeFilters is non-empty, the file must match at least one entry.
+//   - If excludeFilters is non-empty, the file must not match any entry.
+//   - Both conditions must be satisfied for the file to be included.
+//   - Unrecognised keywords are silently ignored.
+func applyFilters(filePath, jobRemotePath string, includeFilters, excludeFilters []string) bool {
 	base := strings.TrimSuffix(jobRemotePath, "/")
 
+	if len(includeFilters) > 0 && !matchesAny(filePath, base, includeFilters) {
+		return false
+	}
+	if len(excludeFilters) > 0 && matchesAny(filePath, base, excludeFilters) {
+		return false
+	}
+	return true
+}
+
+// matchesAny reports whether filePath matches at least one filter in the list.
+func matchesAny(filePath, base string, filters []string) bool {
 	for _, f := range filters {
 		f = strings.TrimSpace(f)
 
@@ -43,7 +51,6 @@ func applyFilters(filePath, jobRemotePath string, filters []string) bool {
 			continue
 		}
 	}
-
 	return false
 }
 

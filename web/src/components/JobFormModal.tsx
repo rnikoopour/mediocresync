@@ -13,7 +13,7 @@ interface Props {
 const empty: JobRequest = {
   name: '', connection_id: '', remote_path: '/', local_dest: '',
   interval_value: 60, interval_unit: 'minutes', concurrency: 1, enabled: true,
-  filters: [],
+  include_filters: [], exclude_filters: [],
 }
 
 function jobToForm(j: SyncJob): JobRequest {
@@ -21,7 +21,8 @@ function jobToForm(j: SyncJob): JobRequest {
     name: j.name, connection_id: j.connection_id, remote_path: j.remote_path,
     local_dest: j.local_dest, interval_value: j.interval_value, interval_unit: j.interval_unit,
     concurrency: j.concurrency, enabled: j.enabled,
-    filters: j.filters ?? [],
+    include_filters: j.include_filters ?? [],
+    exclude_filters: j.exclude_filters ?? [],
   }
 }
 
@@ -135,18 +136,27 @@ export function JobFormModal({ editing, onClose }: Props) {
                 )}
 
                 {activeTab === 'filters' && (
-                  <Field label="Filters">
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">
-                      Only sync files matching at least one filter. Empty = include everything.<br />
-                      <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">path: alpha</code> — include files under the <em>alpha</em> subdirectory.<br />
-                      <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">name: *.dat</code> — include files whose name matches the glob (<code>*</code> and <code>?</code>, does not cross <code>/</code>).
+                  <>
+                    <p className="text-xs text-gray-400 dark:text-gray-500">
+                      Supports <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">path: alpha</code> (subdirectory) and <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">name: *.dat</code> (basename glob).
                     </p>
-                    <FilterList
-                      values={form.filters}
-                      onChange={(v) => setForm({ ...form, filters: v })}
-                      placeholder="e.g. path: alpha  or  name: *.dat"
-                    />
-                  </Field>
+                    <Field label="Include Filters">
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Only sync files matching at least one entry. Empty = include all.</p>
+                      <FilterList
+                        values={form.include_filters}
+                        onChange={(v) => setForm({ ...form, include_filters: v })}
+                        placeholder="e.g. path: alpha  or  name: *.dat"
+                      />
+                    </Field>
+                    <Field label="Exclude Filters">
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Skip files matching any entry. Applied after include filters.</p>
+                      <FilterList
+                        values={form.exclude_filters}
+                        onChange={(v) => setForm({ ...form, exclude_filters: v })}
+                        placeholder="e.g. path: tmp  or  name: *.tmp"
+                      />
+                    </Field>
+                  </>
                 )}
               </div>
 

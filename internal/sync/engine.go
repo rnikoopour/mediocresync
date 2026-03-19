@@ -105,7 +105,7 @@ func (e *Engine) PlanJob(ctx context.Context, jobID string) (*PlanResult, error)
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
-		if !applyFilters(f.Path, job.RemotePath, job.Filters) {
+		if !applyFilters(f.Path, job.RemotePath, job.IncludeFilters, job.ExcludeFilters) {
 			continue
 		}
 		state, _ := e.fileState.Get(jobID, f.Path)
@@ -207,7 +207,7 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Conne
 	// Apply include/exclude filters, then create transfer records for all remaining files.
 	filtered := remoteFiles[:0]
 	for _, f := range remoteFiles {
-		if applyFilters(f.Path, job.RemotePath, job.Filters) {
+		if applyFilters(f.Path, job.RemotePath, job.IncludeFilters, job.ExcludeFilters) {
 			filtered = append(filtered, f)
 		}
 	}

@@ -10,30 +10,32 @@ import (
 )
 
 type jobRequest struct {
-	Name          string   `json:"name"`
-	ConnectionID  string   `json:"connection_id"`
-	RemotePath    string   `json:"remote_path"`
-	LocalDest     string   `json:"local_dest"`
-	IntervalValue int      `json:"interval_value"`
-	IntervalUnit  string   `json:"interval_unit"`
-	Concurrency   int      `json:"concurrency"`
-	Enabled       bool     `json:"enabled"`
-	Filters       []string `json:"filters"`
+	Name           string   `json:"name"`
+	ConnectionID   string   `json:"connection_id"`
+	RemotePath     string   `json:"remote_path"`
+	LocalDest      string   `json:"local_dest"`
+	IntervalValue  int      `json:"interval_value"`
+	IntervalUnit   string   `json:"interval_unit"`
+	Concurrency    int      `json:"concurrency"`
+	Enabled        bool     `json:"enabled"`
+	IncludeFilters []string `json:"include_filters"`
+	ExcludeFilters []string `json:"exclude_filters"`
 }
 
 type jobResponse struct {
-	ID            string   `json:"id"`
-	Name          string   `json:"name"`
-	ConnectionID  string   `json:"connection_id"`
-	RemotePath    string   `json:"remote_path"`
-	LocalDest     string   `json:"local_dest"`
-	IntervalValue int      `json:"interval_value"`
-	IntervalUnit  string   `json:"interval_unit"`
-	Concurrency   int      `json:"concurrency"`
-	Enabled       bool     `json:"enabled"`
-	Filters       []string `json:"filters"`
-	CreatedAt     string   `json:"created_at"`
-	UpdatedAt     string   `json:"updated_at"`
+	ID             string   `json:"id"`
+	Name           string   `json:"name"`
+	ConnectionID   string   `json:"connection_id"`
+	RemotePath     string   `json:"remote_path"`
+	LocalDest      string   `json:"local_dest"`
+	IntervalValue  int      `json:"interval_value"`
+	IntervalUnit   string   `json:"interval_unit"`
+	Concurrency    int      `json:"concurrency"`
+	Enabled        bool     `json:"enabled"`
+	IncludeFilters []string `json:"include_filters"`
+	ExcludeFilters []string `json:"exclude_filters"`
+	CreatedAt      string   `json:"created_at"`
+	UpdatedAt      string   `json:"updated_at"`
 }
 
 func toJobResponse(j *db.SyncJob) jobResponse {
@@ -46,8 +48,9 @@ func toJobResponse(j *db.SyncJob) jobResponse {
 		IntervalValue:  j.IntervalValue,
 		IntervalUnit:   j.IntervalUnit,
 		Concurrency:    j.Concurrency,
-		Enabled:   j.Enabled,
-		Filters:   j.Filters,
+		Enabled:        j.Enabled,
+		IncludeFilters: j.IncludeFilters,
+		ExcludeFilters: j.ExcludeFilters,
 		CreatedAt:      j.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		UpdatedAt:      j.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 	}
@@ -97,8 +100,9 @@ func (h *jobsHandler) create(w http.ResponseWriter, r *http.Request) {
 		IntervalValue:  req.IntervalValue,
 		IntervalUnit:   req.IntervalUnit,
 		Concurrency:    req.Concurrency,
-		Enabled:  req.Enabled,
-		Filters:  req.Filters,
+		Enabled:        req.Enabled,
+		IncludeFilters: req.IncludeFilters,
+		ExcludeFilters: req.ExcludeFilters,
 	}
 	if err := h.repo.Create(job); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to create job")
@@ -141,7 +145,8 @@ func (h *jobsHandler) update(w http.ResponseWriter, r *http.Request) {
 	job.IntervalUnit = req.IntervalUnit
 	job.Concurrency = max(req.Concurrency, 1)
 	job.Enabled = req.Enabled
-	job.Filters = req.Filters
+	job.IncludeFilters = req.IncludeFilters
+	job.ExcludeFilters = req.ExcludeFilters
 
 	if err := h.repo.Update(job); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to update job")

@@ -4,11 +4,12 @@ import "testing"
 
 func TestApplyFilters(t *testing.T) {
 	tests := []struct {
-		name          string
-		filePath      string
-		jobRemotePath string
-		filters       []string
-		want          bool
+		name           string
+		filePath       string
+		jobRemotePath  string
+		filters        []string
+		excludeFilters []string
+		want           bool
 	}{
 		// ── No filters ───────────────────────────────────────────────────────────
 		{
@@ -171,6 +172,38 @@ func TestApplyFilters(t *testing.T) {
 			want:          false,
 		},
 
+		// ── Exclude filters ───────────────────────────────────────────────────────
+		{
+			name:           "exclude overrides include",
+			filePath:       "/foo/bar/alpha/item.dat",
+			jobRemotePath:  "/foo/bar",
+			filters:        []string{"path: alpha"},
+			excludeFilters: []string{"name: *.dat"},
+			want:           false,
+		},
+		{
+			name:           "exclude does not affect non-matching file",
+			filePath:       "/foo/bar/alpha/item.bin",
+			jobRemotePath:  "/foo/bar",
+			filters:        []string{"path: alpha"},
+			excludeFilters: []string{"name: *.dat"},
+			want:           true,
+		},
+		{
+			name:           "exclude with no include — excludes matching",
+			filePath:       "/foo/bar/tmp/file.tmp",
+			jobRemotePath:  "/foo/bar",
+			excludeFilters: []string{"path: tmp"},
+			want:           false,
+		},
+		{
+			name:           "exclude with no include — passes non-matching",
+			filePath:       "/foo/bar/docs/file.pdf",
+			jobRemotePath:  "/foo/bar",
+			excludeFilters: []string{"path: tmp"},
+			want:           true,
+		},
+
 		// ── Whitespace and unknown keywords ───────────────────────────────────────
 		{
 			name:          "extra whitespace is trimmed",
@@ -197,7 +230,7 @@ func TestApplyFilters(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := applyFilters(tt.filePath, tt.jobRemotePath, tt.filters)
+			got := applyFilters(tt.filePath, tt.jobRemotePath, tt.filters, tt.excludeFilters)
 			if got != tt.want {
 				t.Errorf("applyFilters(%q, %q, %v) = %v, want %v",
 					tt.filePath, tt.jobRemotePath, tt.filters, got, tt.want)
