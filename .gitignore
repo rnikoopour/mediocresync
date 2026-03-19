@@ -1,5 +1,6 @@
 web/node_modules/
-web/dist/
+ui/dist/*
+!ui/dist/index.html
 *.db
 .env
 bin/

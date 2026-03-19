@@ -54,8 +54,8 @@
 - [x] `internal/api/router.go` — chi router, mount all handlers, serve embedded React with SPA fallback
 
 ## Phase 8 — Entry Point & Embedding
-- [ ] `cmd/server/embed.go` — `//go:embed ../../web/dist` var
-- [ ] `cmd/server/main.go` — wire all subsystems, start scheduler, graceful shutdown on SIGINT/SIGTERM
+- [x] `ui/ui.go` — `//go:embed all:dist` var; Vite outputs to `ui/dist/` so embed path needs no `..`
+- [x] `cmd/server/main.go` — wire all subsystems, start scheduler, graceful shutdown on SIGINT/SIGTERM
 
 ## Phase 9 — React Frontend
 - [ ] `web/` — Vite + React + TypeScript scaffold (`npm create vite`)
