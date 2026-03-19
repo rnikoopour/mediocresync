@@ -164,9 +164,14 @@ export function JobDetailPage() {
         <div>
           <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">{job?.name}</h1>
           {job && (
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              {job.remote_path} → {job.local_dest} · every {job.interval_value} {job.interval_unit}
-            </p>
+            <>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {job.remote_path} → {job.local_dest}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Every {job.interval_value} {job.interval_unit} · {job.concurrency} concurrent · autosync {job.enabled ? 'enabled' : 'disabled'}
+              </p>
+            </>
           )}
         </div>
         <div className="flex gap-2">
