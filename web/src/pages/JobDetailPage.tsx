@@ -26,6 +26,10 @@ function formatDuration(ms: number): string {
   return `${sec}s`
 }
 
+function formatSpeed(bps: number): string {
+  return `${formatBytes(bps)}/s`
+}
+
 function useElapsed(startedAt: string, isRunning: boolean): string {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -194,6 +198,16 @@ function RunRow({ run: initialRun, remotePath, jobId }: { run: Run; remotePath: 
     ? formatDuration(new Date(run.finished_at).getTime() - new Date(run.started_at).getTime())
     : isRunning ? elapsed : null
 
+  // Live total speed: sum speed_bps of all in-progress transfers.
+  const liveSpeedBps = isRunning
+    ? Array.from(liveEvents.values()).reduce((s, e) => e.status === 'in_progress' ? s + e.speed_bps : s, 0)
+    : 0
+
+  // Average speed for finished runs: total bytes ÷ duration.
+  const avgSpeedBps = !isRunning && run.finished_at && run.total_size_bytes > 0
+    ? run.total_size_bytes / ((new Date(run.finished_at).getTime() - new Date(run.started_at).getTime()) / 1000)
+    : null
+
   return (
     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
       <div className="flex items-center gap-4 px-4 py-3">
@@ -210,6 +224,8 @@ function RunRow({ run: initialRun, remotePath, jobId }: { run: Run; remotePath: 
           </div>
           <div className="flex gap-4 text-xs text-gray-500 dark:text-gray-400">
             {run.total_size_bytes > 0 && <span>{formatBytes(run.total_size_bytes)}</span>}
+            {liveSpeedBps > 0 && <span className="text-blue-600 dark:text-blue-400">{formatSpeed(liveSpeedBps)}</span>}
+            {avgSpeedBps !== null && <span>avg {formatSpeed(avgSpeedBps)}</span>}
             <span>{run.total_files} total</span>
             <span className="text-green-600 dark:text-green-400">{run.copied_files} copied</span>
             <span className="text-yellow-600 dark:text-yellow-400">{run.skipped_files} skipped</span>
