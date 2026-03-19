@@ -27,7 +27,7 @@ export function Layout() {
               className={({ isActive }) =>
                 `block px-4 py-2 text-sm rounded-md mx-2 ${
                   isActive
-                    ? 'bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 font-medium'
+                    ? 'bg-blue-50 dark:bg-gray-700 text-blue-700 dark:text-gray-100 font-medium'
                     : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`
               }
@@ -42,7 +42,7 @@ export function Layout() {
               className={({ isActive }) =>
                 `block px-4 py-2 text-sm rounded-md mx-2 ${
                   isActive
-                    ? 'bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 font-medium'
+                    ? 'bg-blue-50 dark:bg-gray-700 text-blue-700 dark:text-gray-100 font-medium'
                     : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`
               }
@@ -57,7 +57,7 @@ export function Layout() {
                 className={({ isActive }) =>
                   `block pl-7 pr-4 py-1.5 text-xs rounded-md mx-2 truncate ${
                     isActive
-                      ? 'bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 font-medium'
+                      ? 'bg-blue-50 dark:bg-gray-700 text-blue-700 dark:text-gray-100 font-medium'
                       : 'text-gray-500 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
                   }`
                 }

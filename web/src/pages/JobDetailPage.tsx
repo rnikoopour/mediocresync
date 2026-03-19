@@ -55,15 +55,15 @@ function FolderNode({ node, depth }: { node: TreeFolder; depth: number }) {
     <div>
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-2 py-1.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-left"
+        className="w-full flex items-center gap-2 py-1.5 hover:bg-blue-50 dark:hover:bg-gray-700/60 text-left"
         style={{ paddingLeft: `${16 + indent}px`, paddingRight: '16px' }}
       >
         <span className="text-blue-400 text-xs w-3 shrink-0">{open ? '▾' : '▸'}</span>
         <span className="text-blue-500 shrink-0">📁</span>
-        <span className="font-mono text-xs font-semibold text-blue-700 dark:text-blue-400">{node.name}</span>
+        <span className="font-mono text-xs font-semibold text-blue-700 dark:text-gray-200">{node.name}</span>
       </button>
       {open && (
-        <div className="border-l border-blue-100 dark:border-blue-800" style={{ marginLeft: `${16 + indent + 12}px` }}>
+        <div className="border-l border-blue-100 dark:border-gray-600" style={{ marginLeft: `${16 + indent + 12}px` }}>
           {node.children.map((child, i) =>
             child.type === 'folder'
               ? <FolderNode key={child.name + i} node={child} depth={depth + 1} />
@@ -202,7 +202,7 @@ export function JobDetailPage() {
           <Link
             key={run.id}
             to={`/runs/${run.id}`}
-            className="block bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-3 hover:border-blue-300 dark:hover:border-blue-600 transition-colors"
+            className="block bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-3 hover:border-blue-300 dark:hover:border-gray-500 transition-colors"
           >
             <div className="flex items-center gap-4">
               <StatusBadge status={run.status} />

@@ -43,7 +43,7 @@ export function JobsPage() {
         {jobs.map((j) => (
           <div key={j.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-3 flex items-center gap-4">
             <div className="flex-1 min-w-0">
-              <Link to={`/jobs/${j.id}`} className="font-medium text-gray-900 dark:text-gray-100 text-sm hover:text-blue-600 dark:hover:text-blue-400">
+              <Link to={`/jobs/${j.id}`} className="font-medium text-gray-900 dark:text-gray-100 text-sm hover:text-blue-600 dark:hover:text-gray-200">
                 {j.name}
               </Link>
               <p className="text-xs text-gray-500 dark:text-gray-400">{j.remote_path} → {j.local_dest}</p>

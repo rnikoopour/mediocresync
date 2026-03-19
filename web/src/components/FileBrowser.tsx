@@ -45,7 +45,7 @@ export function FileBrowser({ title, initialPath, queryKey, fetcher, onSelect, o
 
         {/* Breadcrumb */}
         <div className="flex items-center gap-1 px-4 py-2 border-b border-gray-100 dark:border-gray-700 text-xs overflow-x-auto whitespace-nowrap">
-          <button onClick={() => navigate('/')} className="text-blue-600 dark:text-blue-400 hover:underline font-medium">/</button>
+          <button onClick={() => navigate('/')} className="text-blue-600 dark:text-gray-300 hover:underline font-medium">/</button>
           {segments.map((seg, i) => {
             const path = '/' + segments.slice(0, i + 1).join('/')
             const isLast = i === segments.length - 1
@@ -55,7 +55,7 @@ export function FileBrowser({ title, initialPath, queryKey, fetcher, onSelect, o
                 {isLast ? (
                   <span className="text-gray-700 dark:text-gray-200 font-medium">{seg}</span>
                 ) : (
-                  <button onClick={() => navigate(path)} className="text-blue-600 dark:text-blue-400 hover:underline">{seg}</button>
+                  <button onClick={() => navigate(path)} className="text-blue-600 dark:text-gray-300 hover:underline">{seg}</button>
                 )}
               </span>
             )

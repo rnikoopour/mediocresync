@@ -108,7 +108,7 @@ export function ConnectionsPage() {
                     onClick={() => setActiveTab(tab)}
                     className={`w-full text-left px-4 py-2 text-sm capitalize ${
                       activeTab === tab
-                        ? 'bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 font-medium border-r-2 border-blue-600'
+                        ? 'bg-blue-50 dark:bg-gray-700 text-blue-700 dark:text-gray-100 font-medium border-r-2 border-blue-600 dark:border-gray-400'
                         : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
                     }`}
                   >
