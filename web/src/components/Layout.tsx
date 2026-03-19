@@ -2,10 +2,12 @@ import { NavLink, Outlet, useMatch } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import { useDarkMode } from '../hooks/useDarkMode'
+import { usePlan } from '../context/PlanContext'
 
 export function Layout() {
   const jobsActive = useMatch('/jobs/*')
   const [dark, toggleDark] = useDarkMode()
+  const { plans } = usePlan()
 
   const { data: jobs = [] } = useQuery({
     queryKey: ['jobs'],
@@ -61,7 +63,12 @@ export function Layout() {
                 }
                 title={job.name}
               >
-                {job.name}
+                <span className="flex items-center gap-1.5 min-w-0">
+                  <span className="truncate">{job.name}</span>
+                  {plans[job.id]?.status === 'running' && (
+                    <span className="shrink-0 w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin opacity-60" />
+                  )}
+                </span>
               </NavLink>
             </li>
           ))}

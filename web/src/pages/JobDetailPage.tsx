@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../api/client'
-import type { PlanFile, PlanResult } from '../api/types'
+import type { PlanFile } from '../api/types'
 import { StatusBadge } from '../components/StatusBadge'
+import { usePlan } from '../context/PlanContext'
 
 function formatBytes(b: number): string {
   if (b >= 1_000_000) return `${(b / 1_000_000).toFixed(1)} MB`
@@ -103,19 +104,15 @@ function PlanTreeView({ files, remotePath }: { files: PlanFile[]; remotePath: st
 export function JobDetailPage() {
   const { id } = useParams<{ id: string }>()
   const qc = useQueryClient()
-  const [plan, setPlan] = useState<PlanResult | null>(null)
 
   const { data: job } = useQuery({ queryKey: ['jobs', id], queryFn: () => api.jobs.get(id!) })
   const { data: runs = [], isLoading } = useQuery({ queryKey: ['runs', id], queryFn: () => api.jobs.listRuns(id!) })
+  const { plans, runPlan, dismissPlan } = usePlan()
+  const planEntry = id ? plans[id] : undefined
 
   const trigger = useMutation({
     mutationFn: () => api.jobs.trigger(id!),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['runs', id] }),
-  })
-
-  const planMutation = useMutation({
-    mutationFn: () => api.jobs.plan(id!),
-    onSuccess: (result) => setPlan(result),
   })
 
   return (
@@ -137,11 +134,11 @@ export function JobDetailPage() {
         </div>
         <div className="flex gap-2">
           <button
-            onClick={() => { setPlan(null); planMutation.mutate() }}
-            disabled={planMutation.isPending}
+            onClick={() => id && runPlan(id)}
+            disabled={planEntry?.status === 'running'}
             className="btn-secondary"
           >
-            {planMutation.isPending ? 'Planning…' : 'Plan'}
+            {planEntry?.status === 'running' ? 'Planning…' : 'Plan'}
           </button>
           <button
             onClick={() => trigger.mutate()}
@@ -156,24 +153,37 @@ export function JobDetailPage() {
       {trigger.isError && (
         <p className="text-red-600 dark:text-red-400 text-sm mb-4">{(trigger.error as Error).message}</p>
       )}
-      {planMutation.isError && (
-        <p className="text-red-600 dark:text-red-400 text-sm mb-4">{(planMutation.error as Error).message}</p>
+      {planEntry?.status === 'error' && (
+        <p className="text-red-600 dark:text-red-400 text-sm mb-4">{planEntry.error}</p>
       )}
 
-      {plan && (
+      {planEntry && planEntry.status !== 'error' && (
         <div className="mb-8">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-medium text-gray-700 dark:text-gray-300">
               Plan Result
-              <span className="ml-2 font-normal text-gray-400 dark:text-gray-500">
-                {plan.to_copy} to copy · {plan.to_skip} to skip · {plan.files.length} total
-              </span>
+              {planEntry.status === 'running' ? (
+                <span className="ml-2 font-normal text-gray-400 dark:text-gray-500">Running…</span>
+              ) : planEntry.result && (
+                <span className="ml-2 font-normal text-gray-400 dark:text-gray-500">
+                  {planEntry.result.to_copy} to copy · {planEntry.result.to_skip} to skip · {planEntry.result.files.length} total
+                </span>
+              )}
             </h2>
-            <button onClick={() => setPlan(null)} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-              Dismiss
-            </button>
+            {planEntry.status !== 'running' && (
+              <button onClick={() => id && dismissPlan(id)} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                Dismiss
+              </button>
+            )}
           </div>
-          <PlanTreeView files={plan.files} remotePath={job?.remote_path ?? ''} />
+          {planEntry.status === 'running' ? (
+            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-8 flex items-center justify-center gap-3 text-sm text-gray-400 dark:text-gray-500">
+              <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              Scanning remote files…
+            </div>
+          ) : planEntry.result && (
+            <PlanTreeView files={planEntry.result.files} remotePath={job?.remote_path ?? ''} />
+          )}
         </div>
       )}
 

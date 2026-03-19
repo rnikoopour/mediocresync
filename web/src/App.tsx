@@ -5,6 +5,7 @@ import { ConnectionsPage } from './pages/ConnectionsPage'
 import { JobsPage } from './pages/JobsPage'
 import { JobDetailPage } from './pages/JobDetailPage'
 import { RunDetailPage } from './pages/RunDetailPage'
+import { PlanProvider } from './context/PlanContext'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 10_000 } },
@@ -13,6 +14,7 @@ const queryClient = new QueryClient({
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
+      <PlanProvider>
       <BrowserRouter>
         <Routes>
           <Route element={<Layout />}>
@@ -24,6 +26,7 @@ export default function App() {
           </Route>
         </Routes>
       </BrowserRouter>
+      </PlanProvider>
     </QueryClientProvider>
   )
 }
