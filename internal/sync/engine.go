@@ -26,8 +26,10 @@ type Engine struct {
 	encKey      []byte
 	broker      *sse.Broker
 
-	mu     sync.Mutex
-	active map[string]bool // jobID → running
+	mu           sync.Mutex
+	active       map[string]bool // jobID → running
+	storedPlans  map[string]*PlanResult
+	storedPlansMu sync.Mutex
 }
 
 func NewEngine(
@@ -48,6 +50,7 @@ func NewEngine(
 		encKey:      encKey,
 		broker:      broker,
 		active:      make(map[string]bool),
+		storedPlans: make(map[string]*PlanResult),
 	}
 }
 
@@ -134,6 +137,11 @@ func (e *Engine) PlanJobStream(ctx context.Context, jobID string, progress func(
 			Action:     action,
 		})
 	}
+
+	e.storedPlansMu.Lock()
+	e.storedPlans[jobID] = result
+	e.storedPlansMu.Unlock()
+
 	return result, nil
 }
 
@@ -144,9 +152,36 @@ func (e *Engine) IsRunning(jobID string) bool {
 	return e.active[jobID]
 }
 
-// RunJob executes a full sync for the given job. Returns ErrJobAlreadyRunning
-// if a run for this job is already in progress.
+// RunJob executes a full sync for the given job using a previously stored plan.
+// Returns an error if no plan has been computed via PlanJob/PlanJobStream first.
+// Returns ErrJobAlreadyRunning if a run for this job is already in progress.
 func (e *Engine) RunJob(ctx context.Context, jobID string) error {
+	e.storedPlansMu.Lock()
+	plan := e.storedPlans[jobID]
+	delete(e.storedPlans, jobID)
+	e.storedPlansMu.Unlock()
+
+	if plan == nil {
+		return fmt.Errorf("no plan available: run Plan before running")
+	}
+	return e.runWithPlan(ctx, jobID, plan)
+}
+
+// PlanThenRun plans and immediately runs the given job without user interaction.
+// Used by the scheduler for automated runs.
+func (e *Engine) PlanThenRun(ctx context.Context, jobID string) error {
+	plan, err := e.PlanJobStream(ctx, jobID, nil)
+	if err != nil {
+		return fmt.Errorf("plan: %w", err)
+	}
+	// discard stored copy — we use the result directly
+	e.storedPlansMu.Lock()
+	delete(e.storedPlans, jobID)
+	e.storedPlansMu.Unlock()
+	return e.runWithPlan(ctx, jobID, plan)
+}
+
+func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanResult) error {
 	e.mu.Lock()
 	if e.active[jobID] {
 		e.mu.Unlock()
@@ -176,7 +211,7 @@ func (e *Engine) RunJob(ctx context.Context, jobID string) error {
 		return fmt.Errorf("create run: %w", err)
 	}
 
-	runErr := e.executeRun(ctx, job, conn, run)
+	runErr := e.executeRun(ctx, job, conn, run, plan)
 
 	finalStatus := "completed"
 	if runErr != nil {
@@ -189,7 +224,7 @@ func (e *Engine) RunJob(ctx context.Context, jobID string) error {
 	return runErr
 }
 
-func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Connection, run *db.Run) error {
+func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Connection, run *db.Run, plan *PlanResult) error {
 	password, err := crypto.Decrypt(e.encKey, conn.Password)
 	if err != nil {
 		return fmt.Errorf("decrypt password: %w", err)
@@ -205,40 +240,37 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Conne
 		return fmt.Errorf("login: %w", err)
 	}
 
-	remoteFiles, err := client.Walk(job.RemotePath)
-	if err != nil {
-		return fmt.Errorf("walk %s: %w", job.RemotePath, err)
-	}
-
 	if err := ensureStagingDir(job.LocalDest); err != nil {
 		return fmt.Errorf("staging dir: %w", err)
 	}
 
-	// Apply include/exclude filters, then create transfer records for all remaining files.
-	filtered := remoteFiles[:0]
-	for _, f := range remoteFiles {
-		if applyFilters(f.Path, job.RemotePath, job.IncludeFilters, job.ExcludeFilters) {
-			filtered = append(filtered, f)
-		}
+	// Create transfer records for all plan files; track which need downloading.
+	type transferEntry struct {
+		transfer *db.Transfer
+		remote   ftpes.RemoteFile
+		skip     bool
 	}
-	remoteFiles = filtered
-
-	transfers := make([]*db.Transfer, len(remoteFiles))
-	for i, f := range remoteFiles {
+	entries := make([]transferEntry, 0, len(plan.Files))
+	for _, pf := range plan.Files {
+		remote := ftpes.RemoteFile{Path: pf.RemotePath, Size: pf.SizeBytes, MTime: pf.MTime}
+		initialStatus := "pending"
+		if pf.Action == "skip" {
+			initialStatus = "skipped"
+		}
 		t := &db.Transfer{
 			RunID:      run.ID,
-			RemotePath: f.Path,
-			LocalPath:  finalPath(job.LocalDest, job.RemotePath, f.Path),
-			SizeBytes:  f.Size,
-			Status:     "pending",
+			RemotePath: pf.RemotePath,
+			LocalPath:  pf.LocalPath,
+			SizeBytes:  pf.SizeBytes,
+			Status:     initialStatus,
 		}
 		if err := e.transfers.Create(t); err != nil {
 			return fmt.Errorf("create transfer record: %w", err)
 		}
-		transfers[i] = t
+		entries = append(entries, transferEntry{transfer: t, remote: remote, skip: pf.Action == "skip"})
 	}
 
-	if err := e.runs.UpdateCounts(run.ID, len(transfers), 0, 0, 0); err != nil {
+	if err := e.runs.UpdateCounts(run.ID, len(entries), 0, 0, 0); err != nil {
 		slog.Error("update run counts", "run_id", run.ID, "err", err)
 	}
 
@@ -253,51 +285,44 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Conne
 		wg      sync.WaitGroup
 	)
 
-	for i, remote := range remoteFiles {
+	for _, entry := range entries {
 		if ctx.Err() != nil {
 			break
 		}
 
-		t := transfers[i]
+		ent := entry
 		sem <- struct{}{}
 
 		wg.Go(func() {
 			defer func() { <-sem }()
 
-			state, _ := e.fileState.Get(job.ID, remote.Path)
-			if Matches(state, remote) {
-				_ = e.transfers.UpdateStatus(t.ID, "skipped", nil, nil)
-				e.broker.Publish(run.ID, sse.Event{
-					RunID: run.ID, TransferID: t.ID,
-					RemotePath: remote.Path, SizeBytes: remote.Size,
-					Status: "skipped",
-				})
+			if ent.skip {
 				mu.Lock()
 				skipped++
-				_ = e.runs.UpdateCounts(run.ID, len(transfers), copied, skipped, failed)
+				_ = e.runs.UpdateCounts(run.ID, len(entries), copied, skipped, failed)
 				mu.Unlock()
 				return
 			}
 
-			if err := e.downloadFile(ctx, client, job, run.ID, t, remote); err != nil {
-				slog.Error("download failed", "path", remote.Path, "err", err)
+			if err := e.downloadFile(ctx, client, job, run.ID, ent.transfer, ent.remote); err != nil {
+				slog.Error("download failed", "path", ent.remote.Path, "err", err)
 				errMsg := err.Error()
-				_ = e.transfers.UpdateStatus(t.ID, "failed", &errMsg, nil)
+				_ = e.transfers.UpdateStatus(ent.transfer.ID, "failed", &errMsg, nil)
 				e.broker.Publish(run.ID, sse.Event{
-					RunID: run.ID, TransferID: t.ID,
-					RemotePath: remote.Path, SizeBytes: remote.Size,
+					RunID: run.ID, TransferID: ent.transfer.ID,
+					RemotePath: ent.remote.Path, SizeBytes: ent.remote.Size,
 					Status: "failed", Error: err.Error(),
 				})
 				mu.Lock()
 				failed++
-				_ = e.runs.UpdateCounts(run.ID, len(transfers), copied, skipped, failed)
+				_ = e.runs.UpdateCounts(run.ID, len(entries), copied, skipped, failed)
 				mu.Unlock()
 				return
 			}
 
 			mu.Lock()
 			copied++
-			_ = e.runs.UpdateCounts(run.ID, len(transfers), copied, skipped, failed)
+			_ = e.runs.UpdateCounts(run.ID, len(entries), copied, skipped, failed)
 			mu.Unlock()
 		})
 	}

@@ -77,7 +77,7 @@ func (s *Scheduler) tick(ctx context.Context) {
 		if isDue(job, s.lastRun(job.ID)) {
 			jobID := job.ID
 			go func() {
-				if err := s.engine.RunJob(ctx, jobID); err != nil {
+				if err := s.engine.PlanThenRun(ctx, jobID); err != nil {
 					if !errors.Is(err, internalsync.ErrJobAlreadyRunning) {
 						slog.Error("scheduled run failed", "job_id", jobID, "err", err)
 					}

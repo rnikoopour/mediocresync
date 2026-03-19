@@ -141,7 +141,10 @@ export function JobDetailPage() {
 
   const trigger = useMutation({
     mutationFn: () => api.jobs.trigger(id!),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['runs', id] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['runs', id] })
+      if (id) dismissPlan(id)
+    },
   })
 
   const unskip = useMutation({
@@ -177,7 +180,8 @@ export function JobDetailPage() {
           </button>
           <button
             onClick={() => trigger.mutate()}
-            disabled={trigger.isPending}
+            disabled={trigger.isPending || planEntry?.status !== 'done'}
+            title={planEntry?.status !== 'done' ? 'Plan first before running' : undefined}
             className="btn-primary"
           >
             {trigger.isPending ? 'Starting…' : 'Run Now'}
