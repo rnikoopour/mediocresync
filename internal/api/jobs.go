@@ -280,6 +280,13 @@ func (h *jobsHandler) cancelRun(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *jobsHandler) planDismiss(w http.ResponseWriter, r *http.Request) {
+	jobID := chi.URLParam(r, "id")
+	h.engine.ClearStoredPlan(jobID)
+	h.broker.Publish(jobID, sse.Event{Status: "plan_dismissed"})
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *jobsHandler) planStart(w http.ResponseWriter, r *http.Request) {
 	jobID := chi.URLParam(r, "id")
 

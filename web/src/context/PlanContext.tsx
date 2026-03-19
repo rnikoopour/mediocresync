@@ -1,5 +1,6 @@
 import { createContext, useContext, useState } from 'react'
 import { openEventSource } from '../hooks/eventSource'
+import { api } from '../api/client'
 import type { PlanResult } from '../api/types'
 
 interface PlanEntry {
@@ -15,6 +16,7 @@ interface PlanContextValue {
   runPlan: (jobId: string) => void
   subscribePlan: (jobId: string) => () => void
   dismissPlan: (jobId: string) => void
+  localDismissPlan: (jobId: string) => void
   unskipFile: (jobId: string, remotePath: string) => void
   skipFile: (jobId: string, remotePath: string) => void
 }
@@ -102,6 +104,15 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
   }
 
   function dismissPlan(jobId: string) {
+    api.jobs.dismissPlan(jobId).catch(() => {})
+    setPlans((p) => {
+      const next = { ...p }
+      delete next[jobId]
+      return next
+    })
+  }
+
+  function localDismissPlan(jobId: string) {
     setPlans((p) => {
       const next = { ...p }
       delete next[jobId]
@@ -110,7 +121,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <PlanContext.Provider value={{ plans, runPlan, subscribePlan, dismissPlan, unskipFile, skipFile }}>
+    <PlanContext.Provider value={{ plans, runPlan, subscribePlan, dismissPlan, localDismissPlan, unskipFile, skipFile }}>
       {children}
     </PlanContext.Provider>
   )

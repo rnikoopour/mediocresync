@@ -312,6 +312,12 @@ func (e *Engine) SubscribePlan(jobID string) (<-chan PlanEvent, func()) {
 
 // UpdateStoredPlanAction changes the action for one file in the stored plan
 // and adjusts the ToCopy/ToSkip counters. No-op if no plan is stored.
+func (e *Engine) ClearStoredPlan(jobID string) {
+	e.storedPlansMu.Lock()
+	defer e.storedPlansMu.Unlock()
+	delete(e.storedPlans, jobID)
+}
+
 func (e *Engine) UpdateStoredPlanAction(jobID, remotePath, action string) {
 	e.storedPlansMu.Lock()
 	defer e.storedPlansMu.Unlock()

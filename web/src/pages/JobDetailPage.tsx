@@ -586,7 +586,7 @@ export function JobDetailPage() {
     queryFn: () => api.jobs.listRuns(id!),
     refetchInterval: (q) => q.state.data?.[0]?.status === 'running' ? 3000 : false,
   })
-  const { plans, runPlan, subscribePlan, dismissPlan, unskipFile, skipFile } = usePlan()
+  const { plans, runPlan, subscribePlan, dismissPlan, localDismissPlan, unskipFile, skipFile } = usePlan()
   const planEntry = id ? plans[id] : undefined
   const [planOpen, setPlanOpen] = useState(true)
 
@@ -607,7 +607,9 @@ export function JobDetailPage() {
         const ev = JSON.parse(e.data)
         if (ev.status === 'started') {
           qc.invalidateQueries({ queryKey: ['runs', id] })
-          dismissPlan(id)
+          localDismissPlan(id)
+        } else if (ev.status === 'plan_dismissed') {
+          localDismissPlan(id)
         } else if (ev.status === 'plan_file_updated') {
           if (ev.plan_action === 'skip') skipFile(id, ev.plan_path)
           else unskipFile(id, ev.plan_path)
