@@ -4,6 +4,7 @@ package db
 var alterations = []string{
 	`ALTER TABLE sync_jobs ADD COLUMN include_filters TEXT NOT NULL DEFAULT '[]'`,
 	`ALTER TABLE sync_jobs ADD COLUMN exclude_filters TEXT NOT NULL DEFAULT '[]'`,
+	`ALTER TABLE connections ADD COLUMN enable_epsv INTEGER NOT NULL DEFAULT 0`,
 }
 
 var schema = []string{

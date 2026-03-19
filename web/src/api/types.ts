@@ -5,6 +5,7 @@ export interface Connection {
   port: number
   username: string
   skip_tls_verify: boolean
+  enable_epsv: boolean
   created_at: string
   updated_at: string
 }
@@ -16,6 +17,7 @@ export interface ConnectionRequest {
   username: string
   password: string
   skip_tls_verify: boolean
+  enable_epsv: boolean
 }
 
 export interface SyncJob {

@@ -15,18 +15,19 @@ type client struct {
 	conn *ftp.ServerConn
 }
 
-func dial(host string, port int, skipTLSVerify bool) (*ftp.ServerConn, error) {
+func dial(host string, port int, skipTLSVerify, enableEPSV bool) (*ftp.ServerConn, error) {
 	tlsCfg := &tls.Config{
 		InsecureSkipVerify: skipTLSVerify, //nolint:gosec // user-controlled opt-in
 		ServerName:         host,
 	}
 
 	addr := fmt.Sprintf("%s:%d", host, port)
-	conn, err := ftp.Dial(
-		addr,
+	opts := []ftp.DialOption{
 		ftp.DialWithTimeout(dialTimeout),
 		ftp.DialWithExplicitTLS(tlsCfg),
-	)
+		ftp.DialWithDisabledEPSV(!enableEPSV),
+	}
+	conn, err := ftp.Dial(addr, opts...)
 	if err != nil {
 		return nil, err
 	}

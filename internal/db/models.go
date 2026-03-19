@@ -10,6 +10,7 @@ type Connection struct {
 	Username      string
 	Password      []byte // AES-256-GCM encrypted; decrypt only when dialing FTPES
 	SkipTLSVerify bool
+	EnableEPSV    bool
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 }

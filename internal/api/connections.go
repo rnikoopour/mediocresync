@@ -16,6 +16,7 @@ type connectionRequest struct {
 	Username      string `json:"username"`
 	Password      string `json:"password"`
 	SkipTLSVerify bool   `json:"skip_tls_verify"`
+	EnableEPSV    bool   `json:"enable_epsv"`
 }
 
 type connectionResponse struct {
@@ -25,6 +26,7 @@ type connectionResponse struct {
 	Port          int    `json:"port"`
 	Username      string `json:"username"`
 	SkipTLSVerify bool   `json:"skip_tls_verify"`
+	EnableEPSV    bool   `json:"enable_epsv"`
 	CreatedAt     string `json:"created_at"`
 	UpdatedAt     string `json:"updated_at"`
 }
@@ -37,6 +39,7 @@ func toConnectionResponse(c *db.Connection) connectionResponse {
 		Port:          c.Port,
 		Username:      c.Username,
 		SkipTLSVerify: c.SkipTLSVerify,
+		EnableEPSV:    c.EnableEPSV,
 		CreatedAt:     c.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		UpdatedAt:     c.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 	}
@@ -87,6 +90,7 @@ func (h *connectionsHandler) create(w http.ResponseWriter, r *http.Request) {
 		Username:      req.Username,
 		Password:      encrypted,
 		SkipTLSVerify: req.SkipTLSVerify,
+		EnableEPSV:    req.EnableEPSV,
 	}
 	if err := h.repo.Create(conn); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to create connection")
@@ -126,6 +130,7 @@ func (h *connectionsHandler) update(w http.ResponseWriter, r *http.Request) {
 	conn.Port = req.Port
 	conn.Username = req.Username
 	conn.SkipTLSVerify = req.SkipTLSVerify
+	conn.EnableEPSV = req.EnableEPSV
 
 	// Only re-encrypt if a new password was provided.
 	if req.Password != "" {
@@ -170,7 +175,7 @@ func (h *connectionsHandler) browse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client, err := ftpes.Dial(conn.Host, conn.Port, conn.SkipTLSVerify)
+	client, err := ftpes.Dial(conn.Host, conn.Port, conn.SkipTLSVerify, conn.EnableEPSV)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
@@ -213,7 +218,7 @@ func (h *connectionsHandler) test(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client, err := ftpes.Dial(conn.Host, conn.Port, conn.SkipTLSVerify)
+	client, err := ftpes.Dial(conn.Host, conn.Port, conn.SkipTLSVerify, conn.EnableEPSV)
 	if err != nil {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "error": err.Error()})
 		return

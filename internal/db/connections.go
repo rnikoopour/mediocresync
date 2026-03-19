@@ -24,10 +24,11 @@ func (r *ConnectionRepository) Create(c *Connection) error {
 	c.UpdatedAt = now
 
 	_, err := r.db.Exec(
-		`INSERT INTO connections (id, name, host, port, username, password, skip_tls_verify, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO connections (id, name, host, port, username, password, skip_tls_verify, enable_epsv, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		c.ID, c.Name, c.Host, c.Port, c.Username, c.Password,
-		boolToInt(c.SkipTLSVerify), formatTime(c.CreatedAt), formatTime(c.UpdatedAt),
+		boolToInt(c.SkipTLSVerify), boolToInt(c.EnableEPSV),
+		formatTime(c.CreatedAt), formatTime(c.UpdatedAt),
 	)
 	if err != nil {
 		return fmt.Errorf("insert connection: %w", err)
@@ -37,7 +38,7 @@ func (r *ConnectionRepository) Create(c *Connection) error {
 
 func (r *ConnectionRepository) List() ([]*Connection, error) {
 	rows, err := r.db.Query(
-		`SELECT id, name, host, port, username, password, skip_tls_verify, created_at, updated_at
+		`SELECT id, name, host, port, username, password, skip_tls_verify, enable_epsv, created_at, updated_at
 		 FROM connections ORDER BY name`,
 	)
 	if err != nil {
@@ -58,7 +59,7 @@ func (r *ConnectionRepository) List() ([]*Connection, error) {
 
 func (r *ConnectionRepository) Get(id string) (*Connection, error) {
 	row := r.db.QueryRow(
-		`SELECT id, name, host, port, username, password, skip_tls_verify, created_at, updated_at
+		`SELECT id, name, host, port, username, password, skip_tls_verify, enable_epsv, created_at, updated_at
 		 FROM connections WHERE id = ?`, id,
 	)
 	c, err := scanConnection(row)
@@ -71,10 +72,11 @@ func (r *ConnectionRepository) Get(id string) (*Connection, error) {
 func (r *ConnectionRepository) Update(c *Connection) error {
 	c.UpdatedAt = time.Now().UTC()
 	res, err := r.db.Exec(
-		`UPDATE connections SET name=?, host=?, port=?, username=?, password=?, skip_tls_verify=?, updated_at=?
+		`UPDATE connections SET name=?, host=?, port=?, username=?, password=?, skip_tls_verify=?, enable_epsv=?, updated_at=?
 		 WHERE id=?`,
 		c.Name, c.Host, c.Port, c.Username, c.Password,
-		boolToInt(c.SkipTLSVerify), formatTime(c.UpdatedAt), c.ID,
+		boolToInt(c.SkipTLSVerify), boolToInt(c.EnableEPSV),
+		formatTime(c.UpdatedAt), c.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("update connection: %w", err)
@@ -98,18 +100,19 @@ type scanner interface {
 
 func scanConnection(s scanner) (*Connection, error) {
 	var c Connection
-	var skipTLS int
+	var skipTLS, enableEPSV int
 	var createdAt, updatedAt string
 
 	err := s.Scan(
 		&c.ID, &c.Name, &c.Host, &c.Port, &c.Username, &c.Password,
-		&skipTLS, &createdAt, &updatedAt,
+		&skipTLS, &enableEPSV, &createdAt, &updatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("scan connection: %w", err)
 	}
 
 	c.SkipTLSVerify = skipTLS == 1
+	c.EnableEPSV = enableEPSV == 1
 	c.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
 	c.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
 	return &c, nil

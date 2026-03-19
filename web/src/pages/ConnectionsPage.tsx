@@ -4,12 +4,16 @@ import { api } from '../api/client'
 import type { Connection, ConnectionRequest } from '../api/types'
 import { StatusBadge } from '../components/StatusBadge'
 
-const empty: ConnectionRequest = { name: '', host: '', port: 21, username: '', password: '', skip_tls_verify: false }
+const empty: ConnectionRequest = {
+  name: '', host: '', port: 21, username: '', password: '',
+  skip_tls_verify: false, enable_epsv: false,
+}
 
 export function ConnectionsPage() {
   const qc = useQueryClient()
   const [modal, setModal] = useState<{ open: boolean; editing: Connection | null }>({ open: false, editing: null })
   const [form, setForm] = useState<ConnectionRequest>(empty)
+  const [activeTab, setActiveTab] = useState<'general' | 'advanced'>('general')
   const [testResult, setTestResult] = useState<{ id: string; ok: boolean; error?: string } | null>(null)
 
   const { data: connections = [], isLoading } = useQuery({ queryKey: ['connections'], queryFn: api.connections.list })
@@ -32,9 +36,14 @@ export function ConnectionsPage() {
     onSuccess: (res, id) => setTestResult({ id, ...res }),
   })
 
-  function openCreate() { setForm(empty); setModal({ open: true, editing: null }) }
+  function openCreate() {
+    setForm(empty)
+    setActiveTab('general')
+    setModal({ open: true, editing: null })
+  }
   function openEdit(c: Connection) {
-    setForm({ name: c.name, host: c.host, port: c.port, username: c.username, password: '', skip_tls_verify: c.skip_tls_verify })
+    setForm({ name: c.name, host: c.host, port: c.port, username: c.username, password: '', skip_tls_verify: c.skip_tls_verify, enable_epsv: c.enable_epsv })
+    setActiveTab('general')
     setModal({ open: true, editing: c })
   }
   function closeModal() { setModal({ open: false, editing: null }); save.reset() }
@@ -81,56 +90,89 @@ export function ConnectionsPage() {
       </div>
 
       {modal.open && (
-        <Modal title={modal.editing ? 'Edit Connection' : 'Add Connection'} onClose={closeModal}>
-          <form
-            onSubmit={(e) => { e.preventDefault(); save.mutate(form) }}
-            className="space-y-3"
-          >
-            <Field label="Name">
-              <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-            </Field>
-            <div className="flex gap-2">
-              <Field label="Host" className="flex-1">
-                <input className="input" value={form.host} onChange={(e) => setForm({ ...form, host: e.target.value })} required />
-              </Field>
-              <Field label="Port" className="w-24">
-                <input className="input" type="number" value={form.port} onChange={(e) => setForm({ ...form, port: Number(e.target.value) })} required />
-              </Field>
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-lg mx-4 max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
+              <h2 className="font-semibold text-gray-900 dark:text-gray-100">{modal.editing ? 'Edit Connection' : 'Add Connection'}</h2>
+              <button onClick={closeModal} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">&times;</button>
             </div>
-            <Field label="Username">
-              <input className="input" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} required />
-            </Field>
-            <Field label={modal.editing ? 'Password (leave blank to keep current)' : 'Password'}>
-              <input className="input" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required={!modal.editing} />
-            </Field>
-            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-              <input type="checkbox" checked={form.skip_tls_verify} onChange={(e) => setForm({ ...form, skip_tls_verify: e.target.checked })} />
-              Skip TLS certificate verification
-            </label>
-            {save.isError && <p className="text-red-600 dark:text-red-400 text-sm">{(save.error as Error).message}</p>}
-            <div className="flex justify-end gap-2 pt-2">
-              <button type="button" onClick={closeModal} className="btn-secondary">Cancel</button>
-              <button type="submit" disabled={save.isPending} className="btn-primary">
-                {save.isPending ? 'Saving…' : 'Save'}
-              </button>
-            </div>
-          </form>
-        </Modal>
-      )}
-    </div>
-  )
-}
 
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md mx-4 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-gray-900 dark:text-gray-100">{title}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">&times;</button>
+            <form onSubmit={(e) => { e.preventDefault(); save.mutate(form) }} className="flex flex-1 min-h-0">
+              {/* Sidebar tabs */}
+              <nav className="w-36 border-r border-gray-200 dark:border-gray-700 py-3 shrink-0">
+                {(['general', 'advanced'] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setActiveTab(tab)}
+                    className={`w-full text-left px-4 py-2 text-sm capitalize ${
+                      activeTab === tab
+                        ? 'bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 font-medium border-r-2 border-blue-600'
+                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </nav>
+
+              {/* Tab content */}
+              <div className="flex-1 flex flex-col min-h-0">
+                <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+                  {activeTab === 'general' && (
+                    <>
+                      <Field label="Name">
+                        <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+                      </Field>
+                      <div className="flex gap-2">
+                        <Field label="Host" className="flex-1">
+                          <input className="input" value={form.host} onChange={(e) => setForm({ ...form, host: e.target.value })} required />
+                        </Field>
+                        <Field label="Port" className="w-24">
+                          <input className="input" type="number" value={form.port} onChange={(e) => setForm({ ...form, port: Number(e.target.value) })} required />
+                        </Field>
+                      </div>
+                      <Field label="Username">
+                        <input className="input" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} required />
+                      </Field>
+                      <Field label={modal.editing ? 'Password (leave blank to keep current)' : 'Password'}>
+                        <input className="input" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required={!modal.editing} />
+                      </Field>
+                    </>
+                  )}
+
+                  {activeTab === 'advanced' && (
+                    <>
+                      <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                        <input type="checkbox" checked={form.enable_epsv} onChange={(e) => setForm({ ...form, enable_epsv: e.target.checked })} />
+                        Enable EPSV
+                        <span className="text-xs text-gray-400 dark:text-gray-500">(Extended Passive mode; disable if you see login: EOF errors)</span>
+                      </label>
+                      <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                        <input type="checkbox" checked={form.skip_tls_verify} onChange={(e) => setForm({ ...form, skip_tls_verify: e.target.checked })} />
+                        Skip TLS certificate verification
+                        <span className="text-xs text-gray-400 dark:text-gray-500">(insecure; use only for self-signed certs)</span>
+                      </label>
+                    </>
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 shrink-0">
+                  {save.isError && <p className="text-red-600 dark:text-red-400 text-sm mb-3">{(save.error as Error).message}</p>}
+                  <div className="flex justify-end gap-2">
+                    <button type="button" onClick={closeModal} className="btn-secondary">Cancel</button>
+                    <button type="submit" disabled={save.isPending} className="btn-primary">
+                      {save.isPending ? 'Saving…' : 'Save'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </form>
+          </div>
         </div>
-        {children}
-      </div>
+      )}
     </div>
   )
 }

@@ -32,8 +32,8 @@ type Client interface {
 
 // Dial opens an FTPES connection (plain FTP upgraded to TLS via AUTH TLS).
 // Call Login next before any other method.
-func Dial(host string, port int, skipTLSVerify bool) (Client, error) {
-	conn, err := dial(host, port, skipTLSVerify)
+func Dial(host string, port int, skipTLSVerify, enableEPSV bool) (Client, error) {
+	conn, err := dial(host, port, skipTLSVerify, enableEPSV)
 	if err != nil {
 		return nil, fmt.Errorf("ftpes dial %s:%d: %w", host, port, err)
 	}

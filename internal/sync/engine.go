@@ -85,7 +85,7 @@ func (e *Engine) PlanJob(ctx context.Context, jobID string) (*PlanResult, error)
 		return nil, fmt.Errorf("decrypt password: %w", err)
 	}
 
-	client, err := ftpes.Dial(conn.Host, conn.Port, conn.SkipTLSVerify)
+	client, err := ftpes.Dial(conn.Host, conn.Port, conn.SkipTLSVerify, conn.EnableEPSV)
 	if err != nil {
 		return nil, fmt.Errorf("dial: %w", err)
 	}
@@ -185,7 +185,7 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Conne
 		return fmt.Errorf("decrypt password: %w", err)
 	}
 
-	client, err := ftpes.Dial(conn.Host, conn.Port, conn.SkipTLSVerify)
+	client, err := ftpes.Dial(conn.Host, conn.Port, conn.SkipTLSVerify, conn.EnableEPSV)
 	if err != nil {
 		return fmt.Errorf("dial: %w", err)
 	}
