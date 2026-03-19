@@ -79,8 +79,8 @@
 - [x] `internal/api/handlers_test.go` — `httptest` + in-memory SQLite, verify status codes and JSON shapes
 
 ## Phase 11 — Packaging
-- [ ] `Dockerfile` — multi-stage: `node:20-alpine` (React build) → `golang:1.22-alpine` (Go build) → `distroless/static`
-- [ ] `README.md` — env vars, key generation (`openssl rand -hex 32`), dev setup, production deploy
+- [ ] `Dockerfile` — multi-stage: `node:20-alpine` (React build) → `golang:1.22-alpine` (Go build) → `distroless/static` *(skipped for now)*
+- [x] `README.md` — env vars, key generation (`openssl rand -hex 32`), dev setup, production deploy
 
 ---
 
