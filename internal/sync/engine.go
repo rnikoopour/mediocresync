@@ -310,6 +310,32 @@ func (e *Engine) SubscribePlan(jobID string) (<-chan PlanEvent, func()) {
 	return ch, unsub
 }
 
+// UpdateStoredPlanAction changes the action for one file in the stored plan
+// and adjusts the ToCopy/ToSkip counters. No-op if no plan is stored.
+func (e *Engine) UpdateStoredPlanAction(jobID, remotePath, action string) {
+	e.storedPlansMu.Lock()
+	defer e.storedPlansMu.Unlock()
+	plan := e.storedPlans[jobID]
+	if plan == nil {
+		return
+	}
+	for i := range plan.Files {
+		f := &plan.Files[i]
+		if f.RemotePath != remotePath || f.Action == action {
+			continue
+		}
+		if f.Action == "copy" {
+			plan.ToCopy--
+			plan.ToSkip++
+		} else {
+			plan.ToSkip--
+			plan.ToCopy++
+		}
+		f.Action = action
+		return
+	}
+}
+
 func (e *Engine) broadcastPlanEvent(jobID string, evt PlanEvent) {
 	e.planMu.Lock()
 	subs := make([]chan PlanEvent, len(e.planSubs[jobID]))

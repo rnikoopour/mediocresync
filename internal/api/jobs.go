@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/rnikoopour/go-ftpes/internal/db"
@@ -186,6 +187,38 @@ func (h *jobsHandler) update(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, toJobResponse(job))
 }
 
+func (h *jobsHandler) putFileState(w http.ResponseWriter, r *http.Request) {
+	jobID := chi.URLParam(r, "id")
+	var body struct {
+		Path      string `json:"path"`
+		SizeBytes int64  `json:"size_bytes"`
+		Mtime     string `json:"mtime"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Path == "" {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	mtime, err := time.Parse(time.RFC3339Nano, body.Mtime)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid mtime format")
+		return
+	}
+	fs := &db.FileState{
+		JobID:      jobID,
+		RemotePath: body.Path,
+		SizeBytes:  body.SizeBytes,
+		MTime:      mtime,
+		CopiedAt:   time.Now(),
+	}
+	if err := h.fileState.Upsert(fs); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to set file state")
+		return
+	}
+	h.engine.UpdateStoredPlanAction(jobID, body.Path, "skip")
+	h.broker.Publish(jobID, sse.Event{Status: "plan_file_updated", PlanPath: body.Path, PlanAction: "skip"})
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *jobsHandler) deleteFileState(w http.ResponseWriter, r *http.Request) {
 	jobID := chi.URLParam(r, "id")
 	remotePath := r.URL.Query().Get("path")
@@ -197,6 +230,8 @@ func (h *jobsHandler) deleteFileState(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to clear file state")
 		return
 	}
+	h.engine.UpdateStoredPlanAction(jobID, remotePath, "copy")
+	h.broker.Publish(jobID, sse.Event{Status: "plan_file_updated", PlanPath: remotePath, PlanAction: "copy"})
 	w.WriteHeader(http.StatusNoContent)
 }
 
