@@ -13,6 +13,7 @@ interface PlanContextValue {
   plans: Record<string, PlanEntry>
   runPlan: (jobId: string) => void
   dismissPlan: (jobId: string) => void
+  unskipFile: (jobId: string, remotePath: string) => void
 }
 
 const PlanContext = createContext<PlanContextValue | null>(null)
@@ -60,6 +61,19 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
       })
   }
 
+  function unskipFile(jobId: string, remotePath: string) {
+    setPlans((p) => {
+      const entry = p[jobId]
+      if (!entry?.result) return p
+      const files = entry.result.files.map((f) =>
+        f.remote_path === remotePath ? { ...f, action: 'copy' as const } : f
+      )
+      const toCopy = files.filter((f) => f.action === 'copy').length
+      const toSkip = files.filter((f) => f.action === 'skip').length
+      return { ...p, [jobId]: { ...entry, result: { ...entry.result, files, to_copy: toCopy, to_skip: toSkip } } }
+    })
+  }
+
   function dismissPlan(jobId: string) {
     setPlans((p) => {
       const next = { ...p }
@@ -69,7 +83,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <PlanContext.Provider value={{ plans, runPlan, dismissPlan }}>
+    <PlanContext.Provider value={{ plans, runPlan, dismissPlan, unskipFile }}>
       {children}
     </PlanContext.Provider>
   )

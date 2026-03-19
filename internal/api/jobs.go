@@ -157,6 +157,20 @@ func (h *jobsHandler) update(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, toJobResponse(job))
 }
 
+func (h *jobsHandler) deleteFileState(w http.ResponseWriter, r *http.Request) {
+	jobID := chi.URLParam(r, "id")
+	remotePath := r.URL.Query().Get("path")
+	if remotePath == "" {
+		writeError(w, http.StatusBadRequest, "path query parameter is required")
+		return
+	}
+	if err := h.fileState.Delete(jobID, remotePath); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to clear file state")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *jobsHandler) delete(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if err := h.fileState.DeleteByJob(id); err != nil {

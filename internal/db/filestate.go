@@ -52,6 +52,11 @@ func (r *FileStateRepository) Get(jobID, remotePath string) (*FileState, error) 
 	return &s, nil
 }
 
+func (r *FileStateRepository) Delete(jobID, remotePath string) error {
+	_, err := r.db.Exec(`DELETE FROM file_state WHERE job_id=? AND remote_path=?`, jobID, remotePath)
+	return err
+}
+
 func (r *FileStateRepository) DeleteByJob(jobID string) error {
 	_, err := r.db.Exec(`DELETE FROM file_state WHERE job_id=?`, jobID)
 	return err

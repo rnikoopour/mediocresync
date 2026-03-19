@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../api/client'
@@ -15,7 +15,7 @@ function formatBytes(b: number): string {
 
 // ── Plan tree ────────────────────────────────────────────────────────────────
 
-type TreeFile = { type: 'file'; name: string; size_bytes: number; action: 'copy' | 'skip' }
+type TreeFile = { type: 'file'; name: string; remote_path: string; size_bytes: number; action: 'copy' | 'skip' }
 type TreeFolder = { type: 'folder'; name: string; children: TreeNode[] }
 type TreeNode = TreeFile | TreeFolder
 
@@ -41,13 +41,13 @@ function buildTree(files: PlanFile[], remotePath: string): TreeNode[] {
       }
       cur = child
     }
-    cur.children.push({ type: 'file', name: segments[segments.length - 1], size_bytes: file.size_bytes, action: file.action })
+    cur.children.push({ type: 'file', name: segments[segments.length - 1], remote_path: file.remote_path, size_bytes: file.size_bytes, action: file.action })
   }
 
   return root.children
 }
 
-function FolderNode({ node, depth }: { node: TreeFolder; depth: number }) {
+function FolderNode({ node, depth, onUnskip }: { node: TreeFolder; depth: number; onUnskip: (remotePath: string) => void }) {
   const [open, setOpen] = useState(true)
   const indent = depth * 16
 
@@ -66,8 +66,8 @@ function FolderNode({ node, depth }: { node: TreeFolder; depth: number }) {
         <div className="border-l border-blue-100 dark:border-gray-600" style={{ marginLeft: `${16 + indent + 12}px` }}>
           {node.children.map((child, i) =>
             child.type === 'folder'
-              ? <FolderNode key={child.name + i} node={child} depth={depth + 1} />
-              : <FileRow key={child.name + i} node={child} depth={depth + 1} />
+              ? <FolderNode key={child.name + i} node={child} depth={depth + 1} onUnskip={onUnskip} />
+              : <FileRow key={child.name + i} node={child} depth={depth + 1} onUnskip={onUnskip} />
           )}
         </div>
       )}
@@ -75,28 +75,55 @@ function FolderNode({ node, depth }: { node: TreeFolder; depth: number }) {
   )
 }
 
-function FileRow({ node }: { node: TreeFile; depth: number }) {
+function FileRow({ node, onUnskip }: { node: TreeFile; depth: number; onUnskip?: (remotePath: string) => void }) {
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!menu) return
+    function close(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenu(null)
+    }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [menu])
+
   return (
     <div
-      className="flex items-center gap-4 py-1 hover:bg-gray-50 dark:hover:bg-gray-700/50"
+      className="flex items-center gap-4 py-1 hover:bg-gray-50 dark:hover:bg-gray-700/50 relative"
       style={{ paddingLeft: '12px', paddingRight: '16px' }}
+      onContextMenu={node.action === 'skip' ? (e) => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY }) } : undefined}
     >
       <span className="text-gray-400 dark:text-gray-500 shrink-0">📄</span>
       <span className="font-mono text-xs text-gray-600 dark:text-gray-300 flex-1 truncate">{node.name}</span>
       <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{formatBytes(node.size_bytes)}</span>
       <span className="shrink-0"><StatusBadge status={node.action === 'copy' ? 'pending' : 'skipped'} /></span>
+      {menu && (
+        <div
+          ref={menuRef}
+          className="fixed z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 min-w-[140px]"
+          style={{ top: menu.y, left: menu.x }}
+        >
+          <button
+            className="w-full text-left px-3 py-1.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+            onClick={() => { onUnskip?.(node.remote_path); setMenu(null) }}
+          >
+            Force copy
+          </button>
+        </div>
+      )}
     </div>
   )
 }
 
-function PlanTreeView({ files, remotePath }: { files: PlanFile[]; remotePath: string }) {
+function PlanTreeView({ files, remotePath, onUnskip }: { files: PlanFile[]; remotePath: string; onUnskip: (remotePath: string) => void }) {
   const nodes = buildTree(files, remotePath)
   return (
     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden py-1">
       {nodes.map((n, i) =>
         n.type === 'folder'
-          ? <FolderNode key={n.name + i} node={n} depth={0} />
-          : <FileRow key={n.name + i} node={n} depth={0} />
+          ? <FolderNode key={n.name + i} node={n} depth={0} onUnskip={onUnskip} />
+          : <FileRow key={n.name + i} node={n} depth={0} onUnskip={onUnskip} />
       )}
     </div>
   )
@@ -108,13 +135,18 @@ export function JobDetailPage() {
 
   const { data: job } = useQuery({ queryKey: ['jobs', id], queryFn: () => api.jobs.get(id!) })
   const { data: runs = [], isLoading } = useQuery({ queryKey: ['runs', id], queryFn: () => api.jobs.listRuns(id!) })
-  const { plans, runPlan, dismissPlan } = usePlan()
+  const { plans, runPlan, dismissPlan, unskipFile } = usePlan()
   const planEntry = id ? plans[id] : undefined
   const [editOpen, setEditOpen] = useState(false)
 
   const trigger = useMutation({
     mutationFn: () => api.jobs.trigger(id!),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['runs', id] }),
+  })
+
+  const unskip = useMutation({
+    mutationFn: (remotePath: string) => api.jobs.deleteFileState(id!, remotePath),
+    onSuccess: (_, remotePath) => id && unskipFile(id, remotePath),
   })
 
   return (
@@ -188,7 +220,7 @@ export function JobDetailPage() {
               )}
             </div>
           ) : planEntry.result && (
-            <PlanTreeView files={planEntry.result.files} remotePath={job?.remote_path ?? ''} />
+            <PlanTreeView files={planEntry.result.files} remotePath={job?.remote_path ?? ''} onUnskip={(p) => unskip.mutate(p)} />
           )}
         </div>
       )}

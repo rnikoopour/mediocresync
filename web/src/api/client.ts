@@ -39,6 +39,7 @@ export const api = {
     delete: (id: string) => request<void>('DELETE', `/jobs/${id}`),
     trigger: (id: string) => request<void>('POST', `/jobs/${id}/run`),
     plan: (id: string) => request<PlanResult>('POST', `/jobs/${id}/plan`),
+    deleteFileState: (id: string, path: string) => request<void>('DELETE', `/jobs/${id}/files?path=${encodeURIComponent(path)}`),
     listRuns: (id: string) => request<Run[]>('GET', `/jobs/${id}/runs`),
   },
 
