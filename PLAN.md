@@ -14,8 +14,8 @@
 - [x] `.gitignore` (`web/node_modules/`, `web/dist/`, `*.db`, `.env`)
 
 ## Phase 1 — Configuration & Secrets
-- [ ] `internal/config/config.go` — `Config` struct, `Load()` reads env vars (`LISTEN_ADDR`, `DB_PATH`, `ENCRYPTION_KEY`)
-- [ ] `internal/crypto/crypto.go` — AES-256-GCM `Encrypt` / `Decrypt`; key validated as 32 bytes
+- [x] `internal/config/config.go` — `Config` struct, `Load()` reads env vars (`LISTEN_ADDR`, `DB_PATH`, `ENCRYPTION_KEY`)
+- [x] `internal/crypto/crypto.go` — AES-256-GCM `Encrypt` / `Decrypt`; key validated as 32 bytes
 
 ## Phase 2 — Database Layer
 - [ ] `internal/db/schema.go` — DDL for 5 tables: `connections`, `sync_jobs`, `runs`, `transfers`, `file_state`
