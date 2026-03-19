@@ -357,6 +357,8 @@ func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanResult
 	if err := e.runs.Create(run); err != nil {
 		return fmt.Errorf("create run: %w", err)
 	}
+	// Notify all clients watching this job that a run has started.
+	e.broker.Publish(jobID, sse.Event{RunID: run.ID, Status: "started"})
 
 	runErr := e.executeRun(jobCtx, job, conn, run, plan)
 

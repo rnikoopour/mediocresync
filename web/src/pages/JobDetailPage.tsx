@@ -447,6 +447,23 @@ export function JobDetailPage() {
     return subscribePlan(id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
+
+  // Subscribe to job-level events so runs triggered by other clients are
+  // discovered immediately rather than relying on polling.
+  useEffect(() => {
+    if (!id) return
+    const es = new EventSource(`/api/jobs/${id}/events`)
+    es.onmessage = (e) => {
+      const ev = JSON.parse(e.data)
+      if (ev.status === 'started') {
+        qc.invalidateQueries({ queryKey: ['runs', id] })
+        dismissPlan(id)
+      }
+    }
+    es.onerror = () => es.close()
+    return () => es.close()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id])
   const [editOpen, setEditOpen] = useState(false)
   const jobIsRunning = runs[0]?.status === 'running'
 

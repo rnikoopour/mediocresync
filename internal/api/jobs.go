@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/rnikoopour/go-ftpes/internal/db"
 	internalsync "github.com/rnikoopour/go-ftpes/internal/sync"
+	"github.com/rnikoopour/go-ftpes/internal/sse"
 )
 
 type jobRequest struct {
@@ -68,6 +69,7 @@ type jobsHandler struct {
 	repo      *db.JobRepository
 	fileState *db.FileStateRepository
 	engine    *internalsync.Engine
+	broker    *sse.Broker
 	appCtx    context.Context
 }
 
@@ -288,6 +290,45 @@ func (h *jobsHandler) planEvents(w http.ResponseWriter, r *http.Request) {
 			if evt.Done || evt.Error != "" {
 				return
 			}
+		case <-r.Context().Done():
+			return
+		case <-h.appCtx.Done():
+			return
+		}
+	}
+}
+
+// jobEvents streams job-level events (e.g. run started) to connected clients.
+// Unlike plan or run progress streams, this stays open indefinitely so any
+// client on the job detail page is notified in real time.
+func (h *jobsHandler) jobEvents(w http.ResponseWriter, r *http.Request) {
+	jobID := chi.URLParam(r, "id")
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		writeError(w, http.StatusInternalServerError, "streaming not supported")
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
+	w.WriteHeader(http.StatusOK)
+	flusher.Flush()
+
+	ch, unsub := h.broker.Subscribe(jobID)
+	defer unsub()
+
+	for {
+		select {
+		case ev, ok := <-ch:
+			if !ok {
+				return
+			}
+			data, _ := json.Marshal(ev)
+			fmt.Fprintf(w, "data: %s\n\n", data)
+			flusher.Flush()
 		case <-r.Context().Done():
 			return
 		case <-h.appCtx.Done():

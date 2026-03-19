@@ -35,7 +35,7 @@ func NewRouter(
 	}
 
 	conns := &connectionsHandler{repo: connections, encKey: encKey}
-	jobsH := &jobsHandler{repo: jobs, fileState: fileState, engine: engine, appCtx: appCtx}
+	jobsH := &jobsHandler{repo: jobs, fileState: fileState, engine: engine, broker: broker, appCtx: appCtx}
 	runsH := &runsHandler{runs: runs, transfers: transfers, broker: broker, appCtx: appCtx}
 
 	r.Route("/api", func(r chi.Router) {
@@ -62,6 +62,7 @@ func NewRouter(
 			r.Delete("/{id}/run", jobsH.cancelRun)
 			r.Post("/{id}/plan", jobsH.planStart)
 			r.Get("/{id}/plan/events", jobsH.planEvents)
+			r.Get("/{id}/events", jobsH.jobEvents)
 			r.Delete("/{id}/files", jobsH.deleteFileState)
 			r.Get("/{id}/runs", runsH.listByJob)
 		})
