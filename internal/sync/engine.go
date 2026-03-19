@@ -19,6 +19,18 @@ import (
 // ErrJobAlreadyRunning is returned by RunJob when a run for the job is already active.
 var ErrJobAlreadyRunning = fmt.Errorf("job is already running")
 
+// ErrPlanAlreadyRunning is returned by StartPlan when a plan for the job is already active.
+var ErrPlanAlreadyRunning = fmt.Errorf("plan is already running")
+
+// PlanEvent is a progress or terminal event broadcast to plan SSE subscribers.
+type PlanEvent struct {
+	Files   int         `json:"files"`
+	Folders int         `json:"folders"`
+	Done    bool        `json:"done"`
+	Error   string      `json:"error"`
+	Result  *PlanResult `json:"result,omitempty"`
+}
+
 type Engine struct {
 	connections *db.ConnectionRepository
 	jobs        *db.JobRepository
@@ -35,6 +47,10 @@ type Engine struct {
 	storedPlans   map[string]*PlanResult
 	storedPlansMu sync.Mutex
 	runWG         sync.WaitGroup // tracks all in-flight runWithPlan calls
+
+	planMu     sync.Mutex
+	planActive map[string]bool
+	planSubs   map[string][]chan PlanEvent
 }
 
 func NewEngine(
@@ -59,6 +75,8 @@ func NewEngine(
 		active:      make(map[string]bool),
 		cancelFuncs: make(map[string]context.CancelFunc),
 		storedPlans: make(map[string]*PlanResult),
+		planActive:  make(map[string]bool),
+		planSubs:    make(map[string][]chan PlanEvent),
 	}
 }
 
@@ -187,6 +205,114 @@ func (e *Engine) PlanThenRun(ctx context.Context, jobID string) error {
 	delete(e.storedPlans, jobID)
 	e.storedPlansMu.Unlock()
 	return e.runWithPlan(ctx, jobID, plan)
+}
+
+// StartPlan starts a plan scan in the background and broadcasts progress to
+// all current and future SSE subscribers for this job.
+// Returns ErrPlanAlreadyRunning if a plan for this job is already in progress.
+func (e *Engine) StartPlan(jobID string) error {
+	e.planMu.Lock()
+	if e.planActive[jobID] {
+		e.planMu.Unlock()
+		return ErrPlanAlreadyRunning
+	}
+	e.planActive[jobID] = true
+	e.planMu.Unlock()
+
+	// Immediately notify any clients already subscribed (e.g. via auto-subscribe
+	// on page load) so their UI flips to "running" before the first walk tick.
+	e.broadcastPlanEvent(jobID, PlanEvent{})
+
+	go func() {
+		result, err := e.PlanJobStream(e.appCtx, jobID, func(files, dirs int) {
+			e.broadcastPlanEvent(jobID, PlanEvent{Files: files, Folders: dirs})
+		})
+
+		e.planMu.Lock()
+		delete(e.planActive, jobID)
+		subs := e.planSubs[jobID]
+		delete(e.planSubs, jobID)
+		e.planMu.Unlock()
+
+		var evt PlanEvent
+		if err != nil {
+			evt = PlanEvent{Error: err.Error()}
+		} else {
+			evt = PlanEvent{Done: true, Result: result}
+		}
+		for _, ch := range subs {
+			select {
+			case ch <- evt:
+			default:
+			}
+			close(ch)
+		}
+	}()
+	return nil
+}
+
+// SubscribePlan returns a channel that receives PlanEvents for the given job,
+// and an unsubscribe function that must be called when the caller is done.
+//
+// If a completed plan result is already stored, a done event is delivered
+// immediately and the channel is closed. Otherwise the channel stays open,
+// receiving progress events as they arrive (whether the plan is already running
+// or starts in the future). Call the returned function to deregister early
+// (e.g. on client disconnect).
+func (e *Engine) SubscribePlan(jobID string) (<-chan PlanEvent, func()) {
+	ch := make(chan PlanEvent, 64)
+
+	e.planMu.Lock()
+
+	// If a result is already stored, deliver it immediately and skip registration.
+	e.storedPlansMu.Lock()
+	result := e.storedPlans[jobID]
+	e.storedPlansMu.Unlock()
+
+	if result != nil {
+		e.planMu.Unlock()
+		ch <- PlanEvent{Done: true, Result: result}
+		close(ch)
+		return ch, func() {}
+	}
+
+	// Register for live events (whether a plan is active now or starts later).
+	e.planSubs[jobID] = append(e.planSubs[jobID], ch)
+
+	// If a plan is already running, push an immediate event so the subscriber
+	// knows to show the "running" state before the next progress tick arrives.
+	if e.planActive[jobID] {
+		ch <- PlanEvent{}
+	}
+	e.planMu.Unlock()
+
+	unsub := func() {
+		e.planMu.Lock()
+		defer e.planMu.Unlock()
+		subs := e.planSubs[jobID]
+		for i, s := range subs {
+			if s == ch {
+				e.planSubs[jobID] = append(subs[:i], subs[i+1:]...)
+				break
+			}
+		}
+	}
+
+	return ch, unsub
+}
+
+func (e *Engine) broadcastPlanEvent(jobID string, evt PlanEvent) {
+	e.planMu.Lock()
+	subs := make([]chan PlanEvent, len(e.planSubs[jobID]))
+	copy(subs, e.planSubs[jobID])
+	e.planMu.Unlock()
+
+	for _, ch := range subs {
+		select {
+		case ch <- evt:
+		default:
+		}
+	}
 }
 
 // Wait blocks until all in-flight runWithPlan calls have finished.

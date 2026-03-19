@@ -437,8 +437,16 @@ export function JobDetailPage() {
     queryFn: () => api.jobs.listRuns(id!),
     refetchInterval: (q) => q.state.data?.[0]?.status === 'running' ? 3000 : false,
   })
-  const { plans, runPlan, dismissPlan, unskipFile } = usePlan()
+  const { plans, runPlan, subscribePlan, dismissPlan, unskipFile } = usePlan()
   const planEntry = id ? plans[id] : undefined
+
+  // Auto-subscribe to plan events so plans started by other clients are visible.
+  // The cleanup closes the EventSource when the page unmounts or id changes.
+  useEffect(() => {
+    if (!id) return
+    return subscribePlan(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id])
   const [editOpen, setEditOpen] = useState(false)
   const jobIsRunning = runs[0]?.status === 'running'
 

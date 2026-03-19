@@ -231,7 +231,24 @@ func (h *jobsHandler) cancelRun(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *jobsHandler) plan(w http.ResponseWriter, r *http.Request) {
+func (h *jobsHandler) planStart(w http.ResponseWriter, r *http.Request) {
+	jobID := chi.URLParam(r, "id")
+
+	job, err := h.repo.Get(jobID)
+	if err != nil || job == nil {
+		writeError(w, http.StatusNotFound, "job not found")
+		return
+	}
+	_ = job
+
+	if err := h.engine.StartPlan(jobID); err != nil {
+		writeError(w, http.StatusConflict, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusAccepted)
+}
+
+func (h *jobsHandler) planEvents(w http.ResponseWriter, r *http.Request) {
 	jobID := chi.URLParam(r, "id")
 
 	job, err := h.repo.Get(jobID)
@@ -250,26 +267,28 @@ func (h *jobsHandler) plan(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
 	w.WriteHeader(http.StatusOK)
-
-	progress := func(files, dirs int) {
-		fmt.Fprintf(w, "data: {\"files\":%d,\"folders\":%d}\n\n", files, dirs)
-		flusher.Flush()
-	}
-
-	result, err := h.engine.PlanJobStream(r.Context(), jobID, progress)
-	if err != nil {
-		fmt.Fprintf(w, "data: {\"error\":%s}\n\n", jsonString(err.Error()))
-		flusher.Flush()
-		return
-	}
-
-	data, _ := json.Marshal(map[string]any{"done": true, "result": result})
-	fmt.Fprintf(w, "data: %s\n\n", data)
 	flusher.Flush()
+
+	ch, unsub := h.engine.SubscribePlan(jobID)
+	defer unsub()
+
+	for {
+		select {
+		case evt, ok := <-ch:
+			if !ok {
+				return
+			}
+			data, _ := json.Marshal(evt)
+			fmt.Fprintf(w, "data: %s\n\n", data)
+			flusher.Flush()
+			if evt.Done || evt.Error != "" {
+				return
+			}
+		case <-r.Context().Done():
+			return
+		}
+	}
 }
 
-func jsonString(s string) string {
-	b, _ := json.Marshal(s)
-	return string(b)
-}
