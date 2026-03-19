@@ -20,6 +20,10 @@ import (
 // ErrJobAlreadyRunning is returned by RunJob when a run for the job is already active.
 var ErrJobAlreadyRunning = fmt.Errorf("job is already running")
 
+const stallTimeout = 30 * time.Second
+
+var errTransferStalled = errors.New("transfer stalled: no data received for 30s")
+
 // ErrPlanAlreadyRunning is returned by StartPlan when a plan for the job is already active.
 var ErrPlanAlreadyRunning = fmt.Errorf("plan is already running")
 
@@ -555,7 +559,9 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Conne
 			if lastErr != nil {
 				slog.Error("transfer failed", "path", ent.remote.Path, "err", lastErr)
 				errMsg := lastErr.Error()
-				if errors.Is(lastErr, context.Canceled) {
+				if errors.Is(lastErr, errTransferStalled) {
+					errMsg = "transfer stalled: no data received"
+				} else if errors.Is(lastErr, context.Canceled) {
 					if e.appCtx.Err() != nil {
 						errMsg = "canceled by server"
 					} else {
@@ -631,16 +637,44 @@ func (e *Engine) downloadFile(
 		})
 	})
 
+	// Stall detection: derive a context that is cancelled if no bytes transfer
+	// for stallTimeout. This covers both user-cancelled jobs (ctx.Done) and true
+	// network stalls where the FTP server stops sending data without closing.
+	stallCtx, cancelStall := context.WithCancelCause(ctx)
+	defer cancelStall(nil)
+
+	go func() {
+		ticker := time.NewTicker(stallTimeout)
+		defer ticker.Stop()
+		var lastBytes int64
+		for {
+			select {
+			case <-stallCtx.Done():
+				return
+			case <-ticker.C:
+				current := pr.n.Load()
+				if current == lastBytes {
+					cancelStall(errTransferStalled)
+					return
+				}
+				lastBytes = current
+			}
+		}
+	}()
+
 	dlDone := make(chan error, 1)
 	go func() {
-		dlDone <- client.Download(remote.Path, pw)
+		// stallCtx is passed so Download closes the FTP response when stall
+		// (or cancellation) is detected, unblocking the internal r.Read().
+		dlDone <- client.Download(stallCtx, remote.Path, pw)
 		pw.Close()
 	}()
 
-	_, copyErr := copyWithContext(ctx, f, pr)
+	_, copyErr := copyWithContext(stallCtx, f, pr)
+	cancelStall(nil) // stop the watchdog goroutine
 	if copyErr != nil {
-		// Signal the download goroutine to stop: closing the pipe reader
-		// causes any pending pw.Write() to return an error immediately.
+		// Closing pr2 causes any pending pw.Write() to fail immediately,
+		// which unblocks io.Copy inside Download if it hasn't exited yet.
 		pr2.CloseWithError(copyErr)
 	}
 	dlErr := <-dlDone
@@ -648,7 +682,12 @@ func (e *Engine) downloadFile(
 
 	var downloadErr error
 	if copyErr != nil {
-		downloadErr = copyErr
+		// Distinguish a stall from a user/server cancellation.
+		if errors.Is(context.Cause(stallCtx), errTransferStalled) {
+			downloadErr = errTransferStalled
+		} else {
+			downloadErr = copyErr
+		}
 	} else if dlErr != nil {
 		downloadErr = dlErr
 	}

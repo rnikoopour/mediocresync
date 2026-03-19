@@ -1,9 +1,11 @@
 package ftpes
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"io"
+	"sync"
 	"time"
 
 	"github.com/jlaffaye/ftp"
@@ -38,17 +40,35 @@ func (c *client) Login(user, pass string) error {
 	return c.conn.Login(user, pass)
 }
 
-func (c *client) Download(remotePath string, dst io.Writer) error {
+func (c *client) Download(ctx context.Context, remotePath string, dst io.Writer) error {
 	r, err := c.conn.Retr(remotePath)
 	if err != nil {
 		return fmt.Errorf("RETR %s: %w", remotePath, err)
 	}
-	defer r.Close()
 
-	if _, err := io.Copy(dst, r); err != nil {
-		return fmt.Errorf("read %s: %w", remotePath, err)
+	// Close the FTP response exactly once (from defer or the ctx watcher below).
+	var once sync.Once
+	closeResp := func() { once.Do(func() { r.Close() }) }
+	defer closeResp()
+
+	// When the context is done, close the FTP data connection so the blocked
+	// r.Read() inside io.Copy returns immediately instead of hanging.
+	stop := make(chan struct{})
+	go func() {
+		select {
+		case <-ctx.Done():
+			closeResp()
+		case <-stop:
+		}
+	}()
+
+	_, copyErr := io.Copy(dst, r)
+	close(stop)
+
+	if copyErr != nil {
+		return fmt.Errorf("read %s: %w", remotePath, copyErr)
 	}
-	return nil
+	return ctx.Err()
 }
 
 func (c *client) Close() error {
