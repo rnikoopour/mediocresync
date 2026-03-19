@@ -163,7 +163,7 @@ function RunRow({ run: initialRun, remotePath, jobId }: { run: Run; remotePath: 
   if (cancelling && run.status !== 'running') setCancelling(false)
 
   const liveEvents = useSSE(open && run.status === 'running' ? run.id : null)
-  const transfers = run.transfers ?? []
+  const transfers = run.transfers // undefined until detail fetch completes
 
   return (
     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
@@ -199,9 +199,13 @@ function RunRow({ run: initialRun, remotePath, jobId }: { run: Run; remotePath: 
       </div>
 
       {open && (
-        transfers.length === 0 ? (
+        transfers === undefined ? (
           <p className="border-t border-gray-100 dark:border-gray-700 px-4 py-4 text-xs text-center text-gray-400 dark:text-gray-500">
-            {run.status === 'running' ? 'Enumerating files…' : 'No transfers recorded.'}
+            Processing plan…
+          </p>
+        ) : transfers.length === 0 ? (
+          <p className="border-t border-gray-100 dark:border-gray-700 px-4 py-4 text-xs text-center text-gray-400 dark:text-gray-500">
+            No transfers recorded.
           </p>
         ) : (
           <RunTreeView transfers={transfers} remotePath={remotePath} liveEvents={liveEvents} />
