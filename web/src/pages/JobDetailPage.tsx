@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router-dom'
 import { api } from '../api/client'
 import type { PlanFile } from '../api/types'
 import { StatusBadge } from '../components/StatusBadge'
+import { JobFormModal } from '../components/JobFormModal'
 import { usePlan } from '../context/PlanContext'
 
 function formatBytes(b: number): string {
@@ -109,6 +110,7 @@ export function JobDetailPage() {
   const { data: runs = [], isLoading } = useQuery({ queryKey: ['runs', id], queryFn: () => api.jobs.listRuns(id!) })
   const { plans, runPlan, dismissPlan } = usePlan()
   const planEntry = id ? plans[id] : undefined
+  const [editOpen, setEditOpen] = useState(false)
 
   const trigger = useMutation({
     mutationFn: () => api.jobs.trigger(id!),
@@ -133,6 +135,7 @@ export function JobDetailPage() {
           )}
         </div>
         <div className="flex gap-2">
+          <button onClick={() => setEditOpen(true)} className="btn-secondary">Edit</button>
           <button
             onClick={() => id && runPlan(id)}
             disabled={planEntry?.status === 'running'}
@@ -219,6 +222,10 @@ export function JobDetailPage() {
           </Link>
         ))}
       </div>
+
+      {editOpen && job && (
+        <JobFormModal editing={job} onClose={() => setEditOpen(false)} />
+      )}
     </div>
   )
 }
