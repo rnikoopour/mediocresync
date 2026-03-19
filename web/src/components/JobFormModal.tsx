@@ -4,6 +4,7 @@ import { api } from '../api/client'
 import type { SyncJob, JobRequest } from '../api/types'
 import { RemoteBrowser } from './RemoteBrowser'
 import { LocalBrowser } from './LocalBrowser'
+import { usePlan } from '../context/PlanContext'
 
 interface Props {
   editing: SyncJob | null
@@ -28,6 +29,7 @@ function jobToForm(j: SyncJob): JobRequest {
 
 export function JobFormModal({ editing, onClose }: Props) {
   const qc = useQueryClient()
+  const { dismissPlan } = usePlan()
   const [form, setForm] = useState<JobRequest>(editing ? jobToForm(editing) : empty)
   const [activeTab, setActiveTab] = useState<'general' | 'filters'>('general')
   const [browserOpen, setBrowserOpen] = useState(false)
@@ -39,6 +41,7 @@ export function JobFormModal({ editing, onClose }: Props) {
     mutationFn: (req: JobRequest) =>
       editing ? api.jobs.update(editing.id, req) : api.jobs.create(req),
     onSuccess: () => {
+      if (editing) dismissPlan(editing.id)
       qc.invalidateQueries({ queryKey: ['jobs'] })
       onClose()
     },
