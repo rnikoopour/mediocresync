@@ -588,6 +588,7 @@ export function JobDetailPage() {
   })
   const { plans, runPlan, subscribePlan, dismissPlan, unskipFile, skipFile } = usePlan()
   const planEntry = id ? plans[id] : undefined
+  const [planOpen, setPlanOpen] = useState(true)
 
   // Auto-subscribe to plan events so plans started by other clients are visible.
   // The cleanup closes the EventSource when the page unmounts or id changes.
@@ -687,35 +688,43 @@ export function JobDetailPage() {
       )}
 
       {planEntry && planEntry.status !== 'error' && (
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Plan Result
+        <div className="mb-8 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+          <div className="flex items-center gap-4 px-4 py-3">
+            <button
+              onClick={() => setPlanOpen((o) => !o)}
+              className="flex flex-wrap items-center gap-4 flex-1 min-w-0 hover:opacity-80 transition-opacity text-left"
+            >
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Plan Result</span>
               {planEntry.status === 'running' ? (
-                <span className="ml-2 font-normal text-gray-400 dark:text-gray-500">Running…</span>
+                <span className="text-xs font-normal text-gray-400 dark:text-gray-500">Running…</span>
               ) : planEntry.result && (
-                <span className="ml-2 font-normal text-gray-400 dark:text-gray-500">
+                <span className="text-xs font-normal text-gray-400 dark:text-gray-500">
                   {planEntry.result.to_copy} to copy · {planEntry.result.to_skip} to skip · {planEntry.result.files.length} total
                   {' · '}{formatBytes(planEntry.result.files.filter(f => f.action === 'copy').reduce((s, f) => s + f.size_bytes, 0))}
                 </span>
               )}
-            </h2>
+              <span className="text-gray-400 dark:text-gray-500 text-xs w-3 shrink-0">{planOpen ? '▾' : '▸'}</span>
+            </button>
             {planEntry.status !== 'running' && (
-              <button onClick={() => id && dismissPlan(id)} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+              <button onClick={() => id && dismissPlan(id)} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0">
                 Dismiss
               </button>
             )}
           </div>
-          {planEntry.status === 'running' ? (
-            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-8 flex items-center justify-center gap-3 text-sm text-gray-400 dark:text-gray-500">
-              <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin shrink-0" />
-              Scanning…
-              {(planEntry.scannedFiles > 0 || planEntry.scannedFolders > 0) && (
-                <span>{planEntry.scannedFiles} files, {planEntry.scannedFolders} folders found</span>
-              )}
-            </div>
-          ) : planEntry.result && (
-            <PlanTreeView files={planEntry.result.files} remotePath={job?.remote_path ?? ''} onSkip={doSkip} onUnskip={doUnskip} />
+          {planOpen && (
+            planEntry.status === 'running' ? (
+              <div className="border-t border-gray-100 dark:border-gray-700 px-4 py-8 flex items-center justify-center gap-3 text-sm text-gray-400 dark:text-gray-500">
+                <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin shrink-0" />
+                Scanning…
+                {(planEntry.scannedFiles > 0 || planEntry.scannedFolders > 0) && (
+                  <span>{planEntry.scannedFiles} files, {planEntry.scannedFolders} folders found</span>
+                )}
+              </div>
+            ) : planEntry.result && (
+              <div className="border-t border-gray-100 dark:border-gray-700">
+                <PlanTreeView files={planEntry.result.files} remotePath={job?.remote_path ?? ''} onSkip={doSkip} onUnskip={doUnskip} />
+              </div>
+            )
           )}
         </div>
       )}
