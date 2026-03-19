@@ -92,39 +92,55 @@ function RunFileRow({ node, liveEvents, runEnded }: { node: RunTreeFile; liveEve
   const t = node.transfer
   const live = liveEvents.get(t.id)
   const status = live?.status ?? (runEnded && t.status === 'pending' ? 'not_copied' : t.status)
-  const percent = live?.percent ?? (t.status === 'done' ? 100 : 0)
   const speed = live?.speed_bps
-
+  const percent = live?.percent ?? (t.status === 'done' ? 100 : 0)
   const isFailed = status === 'failed'
 
   return (
     <div className="py-1 hover:bg-gray-50 dark:hover:bg-gray-700/50"
       style={{ paddingLeft: '12px', paddingRight: '16px' }}>
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-gray-400 dark:text-gray-500 shrink-0">📄</span>
-        {(isFailed || status === 'done' || status === 'not_copied') && <span className="shrink-0"><StatusBadge status={status} /></span>}
-        <span className={`font-mono text-xs flex-1 min-w-0 break-all ${isFailed ? 'text-red-500 dark:text-red-400' : 'text-gray-600 dark:text-gray-300'}`}>{node.name}</span>
-        <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{formatBytes(t.size_bytes)}</span>
-        {status === 'in_progress' && speed !== undefined && speed > 0 && (
-          <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{formatSpeed(speed)}</span>
-        )}
-        {(status === 'in_progress' || status === 'done' || isFailed || status === 'not_copied') ? (
-          <div className="w-full sm:w-48 shrink-0">
-            <ProgressBar
-              percent={isFailed || status === 'not_copied' ? 0 : percent}
-              label={isFailed ? 'Failed' : status === 'not_copied' ? 'Not Copied' : undefined}
-              variant={isFailed ? 'failed' : status === 'not_copied' ? 'not_copied' : 'default'}
-            />
+      <div className="flex items-start gap-2">
+        <span className="text-gray-400 dark:text-gray-500 shrink-0 mt-0.5">📄</span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            {/* desktop: badge left of filename */}
+            <span className="hidden md:inline shrink-0"><StatusBadge status={status} /></span>
+            <span className={`font-mono text-xs break-all flex-1 min-w-0 ${isFailed ? 'text-red-500 dark:text-red-400' : 'text-gray-600 dark:text-gray-300'}`}>{node.name}</span>
+            {/* desktop: size, speed, then progress bar */}
+            <span className="hidden md:inline text-xs text-gray-400 dark:text-gray-500 shrink-0">{formatBytes(t.size_bytes)}</span>
+            {status === 'in_progress' && speed !== undefined && speed > 0 && (
+              <span className="hidden md:inline text-xs text-gray-400 dark:text-gray-500 shrink-0">{formatSpeed(speed)}</span>
+            )}
+            {(status === 'in_progress' || status === 'done' || isFailed || status === 'not_copied') && (
+              <div className="hidden md:block w-32 shrink-0">
+                <ProgressBar
+                  percent={isFailed || status === 'not_copied' ? 0 : percent}
+                  variant={isFailed ? 'failed' : status === 'not_copied' ? 'not_copied' : 'default'}
+                />
+              </div>
+            )}
           </div>
-        ) : (
-          <span className="shrink-0"><StatusBadge status={status} /></span>
-        )}
+          {/* mobile: badge + size + speed on second line, progress bar below */}
+          <div className="flex md:hidden items-center gap-2 mt-0.5">
+            <StatusBadge status={status} />
+            <span className="text-xs text-gray-400 dark:text-gray-500">{formatBytes(t.size_bytes)}</span>
+            {status === 'in_progress' && speed !== undefined && speed > 0 && (
+              <span className="text-xs text-gray-400 dark:text-gray-500">{formatSpeed(speed)}</span>
+            )}
+          </div>
+          {(status === 'in_progress' || status === 'done' || isFailed || status === 'not_copied') && (
+            <div className="md:hidden mt-1">
+              <ProgressBar
+                percent={isFailed || status === 'not_copied' ? 0 : percent}
+                variant={isFailed ? 'failed' : status === 'not_copied' ? 'not_copied' : 'default'}
+              />
+            </div>
+          )}
+          {isFailed && t.error_msg && (
+            <p className="font-mono text-xs text-red-400 dark:text-red-500 break-all mt-0.5">{t.error_msg}</p>
+          )}
+        </div>
       </div>
-      {isFailed && t.error_msg && (
-        <p className="font-mono text-xs text-red-400 dark:text-red-500 break-all mt-0.5" style={{ paddingLeft: '28px' }}>
-          {t.error_msg}
-        </p>
-      )}
     </div>
   )
 }
@@ -448,19 +464,31 @@ function FileRow({ node, onSkip, onUnskip }: { node: TreeFile; depth: number; on
 
   return (
     <div
-      className="flex items-center gap-4 py-1 hover:bg-gray-50 dark:hover:bg-gray-700/50 relative"
+      className="flex items-center gap-2 py-1 hover:bg-gray-50 dark:hover:bg-gray-700/50 relative"
       style={{ paddingLeft: '12px', paddingRight: '16px' }}
       onContextMenu={(e) => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY }) }}
     >
       <span className="text-gray-400 dark:text-gray-500 shrink-0">📄</span>
-      <span className="font-mono text-xs text-gray-600 dark:text-gray-300 flex-1 min-w-0 break-all">{node.name}</span>
-      <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{formatBytes(node.size_bytes)}</span>
-      <span className="shrink-0"><StatusBadge status={node.action === 'copy' ? 'pending' : 'skipped'} /></span>
-      <button
-        className="md:hidden px-1 py-0.5 text-gray-400 dark:text-gray-500 text-base leading-none shrink-0"
-        onClick={(e) => { e.stopPropagation(); setMenu({ x: e.clientX, y: e.clientY }) }}
-        aria-label="Actions"
-      >⋮</button>
+      {/* inner column: name + (mobile) second line with size & badge */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          {/* desktop: badge left of filename */}
+          <span className="hidden md:inline shrink-0"><StatusBadge status={node.action === 'copy' ? 'pending' : 'skipped'} /></span>
+          <span className="font-mono text-xs text-gray-600 dark:text-gray-300 flex-1 min-w-0 break-all">{node.name}</span>
+          {/* desktop: size right of filename */}
+          <span className="hidden md:inline text-xs text-gray-400 dark:text-gray-500 shrink-0">{formatBytes(node.size_bytes)}</span>
+          <button
+            className="md:hidden px-1 py-0.5 text-gray-400 dark:text-gray-500 text-base leading-none shrink-0"
+            onClick={(e) => { e.stopPropagation(); setMenu({ x: e.clientX, y: e.clientY }) }}
+            aria-label="Actions"
+          >⋮</button>
+        </div>
+        {/* mobile: badge + size on second line */}
+        <div className="flex md:hidden items-center gap-2 mt-0.5">
+          <StatusBadge status={node.action === 'copy' ? 'pending' : 'skipped'} />
+          <span className="text-xs text-gray-400 dark:text-gray-500">{formatBytes(node.size_bytes)}</span>
+        </div>
+      </div>
       {menu && (
         <div
           ref={menuRef}

@@ -41,6 +41,8 @@ export const api = {
     cancel: (id: string) => request<void>('DELETE', `/jobs/${id}/run`),
     plan: (id: string) => request<PlanResult>('POST', `/jobs/${id}/plan`),
     deleteFileState: (id: string, path: string) => request<void>('DELETE', `/jobs/${id}/files?path=${encodeURIComponent(path)}`),
+    skipFile: (id: string, path: string, sizeBytes: number, mtime: string) =>
+      request<void>('PUT', `/jobs/${id}/files`, { path, size_bytes: sizeBytes, mtime }),
     listRuns: (id: string) => request<Run[]>('GET', `/jobs/${id}/runs`),
   },
 
