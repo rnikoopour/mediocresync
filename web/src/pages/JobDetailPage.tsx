@@ -180,7 +180,13 @@ function RunRow({ run: initialRun, remotePath, jobId }: { run: Run; remotePath: 
   const cancel = useMutation({
     mutationFn: () => api.jobs.cancel(jobId),
     onMutate: () => setCancelling(true),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['runs', jobId] }),
+    onSuccess: () => {
+      qc.setQueryData(['run', initialRun.id], (old: Run | undefined) =>
+        old ? { ...old, status: 'canceled' as const } : old
+      )
+      qc.invalidateQueries({ queryKey: ['run', initialRun.id] })
+      qc.invalidateQueries({ queryKey: ['runs', jobId] })
+    },
     onError: () => setCancelling(false),
   })
 

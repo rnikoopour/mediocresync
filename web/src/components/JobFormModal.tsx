@@ -13,7 +13,8 @@ interface Props {
 
 const empty: JobRequest = {
   name: '', connection_id: '', remote_path: '/', local_dest: '',
-  interval_value: 60, interval_unit: 'minutes', concurrency: 1, enabled: true,
+  interval_value: 60, interval_unit: 'minutes', concurrency: 1,
+  retry_attempts: 3, retry_delay_seconds: 2, enabled: true,
   include_filters: [], exclude_filters: [],
 }
 
@@ -21,7 +22,8 @@ function jobToForm(j: SyncJob): JobRequest {
   return {
     name: j.name, connection_id: j.connection_id, remote_path: j.remote_path,
     local_dest: j.local_dest, interval_value: j.interval_value, interval_unit: j.interval_unit,
-    concurrency: j.concurrency, enabled: j.enabled,
+    concurrency: j.concurrency, retry_attempts: j.retry_attempts, retry_delay_seconds: j.retry_delay_seconds,
+    enabled: j.enabled,
     include_filters: j.include_filters ?? [],
     exclude_filters: j.exclude_filters ?? [],
   }
@@ -129,6 +131,14 @@ export function JobFormModal({ editing, onClose }: Props) {
                       </Field>
                       <Field label="Concurrency" className="w-28">
                         <input className="input" type="number" min={1} max={20} value={form.concurrency} onChange={(e) => setForm({ ...form, concurrency: Number(e.target.value) })} required />
+                      </Field>
+                    </div>
+                    <div className="flex gap-2">
+                      <Field label="Retries" className="w-28">
+                        <input className="input" type="number" min={1} value={form.retry_attempts} onChange={(e) => setForm({ ...form, retry_attempts: Number(e.target.value) })} required />
+                      </Field>
+                      <Field label="Delay (s)" className="w-28">
+                        <input className="input" type="number" min={0} value={form.retry_delay_seconds} onChange={(e) => setForm({ ...form, retry_delay_seconds: Number(e.target.value) })} required />
                       </Field>
                     </div>
                     <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">

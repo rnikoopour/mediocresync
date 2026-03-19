@@ -372,47 +372,53 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Conne
 
 			// Each goroutine dials its own connection — FTP is not safe for
 			// concurrent use on a single connection (PASV/RETR responses interleave).
-			c, dialErr := ftpes.Dial(conn.Host, conn.Port, conn.SkipTLSVerify, conn.EnableEPSV)
-			if dialErr != nil {
-				slog.Error("dial failed", "path", ent.remote.Path, "err", dialErr)
-				errMsg := dialErr.Error()
-				_ = e.transfers.UpdateStatus(ent.transfer.ID, "failed", &errMsg, nil)
-				e.broker.Publish(run.ID, sse.Event{
-					RunID: run.ID, TransferID: ent.transfer.ID,
-					RemotePath: ent.remote.Path, SizeBytes: ent.remote.Size,
-					Status: "failed", Error: dialErr.Error(),
-				})
-				mu.Lock()
-				failed++
-				_ = e.runs.UpdateCounts(run.ID, len(entries), copied, skipped, failed)
-				mu.Unlock()
-				return
-			}
-			defer c.Close()
-			if loginErr := c.Login(conn.Username, password); loginErr != nil {
-				slog.Error("login failed", "path", ent.remote.Path, "err", loginErr)
-				errMsg := loginErr.Error()
-				_ = e.transfers.UpdateStatus(ent.transfer.ID, "failed", &errMsg, nil)
-				e.broker.Publish(run.ID, sse.Event{
-					RunID: run.ID, TransferID: ent.transfer.ID,
-					RemotePath: ent.remote.Path, SizeBytes: ent.remote.Size,
-					Status: "failed", Error: loginErr.Error(),
-				})
-				mu.Lock()
-				failed++
-				_ = e.runs.UpdateCounts(run.ID, len(entries), copied, skipped, failed)
-				mu.Unlock()
-				return
+			// tryOnce wraps dial+login+download so defer c.Close() fires on every exit path.
+			tryOnce := func() error {
+				c, err := ftpes.Dial(conn.Host, conn.Port, conn.SkipTLSVerify, conn.EnableEPSV)
+				if err != nil {
+					return err
+				}
+				defer c.Close()
+				if err := c.Login(conn.Username, password); err != nil {
+					return err
+				}
+				return e.downloadFile(ctx, c, job, run.ID, ent.transfer, ent.remote)
 			}
 
-			if err := e.downloadFile(ctx, c, job, run.ID, ent.transfer, ent.remote); err != nil {
-				slog.Error("download failed", "path", ent.remote.Path, "err", err)
-				errMsg := err.Error()
+			maxAttempts := max(job.RetryAttempts, 1)
+			var lastErr error
+			for attempt := 1; attempt <= maxAttempts; attempt++ {
+				if ctx.Err() != nil {
+					lastErr = ctx.Err()
+					break
+				}
+				if attempt > 1 {
+					slog.Warn("retrying transfer", "path", ent.remote.Path, "attempt", attempt, "err", lastErr)
+					select {
+					case <-time.After(time.Duration(job.RetryDelaySeconds) * time.Second):
+					case <-ctx.Done():
+						lastErr = ctx.Err()
+					}
+					if ctx.Err() != nil {
+						break
+					}
+				}
+				if lastErr = tryOnce(); lastErr == nil {
+					break
+				}
+				if ctx.Err() != nil {
+					break
+				}
+			}
+
+			if lastErr != nil {
+				slog.Error("transfer failed", "path", ent.remote.Path, "err", lastErr)
+				errMsg := lastErr.Error()
 				_ = e.transfers.UpdateStatus(ent.transfer.ID, "failed", &errMsg, nil)
 				e.broker.Publish(run.ID, sse.Event{
 					RunID: run.ID, TransferID: ent.transfer.ID,
 					RemotePath: ent.remote.Path, SizeBytes: ent.remote.Size,
-					Status: "failed", Error: err.Error(),
+					Status: "failed", Error: lastErr.Error(),
 				})
 				mu.Lock()
 				failed++

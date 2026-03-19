@@ -6,6 +6,8 @@ var alterations = []string{
 	`ALTER TABLE sync_jobs ADD COLUMN exclude_filters TEXT NOT NULL DEFAULT '[]'`,
 	`ALTER TABLE connections ADD COLUMN enable_epsv INTEGER NOT NULL DEFAULT 0`,
 	`ALTER TABLE runs ADD COLUMN total_size_bytes INTEGER NOT NULL DEFAULT 0`,
+	`ALTER TABLE sync_jobs ADD COLUMN retry_attempts INTEGER NOT NULL DEFAULT 3`,
+	`ALTER TABLE sync_jobs ADD COLUMN retry_delay_seconds INTEGER NOT NULL DEFAULT 2`,
 }
 
 var schema = []string{

@@ -23,10 +23,12 @@ type SyncJob struct {
 	LocalDest      string
 	IntervalValue  int
 	IntervalUnit   string // minutes | hours | days
-	Concurrency    int    // number of files to download concurrently (default 1)
-	Enabled        bool
-	IncludeFilters []string // "path: <subdir>" or "name: <glob>" entries; empty = include all
-	ExcludeFilters []string // same syntax; file is excluded if it matches any entry
+	Concurrency      int    // number of files to download concurrently (default 1)
+	RetryAttempts    int    // number of attempts per file (1 = no retry)
+	RetryDelaySeconds int   // seconds to wait between attempts
+	Enabled          bool
+	IncludeFilters   []string // "path: <subdir>" or "name: <glob>" entries; empty = include all
+	ExcludeFilters   []string // same syntax; file is excluded if it matches any entry
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 }

@@ -29,6 +29,8 @@ export interface SyncJob {
   interval_value: number
   interval_unit: 'minutes' | 'hours' | 'days'
   concurrency: number
+  retry_attempts: number
+  retry_delay_seconds: number
   enabled: boolean
   include_filters: string[]
   exclude_filters: string[]
@@ -44,6 +46,8 @@ export interface JobRequest {
   interval_value: number
   interval_unit: 'minutes' | 'hours' | 'days'
   concurrency: number
+  retry_attempts: number
+  retry_delay_seconds: number
   enabled: boolean
   include_filters: string[]
   exclude_filters: string[]
