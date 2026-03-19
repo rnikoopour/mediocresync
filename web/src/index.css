@@ -15,6 +15,12 @@
   --color-gray-900: #141414;
 }
 
+@keyframes slide-indeterminate {
+  0%   { transform: translateX(-100%) scaleX(0.3); }
+  50%  { transform: translateX(60%)   scaleX(0.6); }
+  100% { transform: translateX(300%)  scaleX(0.3); }
+}
+
 @layer base {
   html {
     background-color: #f9f9f9;

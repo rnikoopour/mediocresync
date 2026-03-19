@@ -70,6 +70,12 @@ type PlanResult struct {
 // PlanJob connects to the FTPES server, walks the remote tree, and returns
 // which files would be copied or skipped — without downloading anything.
 func (e *Engine) PlanJob(ctx context.Context, jobID string) (*PlanResult, error) {
+	return e.PlanJobStream(ctx, jobID, nil)
+}
+
+// PlanJobStream is like PlanJob but calls progress(files, dirs) after each
+// file or directory is discovered during the remote walk.
+func (e *Engine) PlanJobStream(ctx context.Context, jobID string, progress func(files, dirs int)) (*PlanResult, error) {
 	job, err := e.jobs.Get(jobID)
 	if err != nil || job == nil {
 		return nil, fmt.Errorf("load job %s: %w", jobID, err)
@@ -95,7 +101,11 @@ func (e *Engine) PlanJob(ctx context.Context, jobID string) (*PlanResult, error)
 		return nil, fmt.Errorf("login: %w", err)
 	}
 
-	remoteFiles, err := client.Walk(job.RemotePath)
+	cb := progress
+	if cb == nil {
+		cb = func(_, _ int) {}
+	}
+	remoteFiles, err := client.WalkWithProgress(job.RemotePath, cb)
 	if err != nil {
 		return nil, fmt.Errorf("walk %s: %w", job.RemotePath, err)
 	}

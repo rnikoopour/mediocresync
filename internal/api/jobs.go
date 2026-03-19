@@ -2,6 +2,8 @@ package api
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -199,12 +201,37 @@ func (h *jobsHandler) plan(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "job not found")
 		return
 	}
+	_ = job
 
-	result, err := h.engine.PlanJob(r.Context(), jobID)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		writeError(w, http.StatusInternalServerError, "streaming not supported")
 		return
 	}
 
-	writeJSON(w, http.StatusOK, result)
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.WriteHeader(http.StatusOK)
+
+	progress := func(files, dirs int) {
+		fmt.Fprintf(w, "data: {\"files\":%d,\"folders\":%d}\n\n", files, dirs)
+		flusher.Flush()
+	}
+
+	result, err := h.engine.PlanJobStream(r.Context(), jobID, progress)
+	if err != nil {
+		fmt.Fprintf(w, "data: {\"error\":%s}\n\n", jsonString(err.Error()))
+		flusher.Flush()
+		return
+	}
+
+	data, _ := json.Marshal(map[string]any{"done": true, "result": result})
+	fmt.Fprintf(w, "data: %s\n\n", data)
+	flusher.Flush()
+}
+
+func jsonString(s string) string {
+	b, _ := json.Marshal(s)
+	return string(b)
 }

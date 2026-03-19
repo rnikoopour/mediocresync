@@ -181,8 +181,11 @@ export function JobDetailPage() {
           </div>
           {planEntry.status === 'running' ? (
             <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-8 flex items-center justify-center gap-3 text-sm text-gray-400 dark:text-gray-500">
-              <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-              Scanning remote files…
+              <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin shrink-0" />
+              Scanning…
+              {(planEntry.scannedFiles > 0 || planEntry.scannedFolders > 0) && (
+                <span>{planEntry.scannedFiles} files, {planEntry.scannedFolders} folders found</span>
+              )}
             </div>
           ) : planEntry.result && (
             <PlanTreeView files={planEntry.result.files} remotePath={job?.remote_path ?? ''} />

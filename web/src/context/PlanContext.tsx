@@ -1,9 +1,10 @@
 import { createContext, useContext, useState } from 'react'
-import { api } from '../api/client'
 import type { PlanResult } from '../api/types'
 
 interface PlanEntry {
   status: 'running' | 'done' | 'error'
+  scannedFiles: number
+  scannedFolders: number
   result?: PlanResult
   error?: string
 }
@@ -20,10 +21,43 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
   const [plans, setPlans] = useState<Record<string, PlanEntry>>({})
 
   function runPlan(jobId: string) {
-    setPlans((p) => ({ ...p, [jobId]: { status: 'running' } }))
-    api.jobs.plan(jobId)
-      .then((result) => setPlans((p) => ({ ...p, [jobId]: { status: 'done', result } })))
-      .catch((err: Error) => setPlans((p) => ({ ...p, [jobId]: { status: 'error', error: err.message } })))
+    setPlans((p) => ({ ...p, [jobId]: { status: 'running', scannedFiles: 0, scannedFolders: 0 } }))
+
+    fetch(`/api/jobs/${jobId}/plan`, { method: 'POST' })
+      .then(async (res) => {
+        if (!res.ok || !res.body) throw new Error('failed to start plan')
+
+        const reader = res.body.getReader()
+        const decoder = new TextDecoder()
+        let buf = ''
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buf += decoder.decode(value, { stream: true })
+          const chunks = buf.split('\n\n')
+          buf = chunks.pop() ?? ''
+
+          for (const chunk of chunks) {
+            const line = chunk.split('\n').find((l) => l.startsWith('data: '))
+            if (!line) continue
+            const msg = JSON.parse(line.slice(6))
+
+            if (msg.error) {
+              setPlans((p) => ({ ...p, [jobId]: { status: 'error', scannedFiles: 0, scannedFolders: 0, error: msg.error } }))
+              return
+            }
+            if (msg.done) {
+              setPlans((p) => ({ ...p, [jobId]: { ...p[jobId], status: 'done', result: msg.result } }))
+              return
+            }
+            setPlans((p) => ({ ...p, [jobId]: { ...p[jobId], status: 'running', scannedFiles: msg.files, scannedFolders: msg.folders } }))
+          }
+        }
+      })
+      .catch((err: Error) => {
+        setPlans((p) => ({ ...p, [jobId]: { status: 'error', scannedFiles: 0, scannedFolders: 0, error: err.message } }))
+      })
   }
 
   function dismissPlan(jobId: string) {

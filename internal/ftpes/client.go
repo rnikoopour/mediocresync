@@ -26,6 +26,7 @@ type Client interface {
 	Login(user, pass string) error
 	List(remotePath string) ([]DirEntry, error)
 	Walk(remotePath string) ([]RemoteFile, error)
+	WalkWithProgress(remotePath string, progress func(files, dirs int)) ([]RemoteFile, error)
 	Download(remotePath string, dst io.Writer) error
 	Close() error
 }
