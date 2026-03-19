@@ -52,6 +52,7 @@ export function JobsPage() {
               </p>
             </div>
             <StatusBadge status={j.enabled ? 'done' : 'skipped'} />
+            <button onClick={() => openEdit(j)} className="btn-secondary text-xs">Edit</button>
             <button
               onClick={() => trigger.mutate(j.id)}
               disabled={trigger.isPending}
@@ -59,7 +60,6 @@ export function JobsPage() {
             >
               Run Now
             </button>
-            <button onClick={() => openEdit(j)} className="btn-secondary text-xs">Edit</button>
             <button
               onClick={() => { if (confirm(`Delete "${j.name}"?`)) remove.mutate(j.id) }}
               className="btn-danger text-xs"

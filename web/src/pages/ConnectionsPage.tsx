@@ -71,6 +71,7 @@ export function ConnectionsPage() {
             {testResult?.id === c.id && (
               <StatusBadge status={testResult.ok ? 'done' : 'failed'} />
             )}
+            <button onClick={() => openEdit(c)} className="btn-secondary text-xs">Edit</button>
             <button
               onClick={() => test.mutate(c.id)}
               disabled={test.isPending}
@@ -78,7 +79,6 @@ export function ConnectionsPage() {
             >
               Test
             </button>
-            <button onClick={() => openEdit(c)} className="btn-secondary text-xs">Edit</button>
             <button
               onClick={() => { if (confirm(`Delete "${c.name}"?`)) remove.mutate(c.id) }}
               className="btn-danger text-xs"
