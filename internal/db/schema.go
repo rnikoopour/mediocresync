@@ -5,6 +5,7 @@ var alterations = []string{
 	`ALTER TABLE sync_jobs ADD COLUMN include_filters TEXT NOT NULL DEFAULT '[]'`,
 	`ALTER TABLE sync_jobs ADD COLUMN exclude_filters TEXT NOT NULL DEFAULT '[]'`,
 	`ALTER TABLE connections ADD COLUMN enable_epsv INTEGER NOT NULL DEFAULT 0`,
+	`ALTER TABLE runs ADD COLUMN total_size_bytes INTEGER NOT NULL DEFAULT 0`,
 }
 
 var schema = []string{
@@ -45,10 +46,11 @@ var schema = []string{
 		status        TEXT NOT NULL CHECK(status IN ('running','completed','failed','canceled','server_stopped')),
 		started_at    TEXT NOT NULL,
 		finished_at   TEXT,
-		total_files   INTEGER NOT NULL DEFAULT 0,
-		copied_files  INTEGER NOT NULL DEFAULT 0,
-		skipped_files INTEGER NOT NULL DEFAULT 0,
-		failed_files  INTEGER NOT NULL DEFAULT 0
+		total_files      INTEGER NOT NULL DEFAULT 0,
+		copied_files     INTEGER NOT NULL DEFAULT 0,
+		skipped_files    INTEGER NOT NULL DEFAULT 0,
+		failed_files     INTEGER NOT NULL DEFAULT 0,
+		total_size_bytes INTEGER NOT NULL DEFAULT 0
 	)`,
 
 	`CREATE TABLE IF NOT EXISTS transfers (

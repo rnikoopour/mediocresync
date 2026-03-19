@@ -266,16 +266,6 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Conne
 		return fmt.Errorf("decrypt password: %w", err)
 	}
 
-	client, err := ftpes.Dial(conn.Host, conn.Port, conn.SkipTLSVerify, conn.EnableEPSV)
-	if err != nil {
-		return fmt.Errorf("dial: %w", err)
-	}
-	defer client.Close()
-
-	if err := client.Login(conn.Username, password); err != nil {
-		return fmt.Errorf("login: %w", err)
-	}
-
 	if err := ensureStagingDir(job.LocalDest); err != nil {
 		return fmt.Errorf("staging dir: %w", err)
 	}
@@ -306,6 +296,15 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Conne
 		entries = append(entries, transferEntry{transfer: t, remote: remote, skip: pf.Action == "skip"})
 	}
 
+	var totalSizeBytes int64
+	for _, pf := range plan.Files {
+		if pf.Action == "copy" {
+			totalSizeBytes += pf.SizeBytes
+		}
+	}
+	if err := e.runs.UpdateTotalSize(run.ID, totalSizeBytes); err != nil {
+		slog.Error("update run total size", "run_id", run.ID, "err", err)
+	}
 	if err := e.runs.UpdateCounts(run.ID, len(entries), 0, 0, 0); err != nil {
 		slog.Error("update run counts", "run_id", run.ID, "err", err)
 	}
@@ -340,7 +339,42 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Conne
 				return
 			}
 
-			if err := e.downloadFile(ctx, client, job, run.ID, ent.transfer, ent.remote); err != nil {
+			// Each goroutine dials its own connection — FTP is not safe for
+			// concurrent use on a single connection (PASV/RETR responses interleave).
+			c, dialErr := ftpes.Dial(conn.Host, conn.Port, conn.SkipTLSVerify, conn.EnableEPSV)
+			if dialErr != nil {
+				slog.Error("dial failed", "path", ent.remote.Path, "err", dialErr)
+				errMsg := dialErr.Error()
+				_ = e.transfers.UpdateStatus(ent.transfer.ID, "failed", &errMsg, nil)
+				e.broker.Publish(run.ID, sse.Event{
+					RunID: run.ID, TransferID: ent.transfer.ID,
+					RemotePath: ent.remote.Path, SizeBytes: ent.remote.Size,
+					Status: "failed", Error: dialErr.Error(),
+				})
+				mu.Lock()
+				failed++
+				_ = e.runs.UpdateCounts(run.ID, len(entries), copied, skipped, failed)
+				mu.Unlock()
+				return
+			}
+			defer c.Close()
+			if loginErr := c.Login(conn.Username, password); loginErr != nil {
+				slog.Error("login failed", "path", ent.remote.Path, "err", loginErr)
+				errMsg := loginErr.Error()
+				_ = e.transfers.UpdateStatus(ent.transfer.ID, "failed", &errMsg, nil)
+				e.broker.Publish(run.ID, sse.Event{
+					RunID: run.ID, TransferID: ent.transfer.ID,
+					RemotePath: ent.remote.Path, SizeBytes: ent.remote.Size,
+					Status: "failed", Error: loginErr.Error(),
+				})
+				mu.Lock()
+				failed++
+				_ = e.runs.UpdateCounts(run.ID, len(entries), copied, skipped, failed)
+				mu.Unlock()
+				return
+			}
+
+			if err := e.downloadFile(ctx, c, job, run.ID, ent.transfer, ent.remote); err != nil {
 				slog.Error("download failed", "path", ent.remote.Path, "err", err)
 				errMsg := err.Error()
 				_ = e.transfers.UpdateStatus(ent.transfer.ID, "failed", &errMsg, nil)

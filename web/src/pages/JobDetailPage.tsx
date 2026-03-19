@@ -10,9 +10,30 @@ import { usePlan } from '../context/PlanContext'
 import { useSSE } from '../hooks/useSSE'
 
 function formatBytes(b: number): string {
-  if (b >= 1_000_000) return `${(b / 1_000_000).toFixed(1)} MB`
-  if (b >= 1_000)     return `${(b / 1_000).toFixed(1)} KB`
+  if (b >= 1_073_741_824) return `${(b / 1_073_741_824).toFixed(1)} GB`
+  if (b >= 1_048_576)     return `${(b / 1_048_576).toFixed(1)} MB`
+  if (b >= 1_024)         return `${(b / 1_024).toFixed(1)} KB`
   return `${b} B`
+}
+
+function formatDuration(ms: number): string {
+  const s = Math.floor(ms / 1000)
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  const sec = s % 60
+  if (h > 0) return `${h}h ${m}m ${sec}s`
+  if (m > 0) return `${m}m ${sec}s`
+  return `${sec}s`
+}
+
+function useElapsed(startedAt: string, isRunning: boolean): string {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (!isRunning) return
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [isRunning])
+  return formatDuration(now - new Date(startedAt).getTime())
 }
 
 // Folders first, then files, each group alpha-sorted by name.
@@ -161,11 +182,17 @@ function RunRow({ run: initialRun, remotePath, jobId }: { run: Run; remotePath: 
 
   const { events: liveEvents, runStatus } = useSSE(open && run.status === 'running' ? run.id : null)
   const effectiveStatus = runStatus ?? run.status
+  const isRunning = effectiveStatus === 'running'
+  const elapsed = useElapsed(run.started_at, isRunning)
 
   // Reset cancelling flag once we know the run is no longer running.
-  if (cancelling && effectiveStatus !== 'running') setCancelling(false)
+  if (cancelling && !isRunning) setCancelling(false)
 
   const transfers = run.transfers // undefined until detail fetch completes
+
+  const duration = run.finished_at
+    ? formatDuration(new Date(run.finished_at).getTime() - new Date(run.started_at).getTime())
+    : isRunning ? elapsed : null
 
   return (
     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
@@ -178,10 +205,11 @@ function RunRow({ run: initialRun, remotePath, jobId }: { run: Run; remotePath: 
           <div className="flex-1 min-w-0">
             <p className="text-xs text-gray-500 dark:text-gray-400">
               Started {new Date(run.started_at).toLocaleString()}
-              {run.finished_at && ` · Finished ${new Date(run.finished_at).toLocaleString()}`}
+              {duration && ` · ${duration}`}
             </p>
           </div>
           <div className="flex gap-4 text-xs text-gray-500 dark:text-gray-400">
+            {run.total_size_bytes > 0 && <span>{formatBytes(run.total_size_bytes)}</span>}
             <span>{run.total_files} total</span>
             <span className="text-green-600 dark:text-green-400">{run.copied_files} copied</span>
             <span className="text-yellow-600 dark:text-yellow-400">{run.skipped_files} skipped</span>
@@ -455,6 +483,7 @@ export function JobDetailPage() {
               ) : planEntry.result && (
                 <span className="ml-2 font-normal text-gray-400 dark:text-gray-500">
                   {planEntry.result.to_copy} to copy · {planEntry.result.to_skip} to skip · {planEntry.result.files.length} total
+                  {' · '}{formatBytes(planEntry.result.files.filter(f => f.action === 'copy').reduce((s, f) => s + f.size_bytes, 0))}
                 </span>
               )}
             </h2>

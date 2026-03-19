@@ -32,9 +32,14 @@ func (r *RunRepository) Create(run *Run) error {
 	return nil
 }
 
+func (r *RunRepository) UpdateTotalSize(id string, bytes int64) error {
+	_, err := r.db.Exec(`UPDATE runs SET total_size_bytes=? WHERE id=?`, bytes, id)
+	return err
+}
+
 func (r *RunRepository) Get(id string) (*Run, error) {
 	row := r.db.QueryRow(
-		`SELECT id, job_id, status, started_at, finished_at, total_files, copied_files, skipped_files, failed_files
+		`SELECT id, job_id, status, started_at, finished_at, total_files, copied_files, skipped_files, failed_files, total_size_bytes
 		 FROM runs WHERE id = ?`, id,
 	)
 	run, err := scanRun(row)
@@ -46,7 +51,7 @@ func (r *RunRepository) Get(id string) (*Run, error) {
 
 func (r *RunRepository) ListByJob(jobID string) ([]*Run, error) {
 	rows, err := r.db.Query(
-		`SELECT id, job_id, status, started_at, finished_at, total_files, copied_files, skipped_files, failed_files
+		`SELECT id, job_id, status, started_at, finished_at, total_files, copied_files, skipped_files, failed_files, total_size_bytes
 		 FROM runs WHERE job_id = ? ORDER BY started_at DESC`, jobID,
 	)
 	if err != nil {
@@ -104,7 +109,7 @@ func scanRun(s scanner) (*Run, error) {
 
 	err := s.Scan(
 		&run.ID, &run.JobID, &run.Status, &startedAt, &finishedAt,
-		&run.TotalFiles, &run.CopiedFiles, &run.SkippedFiles, &run.FailedFiles,
+		&run.TotalFiles, &run.CopiedFiles, &run.SkippedFiles, &run.FailedFiles, &run.TotalSizeBytes,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("scan run: %w", err)

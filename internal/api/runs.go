@@ -11,16 +11,17 @@ import (
 )
 
 type runResponse struct {
-	ID           string             `json:"id"`
-	JobID        string             `json:"job_id"`
-	Status       string             `json:"status"`
-	StartedAt    string             `json:"started_at"`
-	FinishedAt   *string            `json:"finished_at,omitempty"`
-	TotalFiles   int                `json:"total_files"`
-	CopiedFiles  int                `json:"copied_files"`
-	SkippedFiles int                `json:"skipped_files"`
-	FailedFiles  int                `json:"failed_files"`
-	Transfers    []transferResponse `json:"transfers,omitempty"`
+	ID             string             `json:"id"`
+	JobID          string             `json:"job_id"`
+	Status         string             `json:"status"`
+	StartedAt      string             `json:"started_at"`
+	FinishedAt     *string            `json:"finished_at,omitempty"`
+	TotalFiles     int                `json:"total_files"`
+	CopiedFiles    int                `json:"copied_files"`
+	SkippedFiles   int                `json:"skipped_files"`
+	FailedFiles    int                `json:"failed_files"`
+	TotalSizeBytes int64              `json:"total_size_bytes"`
+	Transfers      []transferResponse `json:"transfers,omitempty"`
 }
 
 type transferResponse struct {
@@ -38,14 +39,15 @@ type transferResponse struct {
 
 func toRunResponse(run *db.Run, transfers []*db.Transfer) runResponse {
 	r := runResponse{
-		ID:           run.ID,
-		JobID:        run.JobID,
-		Status:       run.Status,
-		StartedAt:    run.StartedAt.Format("2006-01-02T15:04:05Z"),
-		TotalFiles:   run.TotalFiles,
-		CopiedFiles:  run.CopiedFiles,
-		SkippedFiles: run.SkippedFiles,
-		FailedFiles:  run.FailedFiles,
+		ID:             run.ID,
+		JobID:          run.JobID,
+		Status:         run.Status,
+		StartedAt:      run.StartedAt.Format("2006-01-02T15:04:05Z"),
+		TotalFiles:     run.TotalFiles,
+		CopiedFiles:    run.CopiedFiles,
+		SkippedFiles:   run.SkippedFiles,
+		FailedFiles:    run.FailedFiles,
+		TotalSizeBytes: run.TotalSizeBytes,
 	}
 	if run.FinishedAt != nil {
 		s := run.FinishedAt.Format("2006-01-02T15:04:05Z")

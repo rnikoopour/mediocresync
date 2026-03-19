@@ -32,15 +32,16 @@ type SyncJob struct {
 }
 
 type Run struct {
-	ID           string
-	JobID        string
-	Status       string // running | completed | failed
-	StartedAt    time.Time
-	FinishedAt   *time.Time
-	TotalFiles   int
-	CopiedFiles  int
-	SkippedFiles int
-	FailedFiles  int
+	ID             string
+	JobID          string
+	Status         string // running | completed | failed
+	StartedAt      time.Time
+	FinishedAt     *time.Time
+	TotalFiles     int
+	CopiedFiles    int
+	SkippedFiles   int
+	FailedFiles    int
+	TotalSizeBytes int64
 }
 
 type Transfer struct {
