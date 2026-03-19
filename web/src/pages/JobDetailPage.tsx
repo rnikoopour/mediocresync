@@ -2,13 +2,102 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../api/client'
-import type { PlanResult } from '../api/types'
+import type { PlanFile, PlanResult } from '../api/types'
 import { StatusBadge } from '../components/StatusBadge'
 
 function formatBytes(b: number): string {
   if (b >= 1_000_000) return `${(b / 1_000_000).toFixed(1)} MB`
   if (b >= 1_000)     return `${(b / 1_000).toFixed(1)} KB`
   return `${b} B`
+}
+
+// ── Plan tree ────────────────────────────────────────────────────────────────
+
+type TreeFile = { type: 'file'; name: string; size_bytes: number; action: 'copy' | 'skip' }
+type TreeFolder = { type: 'folder'; name: string; children: TreeNode[] }
+type TreeNode = TreeFile | TreeFolder
+
+function buildTree(files: PlanFile[], remotePath: string): TreeNode[] {
+  const base = remotePath.replace(/\/+$/, '')
+  const root: TreeFolder = { type: 'folder', name: '', children: [] }
+
+  for (const file of files) {
+    let rel = file.remote_path.startsWith(base + '/')
+      ? file.remote_path.slice(base.length + 1)
+      : file.remote_path
+
+    const segments = rel.split('/').filter(Boolean)
+    if (segments.length === 0) continue
+
+    let cur = root
+    for (let i = 0; i < segments.length - 1; i++) {
+      const seg = segments[i]
+      let child = cur.children.find((c): c is TreeFolder => c.type === 'folder' && c.name === seg)
+      if (!child) {
+        child = { type: 'folder', name: seg, children: [] }
+        cur.children.push(child)
+      }
+      cur = child
+    }
+    cur.children.push({ type: 'file', name: segments[segments.length - 1], size_bytes: file.size_bytes, action: file.action })
+  }
+
+  return root.children
+}
+
+function FolderNode({ node, depth }: { node: TreeFolder; depth: number }) {
+  const [open, setOpen] = useState(true)
+  const indent = depth * 16
+
+  return (
+    <div>
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center gap-2 py-1.5 hover:bg-blue-50 text-left group"
+        style={{ paddingLeft: `${16 + indent}px`, paddingRight: '16px' }}
+      >
+        <span className="text-blue-400 text-xs w-3 shrink-0">{open ? '▾' : '▸'}</span>
+        <span className="text-blue-500 shrink-0">📁</span>
+        <span className="font-mono text-xs font-semibold text-blue-700">{node.name}</span>
+      </button>
+      {open && (
+        <div className="border-l border-blue-100 ml-6" style={{ marginLeft: `${16 + indent + 12}px` }}>
+          {node.children.map((child, i) =>
+            child.type === 'folder'
+              ? <FolderNode key={child.name + i} node={child} depth={depth + 1} />
+              : <FileRow key={child.name + i} node={child} depth={depth + 1} />
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function FileRow({ node }: { node: TreeFile; depth: number }) {
+  return (
+    <div
+      className="flex items-center gap-4 py-1 hover:bg-gray-50"
+      style={{ paddingLeft: '12px', paddingRight: '16px' }}
+    >
+      <span className="text-gray-400 shrink-0">📄</span>
+      <span className="font-mono text-xs text-gray-600 flex-1 truncate">{node.name}</span>
+      <span className="text-xs text-gray-400 shrink-0">{formatBytes(node.size_bytes)}</span>
+      <span className="shrink-0"><StatusBadge status={node.action === 'copy' ? 'pending' : 'skipped'} /></span>
+    </div>
+  )
+}
+
+function PlanTreeView({ files, remotePath }: { files: PlanFile[]; remotePath: string }) {
+  const nodes = buildTree(files, remotePath)
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden py-1">
+      {nodes.map((n, i) =>
+        n.type === 'folder'
+          ? <FolderNode key={n.name + i} node={n} depth={0} />
+          : <FileRow key={n.name + i} node={n} depth={0} />
+      )}
+    </div>
+  )
 }
 
 export function JobDetailPage() {
@@ -84,30 +173,7 @@ export function JobDetailPage() {
               Dismiss
             </button>
           </div>
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className="text-left px-4 py-2 font-medium text-gray-600 text-xs">File</th>
-                  <th className="text-left px-4 py-2 font-medium text-gray-600 text-xs w-28">Size</th>
-                  <th className="text-left px-4 py-2 font-medium text-gray-600 text-xs w-24">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {plan.files.map((f) => (
-                  <tr key={f.remote_path} className="hover:bg-gray-50">
-                    <td className="px-4 py-2 font-mono text-xs text-gray-700 truncate max-w-xs" title={f.remote_path}>
-                      {f.remote_path}
-                    </td>
-                    <td className="px-4 py-2 text-xs text-gray-500">{formatBytes(f.size_bytes)}</td>
-                    <td className="px-4 py-2">
-                      <StatusBadge status={f.action === 'copy' ? 'pending' : 'skipped'} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <PlanTreeView files={plan.files} remotePath={job?.remote_path ?? ''} />
         </div>
       )}
 
