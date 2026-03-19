@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -61,7 +62,7 @@ func (r *ConnectionRepository) Get(id string) (*Connection, error) {
 		 FROM connections WHERE id = ?`, id,
 	)
 	c, err := scanConnection(row)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	return c, err

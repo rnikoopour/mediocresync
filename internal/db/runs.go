@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -37,7 +38,7 @@ func (r *RunRepository) Get(id string) (*Run, error) {
 		 FROM runs WHERE id = ?`, id,
 	)
 	run, err := scanRun(row)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	return run, err

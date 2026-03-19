@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -49,7 +50,7 @@ func (r *JobRepository) Get(id string) (*SyncJob, error) {
 		 FROM sync_jobs WHERE id = ?`, id,
 	)
 	j, err := scanJob(row)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	return j, err

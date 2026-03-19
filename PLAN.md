@@ -71,11 +71,11 @@
 - [x] `vite.config.ts` — dev proxy `/api/*` → `http://localhost:8080`
 
 ## Phase 10 — Testing
-- [ ] `internal/crypto/crypto_test.go` — encrypt/decrypt round-trip, wrong key error
-- [ ] `internal/db/db_test.go` — all repo methods against `:memory:` SQLite
-- [ ] `internal/sync/staging_test.go` — `finalPath` edge cases (trailing slash, root remote path)
-- [ ] `internal/sync/fingerprint_test.go` — mtime tolerance boundary cases
-- [ ] `internal/sse/broker_test.go` — subscribe/publish/unsubscribe/close, non-blocking publish under full buffer
+- [x] `internal/crypto/crypto_test.go` — encrypt/decrypt round-trip, wrong key error
+- [x] `internal/db/db_test.go` — all repo methods against `:memory:` SQLite
+- [x] `internal/sync/staging_test.go` — `finalPath` edge cases (trailing slash, root remote path)
+- [x] `internal/sync/fingerprint_test.go` — mtime tolerance boundary cases
+- [x] `internal/sse/broker_test.go` — subscribe/publish/unsubscribe/close, non-blocking publish under full buffer
 - [ ] `internal/api/handlers_test.go` — `httptest` + mocked repos, verify status codes and JSON shapes
 
 ## Phase 11 — Packaging
