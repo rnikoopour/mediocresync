@@ -8,6 +8,7 @@ import { ProgressBar } from '../components/ProgressBar'
 import { JobFormModal } from '../components/JobFormModal'
 import { usePlan } from '../context/PlanContext'
 import { useSSE } from '../hooks/useSSE'
+import { openEventSource } from '../hooks/eventSource'
 
 function formatBytes(b: number): string {
   if (b >= 1_073_741_824) return `${(b / 1_073_741_824).toFixed(1)} GB`
@@ -449,19 +450,19 @@ export function JobDetailPage() {
   }, [id])
 
   // Subscribe to job-level events so runs triggered by other clients are
-  // discovered immediately rather than relying on polling.
+  // discovered immediately. Reconnects after phone lock/unlock automatically.
   useEffect(() => {
     if (!id) return
-    const es = new EventSource(`/api/jobs/${id}/events`)
-    es.onmessage = (e) => {
-      const ev = JSON.parse(e.data)
-      if (ev.status === 'started') {
-        qc.invalidateQueries({ queryKey: ['runs', id] })
-        dismissPlan(id)
+    return openEventSource(`/api/jobs/${id}/events`, (es) => {
+      es.onmessage = (e) => {
+        const ev = JSON.parse(e.data)
+        if (ev.status === 'started') {
+          qc.invalidateQueries({ queryKey: ['runs', id] })
+          dismissPlan(id)
+        }
       }
-    }
-    es.onerror = () => es.close()
-    return () => es.close()
+      es.onerror = () => es.close()
+    })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
   const [editOpen, setEditOpen] = useState(false)
