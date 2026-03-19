@@ -57,6 +57,7 @@ func NewRouter(
 			r.Put("/{id}", jobsH.update)
 			r.Delete("/{id}", jobsH.delete)
 			r.Post("/{id}/run", jobsH.triggerRun)
+			r.Delete("/{id}/run", jobsH.cancelRun)
 			r.Post("/{id}/plan", jobsH.plan)
 			r.Delete("/{id}/files", jobsH.deleteFileState)
 			r.Get("/{id}/runs", runsH.listByJob)

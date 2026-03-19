@@ -140,7 +140,8 @@ function RunTreeView({ transfers, remotePath, liveEvents }: {
   )
 }
 
-function RunRow({ run: initialRun, remotePath }: { run: Run; remotePath: string }) {
+function RunRow({ run: initialRun, remotePath, jobId }: { run: Run; remotePath: string; jobId: string }) {
+  const qc = useQueryClient()
   const [open, setOpen] = useState(initialRun.status === 'running')
 
   const { data: run = initialRun } = useQuery({
@@ -150,30 +151,52 @@ function RunRow({ run: initialRun, remotePath }: { run: Run; remotePath: string 
     refetchInterval: (q) => q.state.data?.status === 'running' ? 3000 : false,
   })
 
+  const [cancelling, setCancelling] = useState(false)
+  const cancel = useMutation({
+    mutationFn: () => api.jobs.cancel(jobId),
+    onMutate: () => setCancelling(true),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['runs', jobId] }),
+    onError: () => setCancelling(false),
+  })
+
+  // Reset cancelling flag once the server confirms the run is no longer running.
+  if (cancelling && run.status !== 'running') setCancelling(false)
+
   const liveEvents = useSSE(open && run.status === 'running' ? run.id : null)
   const transfers = run.transfers ?? []
 
   return (
     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center gap-4 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors text-left"
-      >
-        <StatusBadge status={run.status} />
-        <div className="flex-1 min-w-0">
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            Started {new Date(run.started_at).toLocaleString()}
-            {run.finished_at && ` · Finished ${new Date(run.finished_at).toLocaleString()}`}
-          </p>
-        </div>
-        <div className="flex gap-4 text-xs text-gray-500 dark:text-gray-400">
-          <span>{run.total_files} total</span>
-          <span className="text-green-600 dark:text-green-400">{run.copied_files} copied</span>
-          <span className="text-yellow-600 dark:text-yellow-400">{run.skipped_files} skipped</span>
-          {run.failed_files > 0 && <span className="text-red-600 dark:text-red-400">{run.failed_files} failed</span>}
-        </div>
-        <span className="text-gray-400 dark:text-gray-500 text-xs w-3 shrink-0">{open ? '▾' : '▸'}</span>
-      </button>
+      <div className="flex items-center gap-4 px-4 py-3">
+        <button
+          onClick={() => setOpen((o) => !o)}
+          className="flex items-center gap-4 flex-1 min-w-0 hover:opacity-80 transition-opacity text-left"
+        >
+          <StatusBadge status={run.status} />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Started {new Date(run.started_at).toLocaleString()}
+              {run.finished_at && ` · Finished ${new Date(run.finished_at).toLocaleString()}`}
+            </p>
+          </div>
+          <div className="flex gap-4 text-xs text-gray-500 dark:text-gray-400">
+            <span>{run.total_files} total</span>
+            <span className="text-green-600 dark:text-green-400">{run.copied_files} copied</span>
+            <span className="text-yellow-600 dark:text-yellow-400">{run.skipped_files} skipped</span>
+            {run.failed_files > 0 && <span className="text-red-600 dark:text-red-400">{run.failed_files} failed</span>}
+          </div>
+          <span className="text-gray-400 dark:text-gray-500 text-xs w-3 shrink-0">{open ? '▾' : '▸'}</span>
+        </button>
+        {(run.status === 'running' || cancelling) && (
+          <button
+            onClick={() => cancel.mutate()}
+            disabled={cancelling}
+            className="btn-danger text-xs shrink-0"
+          >
+            {cancelling ? 'Cancelling…' : 'Cancel'}
+          </button>
+        )}
+      </div>
 
       {open && (
         transfers.length === 0 ? (
@@ -344,10 +367,15 @@ export function JobDetailPage() {
   const qc = useQueryClient()
 
   const { data: job } = useQuery({ queryKey: ['jobs', id], queryFn: () => api.jobs.get(id!) })
-  const { data: runs = [], isLoading } = useQuery({ queryKey: ['runs', id], queryFn: () => api.jobs.listRuns(id!) })
+  const { data: runs = [], isLoading } = useQuery({
+    queryKey: ['runs', id],
+    queryFn: () => api.jobs.listRuns(id!),
+    refetchInterval: (q) => q.state.data?.[0]?.status === 'running' ? 3000 : false,
+  })
   const { plans, runPlan, dismissPlan, unskipFile } = usePlan()
   const planEntry = id ? plans[id] : undefined
   const [editOpen, setEditOpen] = useState(false)
+  const jobIsRunning = runs[0]?.status === 'running'
 
   const trigger = useMutation({
     mutationFn: () => api.jobs.trigger(id!),
@@ -388,15 +416,15 @@ export function JobDetailPage() {
           <button onClick={() => setEditOpen(true)} className="btn-secondary">Edit</button>
           <button
             onClick={() => id && runPlan(id)}
-            disabled={planEntry?.status === 'running'}
+            disabled={planEntry?.status === 'running' || jobIsRunning}
             className="btn-secondary"
           >
             {planEntry?.status === 'running' ? 'Planning…' : 'Plan'}
           </button>
           <button
             onClick={() => trigger.mutate()}
-            disabled={trigger.isPending || planEntry?.status !== 'done'}
-            title={planEntry?.status !== 'done' ? 'Plan first before running' : undefined}
+            disabled={trigger.isPending || planEntry?.status !== 'done' || jobIsRunning}
+            title={jobIsRunning ? 'A run is already in progress' : planEntry?.status !== 'done' ? 'Plan first before running' : undefined}
             className="btn-primary"
           >
             {trigger.isPending ? 'Starting…' : 'Run Now'}
@@ -453,7 +481,7 @@ export function JobDetailPage() {
 
       <div className="space-y-2">
         {runs.map((run) => (
-          <RunRow key={run.id} run={run} remotePath={job?.remote_path ?? ''} />
+          <RunRow key={run.id} run={run} remotePath={job?.remote_path ?? ''} jobId={id!} />
         ))}
       </div>
 

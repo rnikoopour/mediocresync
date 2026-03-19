@@ -28,6 +28,7 @@ type Engine struct {
 
 	mu            sync.Mutex
 	active        map[string]bool // jobID → running
+	cancelFuncs   map[string]context.CancelFunc
 	storedPlans   map[string]*PlanResult
 	storedPlansMu sync.Mutex
 	runWG         sync.WaitGroup // tracks all in-flight runWithPlan calls
@@ -51,6 +52,7 @@ func NewEngine(
 		encKey:      encKey,
 		broker:      broker,
 		active:      make(map[string]bool),
+		cancelFuncs: make(map[string]context.CancelFunc),
 		storedPlans: make(map[string]*PlanResult),
 	}
 }
@@ -194,13 +196,17 @@ func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanResult
 		e.mu.Unlock()
 		return ErrJobAlreadyRunning
 	}
+	jobCtx, cancelJob := context.WithCancel(ctx)
 	e.active[jobID] = true
+	e.cancelFuncs[jobID] = cancelJob
 	e.runWG.Add(1)
 	e.mu.Unlock()
 
 	defer func() {
+		cancelJob()
 		e.mu.Lock()
 		delete(e.active, jobID)
+		delete(e.cancelFuncs, jobID)
 		e.mu.Unlock()
 		e.runWG.Done()
 	}()
@@ -220,10 +226,10 @@ func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanResult
 		return fmt.Errorf("create run: %w", err)
 	}
 
-	runErr := e.executeRun(ctx, job, conn, run, plan)
+	runErr := e.executeRun(jobCtx, job, conn, run, plan)
 
 	finalStatus := "completed"
-	if ctx.Err() != nil {
+	if jobCtx.Err() != nil {
 		finalStatus = "canceled"
 	} else if runErr != nil {
 		finalStatus = "failed"
@@ -233,6 +239,19 @@ func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanResult
 	}
 	e.broker.Close(run.ID)
 	return runErr
+}
+
+// CancelJob cancels the currently running job with the given ID.
+// Returns an error if no run is active for that job.
+func (e *Engine) CancelJob(jobID string) error {
+	e.mu.Lock()
+	cancel, ok := e.cancelFuncs[jobID]
+	e.mu.Unlock()
+	if !ok {
+		return fmt.Errorf("job %s is not running", jobID)
+	}
+	cancel()
+	return nil
 }
 
 func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Connection, run *db.Run, plan *PlanResult) error {
@@ -394,6 +413,11 @@ func (e *Engine) downloadFile(
 	}()
 
 	_, copyErr := copyWithContext(ctx, f, pr)
+	if copyErr != nil {
+		// Signal the download goroutine to stop: closing the pipe reader
+		// causes any pending pw.Write() to return an error immediately.
+		pr2.CloseWithError(copyErr)
+	}
 	dlErr := <-dlDone
 	f.Close()
 

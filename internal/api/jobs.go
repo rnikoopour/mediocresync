@@ -207,6 +207,15 @@ func (h *jobsHandler) triggerRun(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
+func (h *jobsHandler) cancelRun(w http.ResponseWriter, r *http.Request) {
+	jobID := chi.URLParam(r, "id")
+	if err := h.engine.CancelJob(jobID); err != nil {
+		writeError(w, http.StatusConflict, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *jobsHandler) plan(w http.ResponseWriter, r *http.Request) {
 	jobID := chi.URLParam(r, "id")
 
