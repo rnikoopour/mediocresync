@@ -44,6 +44,7 @@ type Engine struct {
 
 	mu            sync.Mutex
 	active        map[string]bool // jobID → running
+	activeRunIDs  map[string]string // jobID → current run ID
 	cancelFuncs   map[string]context.CancelFunc
 	storedPlans   map[string]*PlanResult
 	storedPlansMu sync.Mutex
@@ -73,8 +74,9 @@ func NewEngine(
 		encKey:      encKey,
 		broker:      broker,
 		appCtx:      appCtx,
-		active:      make(map[string]bool),
-		cancelFuncs: make(map[string]context.CancelFunc),
+		active:       make(map[string]bool),
+		activeRunIDs: make(map[string]string),
+		cancelFuncs:  make(map[string]context.CancelFunc),
 		storedPlans: make(map[string]*PlanResult),
 		planActive:  make(map[string]bool),
 		planSubs:    make(map[string][]chan PlanEvent),
@@ -338,6 +340,7 @@ func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanResult
 		cancelJob()
 		e.mu.Lock()
 		delete(e.active, jobID)
+		delete(e.activeRunIDs, jobID)
 		delete(e.cancelFuncs, jobID)
 		e.mu.Unlock()
 		e.runWG.Done()
@@ -357,6 +360,9 @@ func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanResult
 	if err := e.runs.Create(run); err != nil {
 		return fmt.Errorf("create run: %w", err)
 	}
+	e.mu.Lock()
+	e.activeRunIDs[jobID] = run.ID
+	e.mu.Unlock()
 	// Notify all clients watching this job that a run has started.
 	e.broker.Publish(jobID, sse.Event{RunID: run.ID, Status: "started"})
 
@@ -383,9 +389,15 @@ func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanResult
 func (e *Engine) CancelJob(jobID string) error {
 	e.mu.Lock()
 	cancel, ok := e.cancelFuncs[jobID]
+	runID := e.activeRunIDs[jobID]
 	e.mu.Unlock()
 	if !ok {
 		return fmt.Errorf("job %s is not running", jobID)
+	}
+	// Notify all clients immediately so they can show a cancelling state
+	// before the run actually stops and the final status event is published.
+	if runID != "" {
+		e.broker.Publish(runID, sse.Event{RunID: runID, RunStatus: "canceling"})
 	}
 	cancel()
 	return nil

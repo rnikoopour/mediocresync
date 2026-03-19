@@ -201,12 +201,15 @@ function RunRow({ run: initialRun, remotePath, jobId }: { run: Run; remotePath: 
   })
 
   const { events: liveEvents, runStatus } = useSSE(open && run.status === 'running' ? run.id : null)
-  const effectiveStatus = runStatus ?? run.status
+  const effectiveStatus = (runStatus && runStatus !== 'canceling') ? runStatus : run.status
   const isRunning = effectiveStatus === 'running'
+  // Cancelling if this client requested it OR if the server broadcast that
+  // another client requested cancellation.
+  const isCancelling = cancelling || runStatus === 'canceling'
   const elapsed = useElapsed(run.started_at, isRunning)
 
-  // Reset cancelling flag once we know the run is no longer running.
-  if (cancelling && !isRunning) setCancelling(false)
+  // Reset local cancelling flag once we know the run is no longer running.
+  if (cancelling && !isRunning && runStatus !== 'canceling') setCancelling(false)
 
   const transfers = run.transfers // undefined until detail fetch completes
 
@@ -249,13 +252,13 @@ function RunRow({ run: initialRun, remotePath, jobId }: { run: Run; remotePath: 
           </div>
           <span className="text-gray-400 dark:text-gray-500 text-xs w-3 shrink-0">{open ? '▾' : '▸'}</span>
         </button>
-        {(effectiveStatus === 'running' || cancelling) && (
+        {(effectiveStatus === 'running' || isCancelling) && (
           <button
             onClick={() => cancel.mutate()}
-            disabled={cancelling}
+            disabled={isCancelling}
             className="btn-danger text-xs shrink-0"
           >
-            {cancelling ? 'Cancelling…' : 'Cancel'}
+            {isCancelling ? 'Cancelling…' : 'Cancel'}
           </button>
         )}
       </div>
