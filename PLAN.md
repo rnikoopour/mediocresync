@@ -18,14 +18,14 @@
 - [x] `internal/crypto/crypto.go` — AES-256-GCM `Encrypt` / `Decrypt`; key validated as 32 bytes
 
 ## Phase 2 — Database Layer
-- [ ] `internal/db/schema.go` — DDL for 5 tables: `connections`, `sync_jobs`, `runs`, `transfers`, `file_state`
-- [ ] `internal/db/migrate.go` — `Migrate(db)` runs `CREATE TABLE IF NOT EXISTS` at startup
-- [ ] `internal/db/db.go` — `Open(path)` opens SQLite, sets WAL + foreign keys, calls `Migrate`
-- [ ] `internal/db/connections.go` — `ConnectionRepository`: `Create`, `List`, `Get`, `Update`, `Delete`
-- [ ] `internal/db/jobs.go` — `JobRepository`: `Create`, `List`, `Get`, `Update`, `Delete`, `ListEnabled`
-- [ ] `internal/db/runs.go` — `RunRepository`: `Create`, `Get`, `ListByJob`, `UpdateStatus`, `UpdateCounts`
-- [ ] `internal/db/transfers.go` — `TransferRepository`: `Create`, `UpdateProgress`, `UpdateStatus`, `ListByRun`
-- [ ] `internal/db/filestate.go` — `FileStateRepository`: `Upsert`, `Get`, `DeleteByJob`
+- [x] `internal/db/schema.go` — DDL for 5 tables: `connections`, `sync_jobs`, `runs`, `transfers`, `file_state`
+- [x] `internal/db/migrate.go` — `Migrate(db)` runs `CREATE TABLE IF NOT EXISTS` at startup
+- [x] `internal/db/db.go` — `Open(path)` opens SQLite, sets WAL + foreign keys, calls `Migrate`
+- [x] `internal/db/connections.go` — `ConnectionRepository`: `Create`, `List`, `Get`, `Update`, `Delete`
+- [x] `internal/db/jobs.go` — `JobRepository`: `Create`, `List`, `Get`, `Update`, `Delete`, `ListEnabled`
+- [x] `internal/db/runs.go` — `RunRepository`: `Create`, `Get`, `ListByJob`, `UpdateStatus`, `UpdateCounts`
+- [x] `internal/db/transfers.go` — `TransferRepository`: `Create`, `UpdateProgress`, `UpdateStatus`, `ListByRun`
+- [x] `internal/db/filestate.go` — `FileStateRepository`: `Upsert`, `Get`, `DeleteByJob`
 
 ## Phase 3 — FTPES Client
 - [ ] `internal/ftpes/dial.go` — `Dial(host, port, skipVerify)` with explicit TLS (`AUTH TLS`)
