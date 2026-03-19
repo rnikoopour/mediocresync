@@ -144,16 +144,20 @@ export function ConnectionsPage() {
 
                   {activeTab === 'advanced' && (
                     <>
-                      <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-                        <input type="checkbox" checked={form.enable_epsv} onChange={(e) => setForm({ ...form, enable_epsv: e.target.checked })} />
-                        Enable EPSV
-                        <span className="text-xs text-gray-400 dark:text-gray-500">(Extended Passive mode; disable if you see login: EOF errors)</span>
-                      </label>
-                      <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-                        <input type="checkbox" checked={form.skip_tls_verify} onChange={(e) => setForm({ ...form, skip_tls_verify: e.target.checked })} />
-                        Skip TLS certificate verification
-                        <span className="text-xs text-gray-400 dark:text-gray-500">(insecure; use only for self-signed certs)</span>
-                      </label>
+                      <div>
+                        <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                          <input type="checkbox" checked={form.enable_epsv} onChange={(e) => setForm({ ...form, enable_epsv: e.target.checked })} />
+                          Enable EPSV
+                        </label>
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 ml-5">Extended Passive mode; disable if you see login: EOF errors</p>
+                      </div>
+                      <div>
+                        <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                          <input type="checkbox" checked={form.skip_tls_verify} onChange={(e) => setForm({ ...form, skip_tls_verify: e.target.checked })} />
+                          Skip TLS certificate verification
+                        </label>
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 ml-5">Insecure; use only for self-signed certs</p>
+                      </div>
                     </>
                   )}
                 </div>
