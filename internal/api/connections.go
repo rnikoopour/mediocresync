@@ -152,6 +152,54 @@ func (h *connectionsHandler) delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *connectionsHandler) browse(w http.ResponseWriter, r *http.Request) {
+	conn, err := h.repo.Get(chi.URLParam(r, "id"))
+	if err != nil || conn == nil {
+		writeError(w, http.StatusNotFound, "connection not found")
+		return
+	}
+
+	remotePath := r.URL.Query().Get("path")
+	if remotePath == "" {
+		remotePath = "/"
+	}
+
+	password, err := crypto.Decrypt(h.encKey, conn.Password)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to decrypt password")
+		return
+	}
+
+	client, err := ftpes.Dial(conn.Host, conn.Port, conn.SkipTLSVerify)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	defer client.Close()
+
+	if err := client.Login(conn.Username, password); err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+
+	entries, err := client.List(remotePath)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+
+	type entry struct {
+		Name  string `json:"name"`
+		Path  string `json:"path"`
+		IsDir bool   `json:"is_dir"`
+	}
+	resp := make([]entry, len(entries))
+	for i, e := range entries {
+		resp[i] = entry{Name: e.Name, Path: e.Path, IsDir: e.IsDir}
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
 func (h *connectionsHandler) test(w http.ResponseWriter, r *http.Request) {
 	conn, err := h.repo.Get(chi.URLParam(r, "id"))
 	if err != nil || conn == nil {

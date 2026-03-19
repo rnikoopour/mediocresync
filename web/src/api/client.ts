@@ -1,7 +1,7 @@
 import type {
   Connection, ConnectionRequest,
   SyncJob, JobRequest,
-  Run, TestResult, PlanResult,
+  Run, TestResult, PlanResult, BrowseEntry,
 } from './types'
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -27,6 +27,7 @@ export const api = {
     update: (id: string, body: Partial<ConnectionRequest>) => request<Connection>('PUT', `/connections/${id}`, body),
     delete: (id: string) => request<void>('DELETE', `/connections/${id}`),
     test: (id: string) => request<TestResult>('POST', `/connections/${id}/test`),
+    browse: (id: string, path: string) => request<BrowseEntry[]>('GET', `/connections/${id}/browse?path=${encodeURIComponent(path)}`),
   },
 
   jobs: {

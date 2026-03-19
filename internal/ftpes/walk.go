@@ -7,6 +7,26 @@ import (
 	"github.com/jlaffaye/ftp"
 )
 
+func (c *client) List(remotePath string) ([]DirEntry, error) {
+	entries, err := c.conn.List(remotePath)
+	if err != nil {
+		return nil, fmt.Errorf("LIST %s: %w", remotePath, err)
+	}
+
+	out := make([]DirEntry, 0, len(entries))
+	for _, e := range entries {
+		if e.Name == "." || e.Name == ".." {
+			continue
+		}
+		out = append(out, DirEntry{
+			Name:  e.Name,
+			Path:  path.Join(remotePath, e.Name),
+			IsDir: e.Type == ftp.EntryTypeFolder,
+		})
+	}
+	return out, nil
+}
+
 func (c *client) Walk(remotePath string) ([]RemoteFile, error) {
 	var files []RemoteFile
 	if err := c.walk(remotePath, &files); err != nil {

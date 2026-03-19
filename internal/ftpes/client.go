@@ -13,10 +13,18 @@ type RemoteFile struct {
 	MTime time.Time
 }
 
+// DirEntry is one item returned by a shallow directory listing.
+type DirEntry struct {
+	Name  string
+	Path  string
+	IsDir bool
+}
+
 // Client is the interface the sync engine uses — backed by a real FTPES
 // connection in production and a mock in tests.
 type Client interface {
 	Login(user, pass string) error
+	List(remotePath string) ([]DirEntry, error)
 	Walk(remotePath string) ([]RemoteFile, error)
 	Download(remotePath string, dst io.Writer) error
 	Close() error

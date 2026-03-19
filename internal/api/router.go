@@ -46,6 +46,7 @@ func NewRouter(
 			r.Put("/{id}", conns.update)
 			r.Delete("/{id}", conns.delete)
 			r.Post("/{id}/test", conns.test)
+			r.Get("/{id}/browse", conns.browse)
 		})
 
 		r.Route("/jobs", func(r chi.Router) {

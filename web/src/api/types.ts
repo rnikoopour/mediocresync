@@ -86,6 +86,12 @@ export interface TestResult {
   error?: string
 }
 
+export interface BrowseEntry {
+  name: string
+  path: string
+  is_dir: boolean
+}
+
 export interface PlanFile {
   remote_path: string
   local_path: string
