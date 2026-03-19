@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -81,6 +82,7 @@ type runsHandler struct {
 	runs      *db.RunRepository
 	transfers *db.TransferRepository
 	broker    *sse.Broker
+	appCtx    context.Context
 }
 
 func (h *runsHandler) listByJob(w http.ResponseWriter, r *http.Request) {
@@ -150,6 +152,8 @@ func (h *runsHandler) progress(w http.ResponseWriter, r *http.Request) {
 			}
 			flusher.Flush()
 		case <-r.Context().Done():
+			return
+		case <-h.appCtx.Done():
 			return
 		}
 	}

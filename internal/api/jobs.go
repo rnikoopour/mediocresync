@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -67,6 +68,7 @@ type jobsHandler struct {
 	repo      *db.JobRepository
 	fileState *db.FileStateRepository
 	engine    *internalsync.Engine
+	appCtx    context.Context
 }
 
 func (h *jobsHandler) list(w http.ResponseWriter, r *http.Request) {
@@ -287,6 +289,8 @@ func (h *jobsHandler) planEvents(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		case <-r.Context().Done():
+			return
+		case <-h.appCtx.Done():
 			return
 		}
 	}

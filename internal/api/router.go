@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"io/fs"
 	"net/http"
 
@@ -12,6 +13,7 @@ import (
 )
 
 func NewRouter(
+	appCtx context.Context,
 	connections *db.ConnectionRepository,
 	jobs *db.JobRepository,
 	runs *db.RunRepository,
@@ -33,8 +35,8 @@ func NewRouter(
 	}
 
 	conns := &connectionsHandler{repo: connections, encKey: encKey}
-	jobsH := &jobsHandler{repo: jobs, fileState: fileState, engine: engine}
-	runsH := &runsHandler{runs: runs, transfers: transfers, broker: broker}
+	jobsH := &jobsHandler{repo: jobs, fileState: fileState, engine: engine, appCtx: appCtx}
+	runsH := &runsHandler{runs: runs, transfers: transfers, broker: broker, appCtx: appCtx}
 
 	r.Route("/api", func(r chi.Router) {
 		r.Use(chiMiddleware.SetHeader("Content-Type", "application/json"))

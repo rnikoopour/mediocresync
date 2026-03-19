@@ -34,7 +34,7 @@ func setupRouter(t *testing.T) (http.Handler, *db.ConnectionRepository, *db.JobR
 	engine := internalsync.NewEngine(connections, jobs, runs, transfers, fileState, testEncKey, broker, context.Background())
 
 	staticFS := fstest.MapFS{"index.html": {Data: []byte("<html></html>")}}
-	router := NewRouter(connections, jobs, runs, transfers, fileState, engine, broker, testEncKey, true, staticFS)
+	router := NewRouter(context.Background(), connections, jobs, runs, transfers, fileState, engine, broker, testEncKey, true, staticFS)
 	return router, connections, jobs, runs
 }
 
