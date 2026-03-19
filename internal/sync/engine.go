@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -260,6 +262,33 @@ func (e *Engine) CancelJob(jobID string) error {
 	return nil
 }
 
+// sortPlanFiles sorts files to match the plan tree view order: depth-first,
+// folders before files at each level, both groups alpha-sorted by name.
+func sortPlanFiles(files []PlanFile, remotePath string) []PlanFile {
+	base := strings.TrimSuffix(remotePath, "/")
+	out := make([]PlanFile, len(files))
+	copy(out, files)
+	sort.SliceStable(out, func(i, j int) bool {
+		relI := strings.TrimPrefix(out[i].RemotePath, base+"/")
+		relJ := strings.TrimPrefix(out[j].RemotePath, base+"/")
+		segsI := strings.Split(relI, "/")
+		segsJ := strings.Split(relJ, "/")
+		for k := 0; k < len(segsI) && k < len(segsJ); k++ {
+			iIsFolder := k < len(segsI)-1
+			jIsFolder := k < len(segsJ)-1
+			if segsI[k] == segsJ[k] {
+				continue
+			}
+			if iIsFolder != jIsFolder {
+				return iIsFolder
+			}
+			return segsI[k] < segsJ[k]
+		}
+		return len(segsI) < len(segsJ)
+	})
+	return out
+}
+
 func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Connection, run *db.Run, plan *PlanResult) error {
 	password, err := crypto.Decrypt(e.encKey, conn.Password)
 	if err != nil {
@@ -270,14 +299,16 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Conne
 		return fmt.Errorf("staging dir: %w", err)
 	}
 
+	orderedFiles := sortPlanFiles(plan.Files, job.RemotePath)
+
 	// Create transfer records for all plan files; track which need downloading.
 	type transferEntry struct {
 		transfer *db.Transfer
 		remote   ftpes.RemoteFile
 		skip     bool
 	}
-	entries := make([]transferEntry, 0, len(plan.Files))
-	for _, pf := range plan.Files {
+	entries := make([]transferEntry, 0, len(orderedFiles))
+	for _, pf := range orderedFiles {
 		remote := ftpes.RemoteFile{Path: pf.RemotePath, Size: pf.SizeBytes, MTime: pf.MTime}
 		initialStatus := "pending"
 		if pf.Action == "skip" {
@@ -297,7 +328,7 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Conne
 	}
 
 	var totalSizeBytes int64
-	for _, pf := range plan.Files {
+	for _, pf := range orderedFiles {
 		if pf.Action == "copy" {
 			totalSizeBytes += pf.SizeBytes
 		}
