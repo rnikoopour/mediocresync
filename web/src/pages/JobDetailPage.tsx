@@ -15,40 +15,124 @@ function formatBytes(b: number): string {
   return `${b} B`
 }
 
-// ── Run row (expandable) ─────────────────────────────────────────────────────
+// Folders first, then files, each group alpha-sorted by name.
+function sortNodes<T extends { type: string; name: string }>(nodes: T[]): T[] {
+  return [...nodes].sort((a, b) => {
+    if (a.type !== b.type) return a.type === 'folder' ? -1 : 1
+    return a.name.localeCompare(b.name)
+  })
+}
 
-function RunTransferRow({ transfer, liveEvent }: {
-  transfer: Transfer
-  liveEvent?: { percent: number; speed_bps: number; status: string } | undefined
-}) {
-  const status = liveEvent?.status ?? transfer.status
-  const percent = liveEvent?.percent ?? (transfer.status === 'done' ? 100 : 0)
-  const speed = liveEvent?.speed_bps
+// ── Run row (expandable, tree view) ──────────────────────────────────────────
+
+type RunTreeFile = { type: 'file'; name: string; transfer: Transfer }
+type RunTreeFolder = { type: 'folder'; name: string; children: RunTreeNode[] }
+type RunTreeNode = RunTreeFile | RunTreeFolder
+
+function buildRunTree(transfers: Transfer[], remotePath: string): RunTreeNode[] {
+  const base = remotePath.replace(/\/+$/, '')
+  const root: RunTreeFolder = { type: 'folder', name: '', children: [] }
+
+  for (const t of transfers) {
+    let rel = t.remote_path.startsWith(base + '/')
+      ? t.remote_path.slice(base.length + 1)
+      : t.remote_path
+    const segments = rel.split('/').filter(Boolean)
+    if (segments.length === 0) continue
+
+    let cur = root
+    for (let i = 0; i < segments.length - 1; i++) {
+      const seg = segments[i]
+      let child = cur.children.find((c): c is RunTreeFolder => c.type === 'folder' && c.name === seg)
+      if (!child) {
+        child = { type: 'folder', name: seg, children: [] }
+        cur.children.push(child)
+      }
+      cur = child
+    }
+    cur.children.push({ type: 'file', name: segments[segments.length - 1], transfer: t })
+  }
+
+  function sortFolder(folder: RunTreeFolder) {
+    folder.children = sortNodes(folder.children)
+    folder.children.forEach((c) => { if (c.type === 'folder') sortFolder(c) })
+  }
+  sortFolder(root)
+
+  return root.children
+}
+
+function RunFileRow({ node, liveEvents }: { node: RunTreeFile; liveEvents: Map<string, { percent: number; speed_bps: number; status: string }> }) {
+  const t = node.transfer
+  const live = liveEvents.get(t.id)
+  const status = live?.status ?? t.status
+  const percent = live?.percent ?? (t.status === 'done' ? 100 : 0)
+  const speed = live?.speed_bps
 
   return (
-    <tr className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-      <td className="px-4 py-1.5 font-mono text-xs text-gray-700 dark:text-gray-300 truncate max-w-xs" title={transfer.remote_path}>
-        {transfer.remote_path}
-      </td>
-      <td className="px-4 py-1.5 text-xs text-gray-500 dark:text-gray-400 w-24">{formatBytes(transfer.size_bytes)}</td>
-      <td className="px-4 py-1.5 w-48">
-        {(status === 'in_progress' || status === 'done') ? (
+    <div className="flex items-center gap-4 py-1 hover:bg-gray-50 dark:hover:bg-gray-700/50"
+      style={{ paddingLeft: '12px', paddingRight: '16px' }}>
+      <span className="text-gray-400 dark:text-gray-500 shrink-0">📄</span>
+      <span className="font-mono text-xs text-gray-600 dark:text-gray-300 flex-1 truncate">{node.name}</span>
+      <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{formatBytes(t.size_bytes)}</span>
+      {(status === 'in_progress' || status === 'done') ? (
+        <div className="w-32 shrink-0">
           <ProgressBar percent={percent} speedBps={status === 'in_progress' ? speed : undefined} />
-        ) : (
-          <span className="text-xs text-gray-400 dark:text-gray-500">—</span>
-        )}
-      </td>
-      <td className="px-4 py-1.5 w-20">
-        <StatusBadge status={status} />
-        {transfer.error_msg && (
-          <p className="text-xs text-red-500 mt-0.5 truncate" title={transfer.error_msg}>{transfer.error_msg}</p>
-        )}
-      </td>
-    </tr>
+        </div>
+      ) : (
+        <span className="shrink-0"><StatusBadge status={status} /></span>
+      )}
+      {t.error_msg && <span className="text-xs text-red-500 truncate shrink-0" title={t.error_msg}>{t.error_msg}</span>}
+    </div>
   )
 }
 
-function RunRow({ run: initialRun }: { run: Run }) {
+function RunFolderNode({ node, depth, liveEvents }: { node: RunTreeFolder; depth: number; liveEvents: Map<string, { percent: number; speed_bps: number; status: string }> }) {
+  const [open, setOpen] = useState(true)
+  const indent = depth * 16
+
+  return (
+    <div>
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center gap-2 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700/60 text-left"
+        style={{ paddingLeft: `${16 + indent}px`, paddingRight: '16px' }}
+      >
+        <span className="text-gray-400 dark:text-violet-500 text-xs w-3 shrink-0">{open ? '▾' : '▸'}</span>
+        <span className="shrink-0">📁</span>
+        <span className="font-mono text-xs font-semibold text-gray-700 dark:text-violet-300">{node.name}</span>
+      </button>
+      {open && (
+        <div className="border-l border-blue-100 dark:border-gray-600" style={{ marginLeft: `${16 + indent + 12}px` }}>
+          {node.children.map((child, i) =>
+            child.type === 'folder'
+              ? <RunFolderNode key={child.name + i} node={child} depth={depth + 1} liveEvents={liveEvents} />
+              : <RunFileRow key={child.name + i} node={child} liveEvents={liveEvents} />
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function RunTreeView({ transfers, remotePath, liveEvents }: {
+  transfers: Transfer[]
+  remotePath: string
+  liveEvents: Map<string, { percent: number; speed_bps: number; status: string }>
+}) {
+  const nodes = buildRunTree(transfers, remotePath)
+  return (
+    <div className="bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 py-1 max-h-64 overflow-y-auto">
+      {nodes.map((n, i) =>
+        n.type === 'folder'
+          ? <RunFolderNode key={n.name + i} node={n} depth={0} liveEvents={liveEvents} />
+          : <RunFileRow key={n.name + i} node={n} liveEvents={liveEvents} />
+      )}
+    </div>
+  )
+}
+
+function RunRow({ run: initialRun, remotePath }: { run: Run; remotePath: string }) {
   const [open, setOpen] = useState(initialRun.status === 'running')
 
   const { data: run = initialRun } = useQuery({
@@ -84,21 +168,13 @@ function RunRow({ run: initialRun }: { run: Run }) {
       </button>
 
       {open && (
-        <div className="border-t border-gray-100 dark:border-gray-700 max-h-64 overflow-y-auto">
-          {transfers.length === 0 ? (
-            <p className="px-4 py-4 text-xs text-center text-gray-400 dark:text-gray-500">
-              {run.status === 'running' ? 'Enumerating files…' : 'No transfers recorded.'}
-            </p>
-          ) : (
-            <table className="w-full text-sm">
-              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                {transfers.map((t) => (
-                  <RunTransferRow key={t.id} transfer={t} liveEvent={liveEvents.get(t.id)} />
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+        transfers.length === 0 ? (
+          <p className="border-t border-gray-100 dark:border-gray-700 px-4 py-4 text-xs text-center text-gray-400 dark:text-gray-500">
+            {run.status === 'running' ? 'Enumerating files…' : 'No transfers recorded.'}
+          </p>
+        ) : (
+          <RunTreeView transfers={transfers} remotePath={remotePath} liveEvents={liveEvents} />
+        )
       )}
     </div>
   )
@@ -134,6 +210,12 @@ function buildTree(files: PlanFile[], remotePath: string): TreeNode[] {
     }
     cur.children.push({ type: 'file', name: segments[segments.length - 1], remote_path: file.remote_path, size_bytes: file.size_bytes, action: file.action })
   }
+
+  function sortFolder(folder: TreeFolder) {
+    folder.children = sortNodes(folder.children)
+    folder.children.forEach((c) => { if (c.type === 'folder') sortFolder(c) })
+  }
+  sortFolder(root)
 
   return root.children
 }
@@ -334,7 +416,7 @@ export function JobDetailPage() {
 
       <div className="space-y-2">
         {runs.map((run) => (
-          <RunRow key={run.id} run={run} />
+          <RunRow key={run.id} run={run} remotePath={job?.remote_path ?? ''} />
         ))}
       </div>
 
