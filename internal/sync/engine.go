@@ -51,6 +51,13 @@ func NewEngine(
 	}
 }
 
+// IsRunning reports whether a run for the given job is currently active.
+func (e *Engine) IsRunning(jobID string) bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.active[jobID]
+}
+
 // RunJob executes a full sync for the given job. Returns ErrJobAlreadyRunning
 // if a run for this job is already in progress.
 func (e *Engine) RunJob(ctx context.Context, jobID string) error {

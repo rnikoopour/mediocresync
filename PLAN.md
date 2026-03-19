@@ -46,12 +46,12 @@
 - [x] `internal/scheduler/scheduler.go` — `Scheduler` with 1-minute tick, `active` map for overlap prevention, `Start`, `Stop`, `TriggerNow`
 
 ## Phase 7 — REST API Handlers
-- [ ] `internal/api/response.go` — shared helpers: `writeJSON`, `writeError`, `readJSON`
-- [ ] `internal/api/middleware.go` — request ID, structured logging, CORS (dev mode)
-- [ ] `internal/api/connections.go` — `List`, `Create`, `Get`, `Update`, `Delete`, `Test` handlers
-- [ ] `internal/api/jobs.go` — `List`, `Create`, `Get`, `Update`, `Delete`, `TriggerRun` handlers
-- [ ] `internal/api/runs.go` — `List`, `Get`, `GetProgress` (SSE) handlers
-- [ ] `internal/api/router.go` — chi router, mount all handlers, serve embedded React with SPA fallback
+- [x] `internal/api/response.go` — shared helpers: `writeJSON`, `writeError`, `readJSON`
+- [x] `internal/api/middleware.go` — request ID, structured logging, CORS (dev mode)
+- [x] `internal/api/connections.go` — `List`, `Create`, `Get`, `Update`, `Delete`, `Test` handlers
+- [x] `internal/api/jobs.go` — `List`, `Create`, `Get`, `Update`, `Delete`, `TriggerRun` handlers
+- [x] `internal/api/runs.go` — `List`, `Get`, `GetProgress` (SSE) handlers
+- [x] `internal/api/router.go` — chi router, mount all handlers, serve embedded React with SPA fallback
 
 ## Phase 8 — Entry Point & Embedding
 - [ ] `cmd/server/embed.go` — `//go:embed ../../web/dist` var
