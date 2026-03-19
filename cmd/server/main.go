@@ -41,6 +41,11 @@ func main() {
 	transfers := db.NewTransferRepository(database)
 	fileState := db.NewFileStateRepository(database)
 
+	// Mark any runs left in "running" state from a previous unclean shutdown.
+	if err := runs.CancelStaleRuns(); err != nil {
+		slog.Error("cancel stale runs", "err", err)
+	}
+
 	broker := sse.NewBroker()
 
 	engine := internalsync.NewEngine(
@@ -95,7 +100,10 @@ func main() {
 	<-quit
 
 	slog.Info("shutting down...")
-	cancel() // stop scheduler from firing new runs
+	cancel() // cancels in-flight runs and stops scheduler
+
+	// Wait for any active runs to finish writing their final status.
+	engine.Wait()
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer shutdownCancel()

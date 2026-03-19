@@ -26,10 +26,11 @@ type Engine struct {
 	encKey      []byte
 	broker      *sse.Broker
 
-	mu           sync.Mutex
-	active       map[string]bool // jobID → running
-	storedPlans  map[string]*PlanResult
+	mu            sync.Mutex
+	active        map[string]bool // jobID → running
+	storedPlans   map[string]*PlanResult
 	storedPlansMu sync.Mutex
+	runWG         sync.WaitGroup // tracks all in-flight runWithPlan calls
 }
 
 func NewEngine(
@@ -181,6 +182,12 @@ func (e *Engine) PlanThenRun(ctx context.Context, jobID string) error {
 	return e.runWithPlan(ctx, jobID, plan)
 }
 
+// Wait blocks until all in-flight runWithPlan calls have finished.
+// Call this during graceful shutdown after cancelling the context.
+func (e *Engine) Wait() {
+	e.runWG.Wait()
+}
+
 func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanResult) error {
 	e.mu.Lock()
 	if e.active[jobID] {
@@ -188,12 +195,14 @@ func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanResult
 		return ErrJobAlreadyRunning
 	}
 	e.active[jobID] = true
+	e.runWG.Add(1)
 	e.mu.Unlock()
 
 	defer func() {
 		e.mu.Lock()
 		delete(e.active, jobID)
 		e.mu.Unlock()
+		e.runWG.Done()
 	}()
 
 	job, err := e.jobs.Get(jobID)
@@ -214,7 +223,9 @@ func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanResult
 	runErr := e.executeRun(ctx, job, conn, run, plan)
 
 	finalStatus := "completed"
-	if runErr != nil {
+	if ctx.Err() != nil {
+		finalStatus = "canceled"
+	} else if runErr != nil {
 		finalStatus = "failed"
 	}
 	if err := e.runs.UpdateStatus(run.ID, finalStatus); err != nil {
