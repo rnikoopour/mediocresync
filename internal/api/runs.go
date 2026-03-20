@@ -22,7 +22,7 @@ type runResponse struct {
 	SkippedFiles   int                `json:"skipped_files"`
 	FailedFiles    int                `json:"failed_files"`
 	TotalSizeBytes int64              `json:"total_size_bytes"`
-	Transfers      []transferResponse `json:"transfers,omitempty"`
+	Transfers      []transferResponse `json:"transfers"`
 }
 
 type transferResponse struct {
@@ -49,6 +49,7 @@ func toRunResponse(run *db.Run, transfers []*db.Transfer) runResponse {
 		SkippedFiles:   run.SkippedFiles,
 		FailedFiles:    run.FailedFiles,
 		TotalSizeBytes: run.TotalSizeBytes,
+		Transfers:      []transferResponse{},
 	}
 	if run.FinishedAt != nil {
 		s := run.FinishedAt.Format("2006-01-02T15:04:05Z")
