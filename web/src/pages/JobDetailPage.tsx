@@ -660,7 +660,11 @@ export function JobDetailPage() {
           )}
         </div>
         <div className="flex flex-wrap gap-2">
-          <button onClick={() => setEditOpen(true)} className="btn-secondary">Edit</button>
+          <button
+            onClick={() => setEditOpen(true)}
+            disabled={planEntry?.status === 'running' || jobIsRunning}
+            className="btn-secondary"
+          >Edit</button>
           <button
             onClick={() => id && runPlan(id)}
             disabled={planEntry?.status === 'running' || jobIsRunning}
