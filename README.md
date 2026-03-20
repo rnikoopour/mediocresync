@@ -52,6 +52,26 @@ The React app runs at `http://localhost:5173` with `/api/*` proxied to the Go se
 make test
 ```
 
+## Deploying on Ubuntu
+
+Download the latest `mediocresync` binary from the [GitHub releases page](https://github.com/rnikoopour/mediocresync/releases), then:
+
+```sh
+# Create a dedicated user
+sudo useradd -r -s /bin/false mediocresync
+
+# Install the binary
+sudo cp mediocresync /usr/local/bin/mediocresync
+sudo chmod +x /usr/local/bin/mediocresync
+
+# Install and enable the systemd service
+sudo cp mediocresync.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now mediocresync
+```
+
+The service listens on port `5000` and stores its database at `/var/lib/mediocresync/mediocresync.db` (created automatically by systemd). To override, edit the `Environment=` lines in the unit file before enabling.
+
 ## How it works
 
 - **Connections** store FTPES server credentials (passwords encrypted with AES-256-GCM at rest).
