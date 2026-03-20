@@ -587,7 +587,7 @@ export function JobDetailPage() {
   const { data: runs = [], isLoading } = useQuery({
     queryKey: ['runs', id],
     queryFn: () => api.jobs.listRuns(id!),
-    refetchInterval: (q) => q.state.data?.[0]?.status === 'running' ? 3000 : false,
+    refetchInterval: (q) => q.state.data?.[0]?.status === 'running' ? 3000 : 15000,
   })
   const { plans, runPlan, subscribePlan, dismissPlan, unskipFile, skipFile } = usePlan()
   const planEntry = id ? plans[id] : undefined
@@ -601,11 +601,15 @@ export function JobDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
-  // Subscribe to job-level events so runs triggered by other clients are
-  // discovered immediately. Reconnects after phone lock/unlock automatically.
+  // Subscribe to job-level events so runs triggered by other clients (including
+  // the scheduler) are discovered immediately. On reconnect after a visibility
+  // change or error, refetch runs to catch any events missed while disconnected.
   useEffect(() => {
     if (!id) return
     return openEventSource(`/api/jobs/${id}/events`, (es) => {
+      es.onopen = () => {
+        qc.invalidateQueries({ queryKey: ['runs', id] })
+      }
       es.onmessage = (e) => {
         const ev = JSON.parse(e.data)
         if (ev.status === 'started') {
@@ -615,7 +619,6 @@ export function JobDetailPage() {
           else unskipFile(id, ev.plan_path)
         }
       }
-      es.onerror = () => es.close()
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
