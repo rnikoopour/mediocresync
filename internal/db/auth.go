@@ -115,6 +115,16 @@ func (r *AuthRepository) DeleteSession(token string) error {
 	return nil
 }
 
+// SetSessionLastUsedAt overwrites the last_used_at timestamp for a session.
+// Used in tests to simulate expired sessions.
+func (r *AuthRepository) SetSessionLastUsedAt(token, lastUsedAt string) error {
+	_, err := r.db.Exec(`UPDATE sessions SET last_used_at = ? WHERE token = ?`, lastUsedAt, token)
+	if err != nil {
+		return fmt.Errorf("set session last_used_at: %w", err)
+	}
+	return nil
+}
+
 // DeleteAllSessions removes all sessions, forcing re-login everywhere.
 func (r *AuthRepository) DeleteAllSessions() error {
 	_, err := r.db.Exec(`DELETE FROM sessions`)
