@@ -4,6 +4,7 @@ import { api } from '../api/client'
 import type { SyncJob, JobRequest } from '../api/types'
 import { RemoteBrowser } from './RemoteBrowser'
 import { LocalBrowser } from './LocalBrowser'
+import { Modal } from './Modal'
 import { usePlan } from '../context/PlanContext'
 
 interface Props {
@@ -54,17 +55,33 @@ export function JobFormModal({ editing, onClose }: Props) {
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col">
+      <Modal size="lg">
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
             <h2 className="font-semibold text-gray-900 dark:text-gray-100">{editing ? 'Edit Job' : 'Add Job'}</h2>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">&times;</button>
           </div>
 
-          <form onSubmit={(e) => { e.preventDefault(); save.mutate(form) }} className="flex flex-1 min-h-0">
-            {/* Sidebar tabs */}
-            <nav className="w-36 border-r border-gray-200 dark:border-gray-700 py-3 shrink-0">
+          <form onSubmit={(e) => { e.preventDefault(); save.mutate(form) }} className="flex flex-col sm:flex-row flex-1 min-h-0">
+            {/* Mobile horizontal tabs */}
+            <div className="sm:hidden flex shrink-0 border-b border-gray-200 dark:border-gray-700">
+              {(['general', 'filters'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setActiveTab(tab)}
+                  className={`flex-1 py-2 text-sm capitalize ${
+                    activeTab === tab
+                      ? 'border-b-2 border-blue-600 text-blue-700 dark:text-gray-100 font-medium'
+                      : 'text-gray-600 dark:text-gray-400'
+                  }`}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+            {/* Desktop sidebar tabs */}
+            <nav className="hidden sm:block w-36 border-r border-gray-200 dark:border-gray-700 py-3 shrink-0">
               {(['general', 'filters'] as const).map((tab) => (
                 <button
                   key={tab}
@@ -86,6 +103,7 @@ export function JobFormModal({ editing, onClose }: Props) {
               <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
                 {activeTab === 'general' && (
                   <>
+                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide pt-1">General</p>
                     <Field label="Name">
                       <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
                     </Field>
@@ -121,7 +139,7 @@ export function JobFormModal({ editing, onClose }: Props) {
                         </button>
                       </div>
                     </Field>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <Field label="Max Concurrent Downloads" className="w-48">
                         <input className="input" type="number" min={1} max={20} value={form.concurrency} onChange={(e) => setForm({ ...form, concurrency: Number(e.target.value) })} required />
                       </Field>
@@ -134,27 +152,32 @@ export function JobFormModal({ editing, onClose }: Props) {
                     </div>
 
                     <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide pt-1">Autosync</p>
-                    <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-                      <input type="checkbox" checked={form.enabled} onChange={(e) => setForm({ ...form, enabled: e.target.checked })} />
-                      Enabled
-                    </label>
-                    <div className="flex gap-2">
-                      <Field label="Every" className="w-24">
-                        <input className="input" type="number" min={1} value={form.interval_value} onChange={(e) => setForm({ ...form, interval_value: Number(e.target.value) })} required />
-                      </Field>
-                      <Field label="Unit" className="flex-1">
-                        <select className="input" value={form.interval_unit} onChange={(e) => setForm({ ...form, interval_unit: e.target.value as JobRequest['interval_unit'] })}>
-                          <option value="minutes">Minutes</option>
-                          <option value="hours">Hours</option>
-                          <option value="days">Days</option>
-                        </select>
-                      </Field>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer shrink-0 w-28">
+                        <span
+                          role="switch"
+                          aria-checked={form.enabled}
+                          onClick={() => setForm({ ...form, enabled: !form.enabled })}
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${form.enabled ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'}`}
+                        >
+                          <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${form.enabled ? 'translate-x-4' : 'translate-x-0'}`} />
+                        </span>
+                        {form.enabled ? 'Enabled' : 'Disabled'}
+                      </label>
+                      <span className="text-sm text-gray-500 dark:text-gray-400 shrink-0">every</span>
+                      <input className="input w-20" type="number" min={1} value={form.interval_value} onChange={(e) => setForm({ ...form, interval_value: Number(e.target.value) })} required />
+                      <select className="input flex-1" value={form.interval_unit} onChange={(e) => setForm({ ...form, interval_unit: e.target.value as JobRequest['interval_unit'] })}>
+                        <option value="minutes">Minutes</option>
+                        <option value="hours">Hours</option>
+                        <option value="days">Days</option>
+                      </select>
                     </div>
                   </>
                 )}
 
                 {activeTab === 'filters' && (
                   <>
+                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide pt-1">Filters</p>
                     <p className="text-xs text-gray-400 dark:text-gray-500">
                       Path filters scope which directories are searched. Name filters scope which files within those directories are included. Both groups must match (AND logic).
                     </p>
@@ -206,8 +229,7 @@ export function JobFormModal({ editing, onClose }: Props) {
               </div>
             </div>
           </form>
-        </div>
-      </div>
+      </Modal>
 
       {browserOpen && form.connection_id && (
         <RemoteBrowser

@@ -8,11 +8,15 @@ GOARCH ?= $(shell go env GOARCH)
 
 build:
 	cd web && npm ci && npm run build
+	touch ui/dist/.gitkeep
 	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o bin/mediocresync ./cmd/server
+
+LISTEN_ALL ?= false
+VITE_HOST_FLAG := $(if $(filter true,$(LISTEN_ALL)),-- --host,)
 
 run-dev:
 	@echo "Starting dev servers..."
-	cd web && npm run dev &
+	cd web && npm run dev $(VITE_HOST_FLAG) &
 	DEV_MODE=true go run ./cmd/server
 
 run-prod: build

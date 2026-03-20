@@ -138,8 +138,9 @@ function JobRow({ job, onEdit, onDelete }: { job: SyncJob; onEdit: () => void; o
             {job.name}
           </Link>
           <p className="text-xs text-gray-500 dark:text-gray-400">{job.remote_path} → {job.local_dest}</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500">{job.concurrency} concurrent downloads</p>
           <p className="text-xs text-gray-400 dark:text-gray-500">
-            Every {job.interval_value} {job.interval_unit} · {job.concurrency} concurrent · autosync {job.enabled ? 'enabled' : 'disabled'}
+            autosync {job.enabled ? 'enabled' : 'disabled'} · every {job.interval_value} {job.interval_unit}
           </p>
         </div>
         <div className="shrink-0 flex flex-wrap gap-2">

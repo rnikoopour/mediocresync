@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import type { BrowseEntry } from '../api/types'
+import { Modal } from './Modal'
 
 interface Props {
   title: string
@@ -44,8 +45,7 @@ export function FileBrowser({ title, initialPath, queryKey, fetcher, onSelect, o
   const files = entries.filter((e) => !e.is_dir)
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-lg mx-4 flex flex-col" style={{ maxHeight: '80vh' }}>
+    <Modal height="h-[70dvh]">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
           <h2 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">{title}</h2>
@@ -126,8 +126,7 @@ export function FileBrowser({ title, initialPath, queryKey, fetcher, onSelect, o
             </button>
           </div>
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }
 

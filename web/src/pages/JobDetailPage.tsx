@@ -193,7 +193,7 @@ function RunTreeView({ transfers, remotePath, liveEvents, runEnded }: {
   const nodes = buildRunTree(filtered, remotePath)
   return (
     <div className="border-t border-gray-100 dark:border-gray-700">
-      <RunTabBar tab={tab} onTab={setTab} />
+      <RunTabBar tab={tab} onTab={setTab} isRunning={!runEnded} />
       <div className="py-1 max-h-64 overflow-y-auto">
         {nodes.length === 0
           ? <p className="px-4 py-4 text-xs text-center text-gray-400 dark:text-gray-500">No transfers recorded.</p>
@@ -548,11 +548,11 @@ function TreeTabBar({ tab, onTab }: { tab: TreeTab; onTab: (t: TreeTab) => void 
   )
 }
 
-function RunTabBar({ tab, onTab }: { tab: RunTab; onTab: (t: RunTab) => void }) {
+function RunTabBar({ tab, onTab, isRunning }: { tab: RunTab; onTab: (t: RunTab) => void; isRunning: boolean }) {
   return (
     <div className="flex flex-wrap items-center gap-1 px-3 py-2 border-b border-gray-100 dark:border-gray-700">
       <TabBtn value="active"      current={tab} label="Active"      onTab={onTab} />
-      <TabBtn value="in_progress" current={tab} label="In Progress" onTab={onTab} />
+      {isRunning && <TabBtn value="in_progress" current={tab} label="In Progress" onTab={onTab} />}
       <TabBtn value="copied"      current={tab} label="Copied"      onTab={onTab} />
       <TabBtn value="not_copied"  current={tab} label="Not Copied"  onTab={onTab} />
       <TabBtn value="failed"      current={tab} label="Failed"      onTab={onTab} />
