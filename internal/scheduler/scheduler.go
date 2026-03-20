@@ -84,6 +84,11 @@ func (s *Scheduler) tick(ctx context.Context) {
 				}
 			}()
 		}
+		if job.RunRetentionDays > 0 {
+			if err := s.runs.PruneForJob(job.ID, job.RunRetentionDays); err != nil {
+				slog.Error("scheduler: prune run history", "job_id", job.ID, "err", err)
+			}
+		}
 	}
 }
 

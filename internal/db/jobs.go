@@ -25,12 +25,13 @@ func (r *JobRepository) Create(j *SyncJob) error {
 	j.UpdatedAt = now
 
 	_, err := r.db.Exec(
-		`INSERT INTO sync_jobs (id, name, connection_id, remote_path, local_dest, interval_value, interval_unit, concurrency, retry_attempts, retry_delay_seconds, enabled, include_filters, exclude_filters, include_path_filters, include_name_filters, exclude_path_filters, exclude_name_filters, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', '[]', ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO sync_jobs (id, name, connection_id, remote_path, local_dest, interval_value, interval_unit, concurrency, retry_attempts, retry_delay_seconds, enabled, include_filters, exclude_filters, include_path_filters, include_name_filters, exclude_path_filters, exclude_name_filters, run_retention_days, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', '[]', ?, ?, ?, ?, ?, ?, ?)`,
 		j.ID, j.Name, j.ConnectionID, j.RemotePath, j.LocalDest,
 		j.IntervalValue, j.IntervalUnit, j.Concurrency, j.RetryAttempts, j.RetryDelaySeconds, boolToInt(j.Enabled),
 		marshalFilters(j.IncludePathFilters), marshalFilters(j.IncludeNameFilters),
 		marshalFilters(j.ExcludePathFilters), marshalFilters(j.ExcludeNameFilters),
+		j.RunRetentionDays,
 		formatTime(j.CreatedAt), formatTime(j.UpdatedAt),
 	)
 	if err != nil {
@@ -39,7 +40,7 @@ func (r *JobRepository) Create(j *SyncJob) error {
 	return nil
 }
 
-const jobColumns = `id, name, connection_id, remote_path, local_dest, interval_value, interval_unit, concurrency, retry_attempts, retry_delay_seconds, enabled, include_filters, exclude_filters, include_path_filters, include_name_filters, exclude_path_filters, exclude_name_filters, created_at, updated_at`
+const jobColumns = `id, name, connection_id, remote_path, local_dest, interval_value, interval_unit, concurrency, retry_attempts, retry_delay_seconds, enabled, include_filters, exclude_filters, include_path_filters, include_name_filters, exclude_path_filters, exclude_name_filters, run_retention_days, created_at, updated_at`
 
 func (r *JobRepository) List() ([]*SyncJob, error) {
 	return r.query(`SELECT ` + jobColumns + ` FROM sync_jobs ORDER BY name`)
@@ -61,12 +62,13 @@ func (r *JobRepository) Get(id string) (*SyncJob, error) {
 func (r *JobRepository) Update(j *SyncJob) error {
 	j.UpdatedAt = time.Now().UTC()
 	res, err := r.db.Exec(
-		`UPDATE sync_jobs SET name=?, connection_id=?, remote_path=?, local_dest=?, interval_value=?, interval_unit=?, concurrency=?, retry_attempts=?, retry_delay_seconds=?, enabled=?, include_filters='[]', exclude_filters='[]', include_path_filters=?, include_name_filters=?, exclude_path_filters=?, exclude_name_filters=?, updated_at=?
+		`UPDATE sync_jobs SET name=?, connection_id=?, remote_path=?, local_dest=?, interval_value=?, interval_unit=?, concurrency=?, retry_attempts=?, retry_delay_seconds=?, enabled=?, include_filters='[]', exclude_filters='[]', include_path_filters=?, include_name_filters=?, exclude_path_filters=?, exclude_name_filters=?, run_retention_days=?, updated_at=?
 		 WHERE id=?`,
 		j.Name, j.ConnectionID, j.RemotePath, j.LocalDest,
 		j.IntervalValue, j.IntervalUnit, j.Concurrency, j.RetryAttempts, j.RetryDelaySeconds, boolToInt(j.Enabled),
 		marshalFilters(j.IncludePathFilters), marshalFilters(j.IncludeNameFilters),
 		marshalFilters(j.ExcludePathFilters), marshalFilters(j.ExcludeNameFilters),
+		j.RunRetentionDays,
 		formatTime(j.UpdatedAt), j.ID,
 	)
 	if err != nil {
@@ -131,6 +133,7 @@ func scanJob(s scanner) (*SyncJob, error) {
 		&j.IntervalValue, &j.IntervalUnit, &j.Concurrency, &j.RetryAttempts, &j.RetryDelaySeconds, &enabled,
 		&oldIncludeFilters, &oldExcludeFilters,
 		&includePathFilters, &includeNameFilters, &excludePathFilters, &excludeNameFilters,
+		&j.RunRetentionDays,
 		&createdAt, &updatedAt,
 	)
 	if err != nil {

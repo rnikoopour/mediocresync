@@ -36,6 +36,7 @@ export interface SyncJob {
   include_name_filters: string[]
   exclude_path_filters: string[]
   exclude_name_filters: string[]
+  run_retention_days: number
   created_at: string
   updated_at: string
 }
@@ -55,6 +56,7 @@ export interface JobRequest {
   include_name_filters: string[]
   exclude_path_filters: string[]
   exclude_name_filters: string[]
+  run_retention_days: number
 }
 
 export interface Run {

@@ -18,6 +18,7 @@ const empty: JobRequest = {
   retry_attempts: 3, retry_delay_seconds: 2, enabled: true,
   include_path_filters: [], include_name_filters: [],
   exclude_path_filters: [], exclude_name_filters: [],
+  run_retention_days: 0,
 }
 
 function jobToForm(j: SyncJob): JobRequest {
@@ -30,6 +31,7 @@ function jobToForm(j: SyncJob): JobRequest {
     include_name_filters: j.include_name_filters ?? [],
     exclude_path_filters: j.exclude_path_filters ?? [],
     exclude_name_filters: j.exclude_name_filters ?? [],
+    run_retention_days: j.run_retention_days ?? 0,
   }
 }
 
@@ -172,6 +174,18 @@ export function JobFormModal({ editing, onClose }: Props) {
                         <option value="days">Days</option>
                       </select>
                     </div>
+
+                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide pt-1">History</p>
+                    <Field label="Run Retention (days)" className="w-48">
+                      <input
+                        className="input"
+                        type="number"
+                        min={0}
+                        value={form.run_retention_days}
+                        onChange={(e) => setForm({ ...form, run_retention_days: Number(e.target.value) })}
+                      />
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">0 = keep forever</p>
+                    </Field>
                   </>
                 )}
 

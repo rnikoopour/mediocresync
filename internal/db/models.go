@@ -31,6 +31,7 @@ type SyncJob struct {
 	IncludeNameFilters []string // basename glob patterns; file basename must match at least one (if non-empty)
 	ExcludePathFilters []string // file excluded if under any of these
 	ExcludeNameFilters []string // file excluded if basename matches any of these
+	RunRetentionDays int      // days to keep run history; 0 = keep forever
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 }
