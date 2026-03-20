@@ -35,6 +35,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	auth := db.NewAuthRepository(database)
 	connections := db.NewConnectionRepository(database)
 	jobs := db.NewJobRepository(database)
 	runs := db.NewRunRepository(database)
@@ -66,6 +67,7 @@ func main() {
 
 	router := api.NewRouter(
 		ctx,
+		auth,
 		connections,
 		jobs,
 		runs,
