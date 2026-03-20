@@ -44,7 +44,7 @@ export function SettingsGeneralPage() {
   }
 
   return (
-    <div className="max-w-lg">
+    <div>
       <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-6">General</h1>
 
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">

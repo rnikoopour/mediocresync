@@ -8,6 +8,7 @@ import { RunDetailPage } from './pages/RunDetailPage'
 import { LoginPage } from './pages/LoginPage'
 import { SetupPage } from './pages/SetupPage'
 import { SettingsGeneralPage } from './pages/SettingsGeneralPage'
+import { SettingsIndexPage } from './pages/SettingsIndexPage'
 import { PlanProvider } from './context/PlanContext'
 
 const queryClient = new QueryClient({
@@ -28,6 +29,7 @@ export default function App() {
             <Route path="jobs" element={<JobsPage />} />
             <Route path="jobs/:id" element={<JobDetailPage />} />
             <Route path="runs/:id" element={<RunDetailPage />} />
+            <Route path="settings" element={<SettingsIndexPage />} />
             <Route path="settings/general" element={<SettingsGeneralPage />} />
           </Route>
         </Routes>
