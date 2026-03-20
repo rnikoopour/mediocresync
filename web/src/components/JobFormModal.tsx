@@ -86,6 +86,7 @@ export function JobFormModal({ editing, onClose }: Props) {
               <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
                 {activeTab === 'general' && (
                   <>
+                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide pt-1">General</p>
                     <Field label="Name">
                       <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
                     </Field>
@@ -159,6 +160,7 @@ export function JobFormModal({ editing, onClose }: Props) {
 
                 {activeTab === 'filters' && (
                   <>
+                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide pt-1">Filters</p>
                     <p className="text-xs text-gray-400 dark:text-gray-500">
                       Path filters scope which directories are searched. Name filters scope which files within those directories are included. Both groups must match (AND logic).
                     </p>
