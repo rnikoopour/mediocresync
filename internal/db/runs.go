@@ -72,7 +72,7 @@ func (r *RunRepository) ListByJob(jobID string) ([]*Run, error) {
 
 func (r *RunRepository) UpdateStatus(id, status string) error {
 	var finishedAt *string
-	if status == "completed" || status == "failed" || status == "canceled" || status == "server_stopped" {
+	if status == "completed" || status == "nothing_to_sync" || status == "failed" || status == "canceled" || status == "server_stopped" {
 		s := formatTime(time.Now().UTC())
 		finishedAt = &s
 	}

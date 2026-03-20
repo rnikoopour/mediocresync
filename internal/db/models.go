@@ -38,7 +38,7 @@ type SyncJob struct {
 type Run struct {
 	ID             string
 	JobID          string
-	Status         string // running | completed | failed
+	Status         string // running | completed | nothing_to_sync | failed | canceled | server_stopped
 	StartedAt      time.Time
 	FinishedAt     *time.Time
 	TotalFiles     int

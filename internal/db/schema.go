@@ -49,7 +49,7 @@ var schema = []string{
 	`CREATE TABLE IF NOT EXISTS runs (
 		id            TEXT PRIMARY KEY,
 		job_id        TEXT NOT NULL REFERENCES sync_jobs(id),
-		status        TEXT NOT NULL CHECK(status IN ('running','completed','failed','canceled','server_stopped')),
+		status        TEXT NOT NULL CHECK(status IN ('running','completed','nothing_to_sync','failed','canceled','server_stopped')),
 		started_at    TEXT NOT NULL,
 		finished_at   TEXT,
 		total_files      INTEGER NOT NULL DEFAULT 0,

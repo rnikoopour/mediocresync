@@ -195,11 +195,14 @@ function RunTreeView({ transfers, remotePath, liveEvents, runEnded }: {
     <div className="border-t border-gray-100 dark:border-gray-700">
       <RunTabBar tab={tab} onTab={setTab} />
       <div className="py-1 max-h-64 overflow-y-auto">
-        {nodes.map((n, i) =>
-          n.type === 'folder'
-            ? <RunFolderNode key={n.name + i} node={n} depth={0} liveEvents={liveEvents} runEnded={runEnded} />
-            : <RunFileRow key={n.name + i} node={n} liveEvents={liveEvents} runEnded={runEnded} />
-        )}
+        {nodes.length === 0
+          ? <p className="px-4 py-4 text-xs text-center text-gray-400 dark:text-gray-500">No transfers recorded.</p>
+          : nodes.map((n, i) =>
+              n.type === 'folder'
+                ? <RunFolderNode key={n.name + i} node={n} depth={0} liveEvents={liveEvents} runEnded={runEnded} />
+                : <RunFileRow key={n.name + i} node={n} liveEvents={liveEvents} runEnded={runEnded} />
+            )
+        }
       </div>
     </div>
   )
