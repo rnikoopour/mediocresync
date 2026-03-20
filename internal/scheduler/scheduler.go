@@ -97,13 +97,11 @@ func (s *Scheduler) lastRun(jobID string) time.Time {
 	return runs[0].StartedAt
 }
 
-// isDue returns true if enough time has elapsed since the last run to warrant
-// a new one, based on the job's interval setting.
+// isDue returns true if the job has not yet run during the current
+// clock-aligned slot. Slots are computed by truncating the current time to
+// the job's interval, so a 60-minute job fires at 00:00, 01:00, 02:00, etc.
+// and a 30-minute job fires at 00:00, 00:30, 01:00, etc.
 func isDue(job *db.SyncJob, lastRun time.Time) bool {
-	if lastRun.IsZero() {
-		return true
-	}
-
 	var interval time.Duration
 	switch job.IntervalUnit {
 	case "minutes":
@@ -116,5 +114,6 @@ func isDue(job *db.SyncJob, lastRun time.Time) bool {
 		return false
 	}
 
-	return time.Since(lastRun) >= interval
+	slotStart := time.Now().UTC().Truncate(interval)
+	return lastRun.Before(slotStart)
 }
