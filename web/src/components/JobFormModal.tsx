@@ -55,7 +55,7 @@ export function JobFormModal({ editing, onClose }: Props) {
   return (
     <>
       <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-2xl mx-4 h-[90vh] flex flex-col">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-2xl mx-4 h-[90vh] flex flex-col overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
             <h2 className="font-semibold text-gray-900 dark:text-gray-100">{editing ? 'Edit Job' : 'Add Job'}</h2>
@@ -122,7 +122,7 @@ export function JobFormModal({ editing, onClose }: Props) {
                         </button>
                       </div>
                     </Field>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <Field label="Max Concurrent Downloads" className="w-48">
                         <input className="input" type="number" min={1} max={20} value={form.concurrency} onChange={(e) => setForm({ ...form, concurrency: Number(e.target.value) })} required />
                       </Field>
@@ -135,7 +135,7 @@ export function JobFormModal({ editing, onClose }: Props) {
                     </div>
 
                     <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide pt-1">Autosync</p>
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
                       <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer shrink-0 w-28">
                         <span
                           role="switch"
