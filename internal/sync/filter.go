@@ -3,6 +3,8 @@ package sync
 import (
 	"path"
 	"strings"
+
+	"github.com/bmatcuk/doublestar/v4"
 )
 
 // applyFilters reports whether a remote file at filePath should be included.
@@ -37,8 +39,42 @@ func applyFilters(
 
 func matchesAnyPath(filePath, base string, subdirs []string) bool {
 	for _, subdir := range subdirs {
-		prefix := base + "/" + strings.Trim(subdir, "/")
-		if strings.HasPrefix(filePath, prefix+"/") || filePath == prefix {
+		subdir = strings.Trim(subdir, "/")
+		if isGlobPattern(subdir) {
+			if matchesGlobPath(filePath, base, subdir) {
+				return true
+			}
+		} else {
+			prefix := base + "/" + subdir
+			if strings.HasPrefix(filePath, prefix+"/") || filePath == prefix {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// isGlobPattern reports whether s contains any glob metacharacter.
+func isGlobPattern(s string) bool {
+	return strings.ContainsAny(s, "*?[")
+}
+
+// matchesGlobPath reports whether filePath is under a directory (relative to
+// base) that matches the doublestar glob pattern. Each directory-level prefix
+// of the relative path is tested so that, e.g., pattern "**/*alpha*" matches
+// a file nested at any depth under a directory whose name contains "alpha".
+func matchesGlobPath(filePath, base, pattern string) bool {
+	base = strings.TrimSuffix(base, "/")
+	prefix := base + "/"
+	if !strings.HasPrefix(filePath, prefix) {
+		return false
+	}
+	rel := filePath[len(prefix):]
+	parts := strings.Split(rel, "/")
+	// Test each directory prefix (not the filename itself).
+	for i := 1; i < len(parts); i++ {
+		dir := strings.Join(parts[:i], "/")
+		if matched, _ := doublestar.Match(pattern, dir); matched {
 			return true
 		}
 	}

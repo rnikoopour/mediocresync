@@ -240,6 +240,64 @@ func TestApplyFilters(t *testing.T) {
 			excludeNameFilters: []string{"*.dat"},
 			want:               true,
 		},
+
+	// ── Glob path filters (**) ───────────────────────────────────────────────
+	{
+		name:               "glob includePathFilter: **/*alpha* matches direct child containing alpha",
+		filePath:           "/foo/bar/sub_alpha_string/item.dat",
+		jobRemotePath:      "/foo/bar",
+		includePathFilters: []string{"**/*alpha*"},
+		want:               true,
+	},
+	{
+		name:               "glob includePathFilter: **/*alpha* matches deeply nested file under alpha dir",
+		filePath:           "/foo/bar/sub_alpha_string/deep/nested/item.dat",
+		jobRemotePath:      "/foo/bar",
+		includePathFilters: []string{"**/*alpha*"},
+		want:               true,
+	},
+	{
+		name:               "glob includePathFilter: **/*alpha* matches alpha dir at non-root depth",
+		filePath:           "/foo/bar/category/sub_alpha_string/item.dat",
+		jobRemotePath:      "/foo/bar",
+		includePathFilters: []string{"**/*alpha*"},
+		want:               true,
+	},
+	{
+		name:               "glob includePathFilter: **/*alpha* does not match file with no alpha in path",
+		filePath:           "/foo/bar/beta/item.dat",
+		jobRemotePath:      "/foo/bar",
+		includePathFilters: []string{"**/*alpha*"},
+		want:               false,
+	},
+	{
+		name:               "glob includePathFilter: **/tmp matches tmp dir at any depth",
+		filePath:           "/foo/bar/a/b/tmp/item.dat",
+		jobRemotePath:      "/foo/bar",
+		includePathFilters: []string{"**/tmp"},
+		want:               true,
+	},
+	{
+		name:               "glob includePathFilter: **/tmp does not match tmp2",
+		filePath:           "/foo/bar/tmp2/item.dat",
+		jobRemotePath:      "/foo/bar",
+		includePathFilters: []string{"**/tmp"},
+		want:               false,
+	},
+	{
+		name:               "glob excludePathFilter: **/*alpha* excludes file under alpha dir",
+		filePath:           "/foo/bar/sub_alpha_string/item.dat",
+		jobRemotePath:      "/foo/bar",
+		excludePathFilters: []string{"**/*alpha*"},
+		want:               false,
+	},
+	{
+		name:               "glob excludePathFilter: **/*alpha* does not exclude unrelated file",
+		filePath:           "/foo/bar/beta/item.dat",
+		jobRemotePath:      "/foo/bar",
+		excludePathFilters: []string{"**/*alpha*"},
+		want:               true,
+	},
 	}
 
 	for _, tt := range tests {
