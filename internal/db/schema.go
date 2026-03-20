@@ -81,4 +81,9 @@ var schema = []string{
 		copied_at   TEXT NOT NULL,
 		PRIMARY KEY (job_id, remote_path)
 	)`,
+
+	`CREATE TABLE IF NOT EXISTS sessions (
+		token        TEXT PRIMARY KEY,
+		last_used_at TEXT NOT NULL
+	)`,
 }
