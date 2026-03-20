@@ -122,7 +122,7 @@ sketch
 
 # End of https://www.toptal.com/developers/gitignore/api/go,emacs,osx,react
 
-!ui/dist/index.html
+
 *.db
 .env
 bin/

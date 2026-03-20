@@ -14,7 +14,8 @@ class MockEventSource {
 
   private listeners: Map<string, EventListener[]> = new Map()
 
-  constructor(public readonly url: string) {}
+  readonly url: string
+  constructor(url: string) { this.url = url }
 
   addEventListener(type: string, listener: EventListener) {
     const list = this.listeners.get(type) ?? []
