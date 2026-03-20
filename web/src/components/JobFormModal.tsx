@@ -55,7 +55,7 @@ export function JobFormModal({ editing, onClose }: Props) {
   return (
     <>
       <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-2xl mx-4 h-[90vh] flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
             <h2 className="font-semibold text-gray-900 dark:text-gray-100">{editing ? 'Edit Job' : 'Add Job'}</h2>
@@ -134,21 +134,25 @@ export function JobFormModal({ editing, onClose }: Props) {
                     </div>
 
                     <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide pt-1">Autosync</p>
-                    <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-                      <input type="checkbox" checked={form.enabled} onChange={(e) => setForm({ ...form, enabled: e.target.checked })} />
-                      Enabled
-                    </label>
-                    <div className="flex gap-2">
-                      <Field label="Every" className="w-24">
-                        <input className="input" type="number" min={1} value={form.interval_value} onChange={(e) => setForm({ ...form, interval_value: Number(e.target.value) })} required />
-                      </Field>
-                      <Field label="Unit" className="flex-1">
-                        <select className="input" value={form.interval_unit} onChange={(e) => setForm({ ...form, interval_unit: e.target.value as JobRequest['interval_unit'] })}>
-                          <option value="minutes">Minutes</option>
-                          <option value="hours">Hours</option>
-                          <option value="days">Days</option>
-                        </select>
-                      </Field>
+                    <div className="flex items-center gap-3">
+                      <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer shrink-0 w-28">
+                        <span
+                          role="switch"
+                          aria-checked={form.enabled}
+                          onClick={() => setForm({ ...form, enabled: !form.enabled })}
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${form.enabled ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'}`}
+                        >
+                          <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${form.enabled ? 'translate-x-4' : 'translate-x-0'}`} />
+                        </span>
+                        {form.enabled ? 'Enabled' : 'Disabled'}
+                      </label>
+                      <span className="text-sm text-gray-500 dark:text-gray-400 shrink-0">every</span>
+                      <input className="input w-20" type="number" min={1} value={form.interval_value} onChange={(e) => setForm({ ...form, interval_value: Number(e.target.value) })} required />
+                      <select className="input flex-1" value={form.interval_unit} onChange={(e) => setForm({ ...form, interval_unit: e.target.value as JobRequest['interval_unit'] })}>
+                        <option value="minutes">Minutes</option>
+                        <option value="hours">Hours</option>
+                        <option value="days">Days</option>
+                      </select>
                     </div>
                   </>
                 )}
