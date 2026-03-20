@@ -4,6 +4,7 @@ import { api } from '../api/client'
 import type { SyncJob, JobRequest } from '../api/types'
 import { RemoteBrowser } from './RemoteBrowser'
 import { LocalBrowser } from './LocalBrowser'
+import { Modal } from './Modal'
 import { usePlan } from '../context/PlanContext'
 
 interface Props {
@@ -54,17 +55,33 @@ export function JobFormModal({ editing, onClose }: Props) {
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col overflow-hidden">
+      <Modal size="lg">
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
             <h2 className="font-semibold text-gray-900 dark:text-gray-100">{editing ? 'Edit Job' : 'Add Job'}</h2>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">&times;</button>
           </div>
 
-          <form onSubmit={(e) => { e.preventDefault(); save.mutate(form) }} className="flex flex-1 min-h-0">
-            {/* Sidebar tabs */}
-            <nav className="w-36 border-r border-gray-200 dark:border-gray-700 py-3 shrink-0">
+          <form onSubmit={(e) => { e.preventDefault(); save.mutate(form) }} className="flex flex-col sm:flex-row flex-1 min-h-0">
+            {/* Mobile horizontal tabs */}
+            <div className="sm:hidden flex shrink-0 border-b border-gray-200 dark:border-gray-700">
+              {(['general', 'filters'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setActiveTab(tab)}
+                  className={`flex-1 py-2 text-sm capitalize ${
+                    activeTab === tab
+                      ? 'border-b-2 border-blue-600 text-blue-700 dark:text-gray-100 font-medium'
+                      : 'text-gray-600 dark:text-gray-400'
+                  }`}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+            {/* Desktop sidebar tabs */}
+            <nav className="hidden sm:block w-36 border-r border-gray-200 dark:border-gray-700 py-3 shrink-0">
               {(['general', 'filters'] as const).map((tab) => (
                 <button
                   key={tab}
@@ -212,8 +229,7 @@ export function JobFormModal({ editing, onClose }: Props) {
               </div>
             </div>
           </form>
-        </div>
-      </div>
+      </Modal>
 
       {browserOpen && form.connection_id && (
         <RemoteBrowser

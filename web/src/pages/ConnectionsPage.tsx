@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client'
 import type { Connection, ConnectionRequest } from '../api/types'
 import { StatusBadge } from '../components/StatusBadge'
+import { Modal } from '../components/Modal'
 
 const empty: ConnectionRequest = {
   name: '', host: '', port: 21, username: '', password: '',
@@ -105,17 +106,33 @@ export function ConnectionsPage() {
       </div>
 
       {modal.open && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-lg mx-4 max-h-[90vh] flex flex-col">
+        <Modal>
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
               <h2 className="font-semibold text-gray-900 dark:text-gray-100">{modal.editing ? 'Edit Connection' : 'Add Connection'}</h2>
               <button onClick={closeModal} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">&times;</button>
             </div>
 
-            <form onSubmit={(e) => { e.preventDefault(); save.mutate(form) }} className="flex flex-1 min-h-0">
-              {/* Sidebar tabs */}
-              <nav className="w-36 border-r border-gray-200 dark:border-gray-700 py-3 shrink-0">
+            <form onSubmit={(e) => { e.preventDefault(); save.mutate(form) }} className="flex flex-col sm:flex-row flex-1 min-h-0 overflow-hidden">
+              {/* Mobile horizontal tabs */}
+              <div className="sm:hidden flex shrink-0 border-b border-gray-200 dark:border-gray-700">
+                {(['general', 'advanced'] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setActiveTab(tab)}
+                    className={`flex-1 py-2 text-sm capitalize ${
+                      activeTab === tab
+                        ? 'border-b-2 border-blue-600 text-blue-700 dark:text-gray-100 font-medium'
+                        : 'text-gray-600 dark:text-gray-400'
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
+              {/* Desktop sidebar tabs */}
+              <nav className="hidden sm:block w-36 border-r border-gray-200 dark:border-gray-700 py-3 shrink-0">
                 {(['general', 'advanced'] as const).map((tab) => (
                   <button
                     key={tab}
@@ -204,8 +221,7 @@ export function ConnectionsPage() {
                 </div>
               </div>
             </form>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   )
