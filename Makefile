@@ -8,6 +8,7 @@ GOARCH ?= $(shell go env GOARCH)
 
 build:
 	cd web && npm ci && npm run build
+	touch ui/dist/.gitkeep
 	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o bin/mediocresync ./cmd/server
 
 LISTEN_ALL ?= false
