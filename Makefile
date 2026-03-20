@@ -19,7 +19,8 @@ run-prod: build
 	./bin/mediocresync
 
 test:
-	go test ./...
+	# web/node_modules contains Go files that confuse ./...; list packages explicitly instead
+	go test ./cmd/... ./internal/... ./ui/...
 	cd web && npm test -- --run
 
 lint:
