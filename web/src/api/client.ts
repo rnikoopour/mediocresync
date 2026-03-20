@@ -4,13 +4,13 @@ import type {
   Run, TestResult, PlanResult, BrowseEntry,
 } from './types'
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function request<T>(method: string, path: string, body?: unknown, throw401 = false): Promise<T> {
   const res = await fetch(`/api${path}`, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : {},
     body: body ? JSON.stringify(body) : undefined,
   })
-  if (res.status === 401) {
+  if (res.status === 401 && !throw401) {
     window.location.href = '/login'
     return undefined as T
   }
@@ -65,10 +65,10 @@ export const api = {
     setup: (body: { username: string; password: string; password_confirm: string }) =>
       request<void>('POST', '/auth/setup', body),
     login: (body: { username: string; password: string }) =>
-      request<void>('POST', '/auth/login', body),
+      request<void>('POST', '/auth/login', body, true),
     logout: () => request<void>('POST', '/auth/logout'),
     me: () => request<{ username: string }>('GET', '/auth/me'),
     updateCredentials: (body: { current_password: string; username?: string; new_password?: string }) =>
-      request<void>('PUT', '/auth/credentials', body),
+      request<void>('PUT', '/auth/credentials', body, true),
   },
 }
