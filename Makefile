@@ -3,9 +3,12 @@
 NODE_BIN ?= $(shell command -v node 2>/dev/null)
 export PATH := $(dir $(NODE_BIN)):$(PATH)
 
+GOOS   ?= $(shell go env GOOS)
+GOARCH ?= $(shell go env GOARCH)
+
 build:
 	cd web && npm ci && npm run build
-	go build -o bin/mediocresync ./cmd/server
+	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o bin/mediocresync ./cmd/server
 
 run-dev:
 	@echo "Starting dev servers..."
