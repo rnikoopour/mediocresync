@@ -60,7 +60,7 @@ func TestFinalPath(t *testing.T) {
 
 func TestStagingPath(t *testing.T) {
 	got := stagingPath("/data/downloads", "/exports/reports/jan.csv")
-	want := "/data/downloads/.go-ftpes/jan.csv"
+	want := "/data/downloads/.mediocresync/jan.csv"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
@@ -69,7 +69,7 @@ func TestStagingPath(t *testing.T) {
 func TestStagingPathFlat(t *testing.T) {
 	// Deep remote path should still produce a flat staging path (just the filename)
 	got := stagingPath("/data", "/a/b/c/d/e/deep.csv")
-	want := "/data/.go-ftpes/deep.csv"
+	want := "/data/.mediocresync/deep.csv"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}

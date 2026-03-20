@@ -7,8 +7,8 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/rnikoopour/go-ftpes/internal/db"
-	"github.com/rnikoopour/go-ftpes/internal/sse"
+	"github.com/rnikoopour/mediocresync/internal/db"
+	"github.com/rnikoopour/mediocresync/internal/sse"
 )
 
 type runResponse struct {

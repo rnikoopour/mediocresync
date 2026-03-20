@@ -11,10 +11,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rnikoopour/go-ftpes/internal/crypto"
-	"github.com/rnikoopour/go-ftpes/internal/db"
-	"github.com/rnikoopour/go-ftpes/internal/ftpes"
-	"github.com/rnikoopour/go-ftpes/internal/sse"
+	"github.com/rnikoopour/mediocresync/internal/crypto"
+	"github.com/rnikoopour/mediocresync/internal/db"
+	"github.com/rnikoopour/mediocresync/internal/ftpes"
+	"github.com/rnikoopour/mediocresync/internal/sse"
 )
 
 // ErrJobAlreadyRunning is returned by RunJob when a run for the job is already active.

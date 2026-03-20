@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rnikoopour/go-ftpes/internal/db"
-	"github.com/rnikoopour/go-ftpes/internal/ftpes"
+	"github.com/rnikoopour/mediocresync/internal/db"
+	"github.com/rnikoopour/mediocresync/internal/ftpes"
 )
 
 func TestMatchesNilState(t *testing.T) {

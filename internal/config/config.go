@@ -23,7 +23,7 @@ func Load() *Config {
 		if err != nil {
 			home = "."
 		}
-		dbPath = filepath.Join(home, ".go-ftpes", "mediocresync.db")
+		dbPath = filepath.Join(home, ".mediocresync", "mediocresync.db")
 	}
 
 	return &Config{

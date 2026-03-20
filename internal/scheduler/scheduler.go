@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/rnikoopour/go-ftpes/internal/db"
-	internalsync "github.com/rnikoopour/go-ftpes/internal/sync"
+	"github.com/rnikoopour/mediocresync/internal/db"
+	internalsync "github.com/rnikoopour/mediocresync/internal/sync"
 )
 
 const tickInterval = time.Minute

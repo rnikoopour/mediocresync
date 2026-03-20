@@ -10,13 +10,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/rnikoopour/go-ftpes/internal/api"
-	"github.com/rnikoopour/go-ftpes/internal/config"
-	"github.com/rnikoopour/go-ftpes/internal/db"
-	"github.com/rnikoopour/go-ftpes/internal/scheduler"
-	internalsync "github.com/rnikoopour/go-ftpes/internal/sync"
-	"github.com/rnikoopour/go-ftpes/internal/sse"
-	"github.com/rnikoopour/go-ftpes/ui"
+	"github.com/rnikoopour/mediocresync/internal/api"
+	"github.com/rnikoopour/mediocresync/internal/config"
+	"github.com/rnikoopour/mediocresync/internal/db"
+	"github.com/rnikoopour/mediocresync/internal/scheduler"
+	internalsync "github.com/rnikoopour/mediocresync/internal/sync"
+	"github.com/rnikoopour/mediocresync/internal/sse"
+	"github.com/rnikoopour/mediocresync/ui"
 )
 
 func main() {

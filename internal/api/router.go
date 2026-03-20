@@ -7,9 +7,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
-	"github.com/rnikoopour/go-ftpes/internal/db"
-	internalsync "github.com/rnikoopour/go-ftpes/internal/sync"
-	"github.com/rnikoopour/go-ftpes/internal/sse"
+	"github.com/rnikoopour/mediocresync/internal/db"
+	internalsync "github.com/rnikoopour/mediocresync/internal/sync"
+	"github.com/rnikoopour/mediocresync/internal/sse"
 )
 
 func NewRouter(

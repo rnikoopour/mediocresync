@@ -5,7 +5,7 @@ export PATH := $(dir $(NODE_BIN)):$(PATH)
 
 build:
 	cd web && npm ci && npm run build
-	go build -o bin/go-ftpes ./cmd/server
+	go build -o bin/mediocresync ./cmd/server
 
 run-dev:
 	@echo "Starting dev servers..."
@@ -13,7 +13,7 @@ run-dev:
 	DEV_MODE=true go run ./cmd/server
 
 run-prod: build
-	./bin/go-ftpes
+	./bin/mediocresync
 
 test:
 	go test ./...

@@ -9,10 +9,10 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/rnikoopour/go-ftpes/internal/crypto"
-	"github.com/rnikoopour/go-ftpes/internal/db"
-	internalsync "github.com/rnikoopour/go-ftpes/internal/sync"
-	"github.com/rnikoopour/go-ftpes/internal/sse"
+	"github.com/rnikoopour/mediocresync/internal/crypto"
+	"github.com/rnikoopour/mediocresync/internal/db"
+	internalsync "github.com/rnikoopour/mediocresync/internal/sync"
+	"github.com/rnikoopour/mediocresync/internal/sse"
 )
 
 var testEncKey = bytes.Repeat([]byte{0x01}, 32)

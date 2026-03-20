@@ -1,4 +1,4 @@
-# go-ftpes
+# MediocreSync
 
 A web application for scheduling and monitoring incremental file copies from FTPES (FTP over Explicit TLS) servers. Configure connections and sync jobs through a browser UI; watch per-file progress live as transfers run.
 
@@ -14,7 +14,7 @@ All configuration is via environment variables:
 | Variable      | Required | Default      | Description |
 |---------------|----------|--------------|-------------|
 | `LISTEN_ADDR` | No       | `:8080`      | Address and port the server listens on |
-| `DB_PATH`     | No       | `~/.go-ftpes/mediocresync.db` | Path to the SQLite database file |
+| `DB_PATH`     | No       | `~/.mediocresync/mediocresync.db` | Path to the SQLite database file |
 | `DEV_MODE`    | No       | `false`      | Enables CORS headers for local frontend development |
 
 On first startup the server generates a random AES-256 encryption key and stores it in the database. Stored FTPES passwords are encrypted with that key. Deleting or replacing the database will make existing credentials unreadable.
@@ -25,12 +25,12 @@ On first startup the server generates a random AES-256 encryption key and stores
 make build
 ```
 
-This runs `npm run build` in `web/` (outputting to `ui/dist/`), then compiles the Go binary with the React app embedded. The result is a single binary at `bin/go-ftpes`.
+This runs `npm run build` in `web/` (outputting to `ui/dist/`), then compiles the Go binary with the React app embedded. The result is a single binary at `bin/mediocresync`.
 
 ## Running
 
 ```sh
-./bin/go-ftpes
+./bin/mediocresync
 ```
 
 Open `http://localhost:8080` in your browser.
@@ -57,6 +57,6 @@ make test
 - **Connections** store FTPES server credentials (passwords encrypted with AES-256-GCM at rest).
 - **Sync jobs** define what to copy, where to put it, and how often to run.
 - On each run, files are compared by size and modification time against previously copied state. Only new or changed files are downloaded.
-- In-progress files are written to `<local-dest>/.go-ftpes/<filename>` and atomically moved to their final path on success, so partial downloads never appear at the destination.
+- In-progress files are written to `<local-dest>/.mediocresync/<filename>` and atomically moved to their final path on success, so partial downloads never appear at the destination.
 - Live transfer progress is streamed to the browser via Server-Sent Events.
 - The scheduler runs inside the server process — no external queue or cron needed. If a job's interval fires while a run is still active, that interval is skipped.

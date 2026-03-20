@@ -7,10 +7,10 @@ import (
 	"strings"
 )
 
-const stagingDir = ".go-ftpes"
+const stagingDir = ".mediocresync"
 
 // stagingPath returns the flat staging path for a file during download.
-// All in-progress files land in <localDest>/.go-ftpes/<filename> regardless
+// All in-progress files land in <localDest>/.mediocresync/<filename> regardless
 // of their directory depth on the remote.
 func stagingPath(localDest, filename string) string {
 	return filepath.Join(localDest, stagingDir, filepath.Base(filename))
@@ -41,7 +41,7 @@ func atomicMove(src, dst string) error {
 	return nil
 }
 
-// ensureStagingDir creates <localDest>/.go-ftpes/ if it does not exist.
+// ensureStagingDir creates <localDest>/.mediocresync/ if it does not exist.
 func ensureStagingDir(localDest string) error {
 	dir := filepath.Join(localDest, stagingDir)
 	return os.MkdirAll(dir, 0o755)

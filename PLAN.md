@@ -1,4 +1,4 @@
-# go-ftpes Implementation Plan
+# MediocreSync Implementation Plan
 
 ## Status Legend
 - [ ] Not started
@@ -91,7 +91,7 @@
 | SQLite driver | `modernc.org/sqlite` — pure Go, no CGO, single binary |
 | WAL mode | Enabled at open — concurrent SSE reads during active syncs |
 | Password encryption | AES-256-GCM, key from `ENCRYPTION_KEY` env var |
-| Staging dir | Always under `<local-dest>/.go-ftpes/<filename>` — same partition guarantees atomic rename |
+| Staging dir | Always under `<local-dest>/.mediocresync/<filename>` — same partition guarantees atomic rename |
 | SSE fan-out | Buffered channels, non-blocking publish — slow clients drop events, never stall sync |
 | Scheduler overlap | In-memory `active` map — skip, never queue |
 | Scheduler tick | 1-minute granularity — matches minimum schedule unit (N minutes) |

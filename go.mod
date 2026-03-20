@@ -1,4 +1,4 @@
-module github.com/rnikoopour/go-ftpes
+module github.com/rnikoopour/mediocresync
 
 go 1.25.0
 

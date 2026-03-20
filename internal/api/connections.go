@@ -4,9 +4,9 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/rnikoopour/go-ftpes/internal/crypto"
-	"github.com/rnikoopour/go-ftpes/internal/db"
-	"github.com/rnikoopour/go-ftpes/internal/ftpes"
+	"github.com/rnikoopour/mediocresync/internal/crypto"
+	"github.com/rnikoopour/mediocresync/internal/db"
+	"github.com/rnikoopour/mediocresync/internal/ftpes"
 )
 
 type connectionRequest struct {

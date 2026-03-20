@@ -1,4 +1,4 @@
-# PRD: go-ftpes — FTPES Sync Web App
+# PRD: MediocreSync — FTPES Sync Web App
 
 ## Overview
 
@@ -104,12 +104,12 @@ Fields per job:
 
 To prevent partial or corrupt files from appearing at the final destination:
 
-1. Each file is first downloaded to a flat staging directory: `<local-destination>/.go-ftpes/<filename>`
-   - Example: `/data/downloads/.go-ftpes/jan.csv`
+1. Each file is first downloaded to a flat staging directory: `<local-destination>/.mediocresync/<filename>`
+   - Example: `/data/downloads/.mediocresync/jan.csv`
 2. On successful completion, the staged file is atomically moved (`os.Rename`) to its final destination path (with full directory structure)
 3. On failure, the staged file is deleted; the final destination path is never written to
 
-The `.go-ftpes/` staging directory is created automatically and managed entirely by the app. Users should not write files into it.
+The `.mediocresync/` staging directory is created automatically and managed entirely by the app. Users should not write files into it.
 
 ### Transfer Safety
 
@@ -142,7 +142,7 @@ scheduled / manual trigger
     CONNECTING
         ↓
     RUNNING  ← per-file progress streamed via SSE
-               files staged at <dest>/.go-ftpes/<filename>
+               files staged at <dest>/.mediocresync/<filename>
                then moved to <dest>/<relative-path> on success
         ↓
  COMPLETED | FAILED
@@ -205,7 +205,7 @@ The Go binary serves the React build as static assets so a single binary + SQLit
 4. User can trigger a run manually and watch per-file progress update live
 5. Re-running a job skips already-downloaded files; changed files are re-downloaded
 6. Local directory structure mirrors the remote tree
-7. In-progress files are staged at `<dest>/.go-ftpes/<filename>` and only moved to their final path on success — no partial files at the destination
+7. In-progress files are staged at `<dest>/.mediocresync/<filename>` and only moved to their final path on success — no partial files at the destination
 8. Failed transfers do not corrupt state
 9. App survives restart: schedule resumes, state is preserved in SQLite
 10. Single deployable artifact: one Go binary embedding the React build

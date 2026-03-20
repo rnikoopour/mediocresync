@@ -34,7 +34,7 @@ export function Layout() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
-        <span className="flex-1 text-center font-semibold text-gray-900 dark:text-gray-100 text-sm">go-ftpes</span>
+        <span className="flex-1 text-center font-semibold text-gray-900 dark:text-gray-100 text-sm">MediocreSync</span>
         <button
           onClick={toggleDark}
           className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-sm"
@@ -53,7 +53,7 @@ export function Layout() {
       {/* Sidebar */}
       <nav className={`fixed inset-y-0 left-0 z-50 w-52 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col transition-transform duration-200 ease-in-out sm:static sm:inset-auto sm:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="hidden sm:block px-4 py-5 border-b border-gray-200 dark:border-gray-700">
-          <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm">go-ftpes</span>
+          <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm">MediocreSync</span>
         </div>
         <ul className="flex-1 py-3 space-y-0.5">
           <li>
