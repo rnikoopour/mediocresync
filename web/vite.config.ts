@@ -1,6 +1,8 @@
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import path from 'node:path'
+import os from 'node:os'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -18,5 +20,9 @@ export default defineConfig({
     globals: true,
     environment: 'happy-dom',
     setupFiles: ['./src/test/setup.ts'],
+    execArgv: [
+      '--localstorage-file',
+      path.resolve(os.tmpdir(), `vitest-${process.pid}.localstorage`),
+    ],
   },
 })
