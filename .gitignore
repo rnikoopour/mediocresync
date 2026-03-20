@@ -34,7 +34,8 @@ tramp
 
 # cask packages
 .cask/
-dist/
+ui/dist/*
+!ui/dist/.gitkeep
 
 # Flycheck
 flycheck_*.el
