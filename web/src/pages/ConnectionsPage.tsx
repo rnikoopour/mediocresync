@@ -79,10 +79,10 @@ export function ConnectionsPage() {
 
       <div className="space-y-2">
         {connections.map((c) => (
-          <div key={c.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-3 flex flex-wrap items-center gap-2 sm:gap-4">
+          <div key={c.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-3 flex flex-wrap items-start gap-2 sm:gap-4">
             <div className="flex-1 min-w-0">
               <p className="font-medium text-gray-900 dark:text-gray-100 text-sm">{c.name}</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">{c.username}@{c.host}:{c.port}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 break-all">{c.username}@{c.host}:{c.port}</p>
             </div>
             {testResult?.id === c.id && (
               <StatusBadge status={testResult.ok ? 'done' : 'failed'} />
