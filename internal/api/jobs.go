@@ -283,7 +283,6 @@ func (h *jobsHandler) cancelRun(w http.ResponseWriter, r *http.Request) {
 func (h *jobsHandler) planDismiss(w http.ResponseWriter, r *http.Request) {
 	jobID := chi.URLParam(r, "id")
 	h.engine.ClearStoredPlan(jobID)
-	h.broker.Publish(jobID, sse.Event{Status: "plan_dismissed"})
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -339,9 +338,6 @@ func (h *jobsHandler) planEvents(w http.ResponseWriter, r *http.Request) {
 			data, _ := json.Marshal(evt)
 			fmt.Fprintf(w, "data: %s\n\n", data)
 			flusher.Flush()
-			if evt.Done || evt.Error != "" {
-				return
-			}
 		case <-r.Context().Done():
 			return
 		case <-h.appCtx.Done():

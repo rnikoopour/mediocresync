@@ -29,11 +29,12 @@ var ErrPlanAlreadyRunning = fmt.Errorf("plan is already running")
 
 // PlanEvent is a progress or terminal event broadcast to plan SSE subscribers.
 type PlanEvent struct {
-	Files   int         `json:"files"`
-	Folders int         `json:"folders"`
-	Done    bool        `json:"done"`
-	Error   string      `json:"error"`
-	Result  *PlanResult `json:"result,omitempty"`
+	Files     int         `json:"files"`
+	Folders   int         `json:"folders"`
+	Done      bool        `json:"done"`
+	Dismissed bool        `json:"dismissed"`
+	Error     string      `json:"error"`
+	Result    *PlanResult `json:"result,omitempty"`
 }
 
 type Engine struct {
@@ -239,8 +240,6 @@ func (e *Engine) StartPlan(jobID string) error {
 
 		e.planMu.Lock()
 		delete(e.planActive, jobID)
-		subs := e.planSubs[jobID]
-		delete(e.planSubs, jobID)
 		e.planMu.Unlock()
 
 		var evt PlanEvent
@@ -249,13 +248,7 @@ func (e *Engine) StartPlan(jobID string) error {
 		} else {
 			evt = PlanEvent{Done: true, Result: result}
 		}
-		for _, ch := range subs {
-			select {
-			case ch <- evt:
-			default:
-			}
-			close(ch)
-		}
+		e.broadcastPlanEvent(jobID, evt)
 	}()
 	return nil
 }
@@ -278,19 +271,16 @@ func (e *Engine) SubscribePlan(jobID string) (<-chan PlanEvent, func()) {
 	result := e.storedPlans[jobID]
 	e.storedPlansMu.Unlock()
 
-	if result != nil {
-		e.planMu.Unlock()
-		ch <- PlanEvent{Done: true, Result: result}
-		close(ch)
-		return ch, func() {}
-	}
-
 	// Register for live events (whether a plan is active now or starts later).
 	e.planSubs[jobID] = append(e.planSubs[jobID], ch)
 
-	// If a plan is already running, push an immediate event so the subscriber
-	// knows to show the "running" state before the next progress tick arrives.
-	if e.planActive[jobID] {
+	if result != nil {
+		// Deliver the stored result immediately, but keep the channel open so
+		// future plans and dismissed events flow through the same connection.
+		ch <- PlanEvent{Done: true, Result: result}
+	} else if e.planActive[jobID] {
+		// If a plan is already running, push an immediate event so the subscriber
+		// knows to show the "running" state before the next progress tick arrives.
 		ch <- PlanEvent{}
 	}
 	e.planMu.Unlock()
@@ -314,8 +304,9 @@ func (e *Engine) SubscribePlan(jobID string) (<-chan PlanEvent, func()) {
 // and adjusts the ToCopy/ToSkip counters. No-op if no plan is stored.
 func (e *Engine) ClearStoredPlan(jobID string) {
 	e.storedPlansMu.Lock()
-	defer e.storedPlansMu.Unlock()
 	delete(e.storedPlans, jobID)
+	e.storedPlansMu.Unlock()
+	e.broadcastPlanEvent(jobID, PlanEvent{Dismissed: true})
 }
 
 func (e *Engine) UpdateStoredPlanAction(jobID, remotePath, action string) {

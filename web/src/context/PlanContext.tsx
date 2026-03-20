@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useRef, useState } from 'react'
 import { openEventSource } from '../hooks/eventSource'
 import { api } from '../api/client'
 import type { PlanResult } from '../api/types'
@@ -16,7 +16,6 @@ interface PlanContextValue {
   runPlan: (jobId: string) => void
   subscribePlan: (jobId: string) => () => void
   dismissPlan: (jobId: string) => void
-  localDismissPlan: (jobId: string) => void
   unskipFile: (jobId: string, remotePath: string) => void
   skipFile: (jobId: string, remotePath: string) => void
 }
@@ -25,23 +24,36 @@ const PlanContext = createContext<PlanContextValue | null>(null)
 
 export function PlanProvider({ children }: { children: React.ReactNode }) {
   const [plans, setPlans] = useState<Record<string, PlanEntry>>({})
+  // One active EventSource cleanup per job — re-subscribing replaces the old one.
+  const subs = useRef<Map<string, () => void>>(new Map())
 
   function connectPlanEvents(jobId: string): () => void {
-    return openEventSource(`/api/jobs/${jobId}/plan/events`, (es, markDone) => {
+    // Replace any existing subscription so we don't double-subscribe.
+    subs.current.get(jobId)?.()
+
+    const cleanup = openEventSource(`/api/jobs/${jobId}/plan/events`, (es) => {
+      // No markDone — the connection stays open indefinitely so future plan
+      // events and dismissed signals flow through the same EventSource.
       es.onmessage = (e) => {
         const msg = JSON.parse(e.data)
 
+        if (msg.dismissed) {
+          setPlans((p) => {
+            const next = { ...p }
+            delete next[jobId]
+            return next
+          })
+          return
+        }
         if (msg.error) {
           setPlans((p) => ({ ...p, [jobId]: { status: 'error', scannedFiles: 0, scannedFolders: 0, error: msg.error } }))
-          markDone()
           return
         }
         if (msg.done) {
           setPlans((p) => ({ ...p, [jobId]: { ...p[jobId], status: 'done', result: msg.result } }))
-          markDone()
           return
         }
-        // progress event — may arrive before the plan entry exists (another client started it)
+        // progress event
         setPlans((p) => ({
           ...p,
           [jobId]: {
@@ -57,6 +69,12 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
         es.close()
       }
     })
+
+    subs.current.set(jobId, cleanup)
+    return () => {
+      cleanup()
+      subs.current.delete(jobId)
+    }
   }
 
   function runPlan(jobId: string) {
@@ -64,9 +82,9 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
 
     fetch(`/api/jobs/${jobId}/plan`, { method: 'POST' })
       .then((res) => {
-        // 409 means another client already started a plan — just subscribe to its events.
         if (!res.ok && res.status !== 409) throw new Error('failed to start plan')
-        connectPlanEvents(jobId)
+        // Events arrive through the already-open plan EventSource — no extra
+        // subscription needed.
       })
       .catch((err: Error) => {
         setPlans((p) => ({ ...p, [jobId]: { status: 'error', scannedFiles: 0, scannedFolders: 0, error: err.message } }))
@@ -105,14 +123,8 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
 
   function dismissPlan(jobId: string) {
     api.jobs.dismissPlan(jobId).catch(() => {})
-    setPlans((p) => {
-      const next = { ...p }
-      delete next[jobId]
-      return next
-    })
-  }
-
-  function localDismissPlan(jobId: string) {
+    // Local state cleared immediately; the dismissed event through plan SSE
+    // will clear all other connected clients.
     setPlans((p) => {
       const next = { ...p }
       delete next[jobId]
@@ -121,7 +133,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <PlanContext.Provider value={{ plans, runPlan, subscribePlan, dismissPlan, localDismissPlan, unskipFile, skipFile }}>
+    <PlanContext.Provider value={{ plans, runPlan, subscribePlan, dismissPlan, unskipFile, skipFile }}>
       {children}
     </PlanContext.Provider>
   )
