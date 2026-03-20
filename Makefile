@@ -20,6 +20,7 @@ run-prod: build
 
 test:
 	go test ./...
+	cd web && npm test -- --run
 
 lint:
 	golangci-lint run
