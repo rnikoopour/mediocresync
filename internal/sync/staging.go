@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 const stagingDir = ".mediocresync"
@@ -42,7 +43,17 @@ func atomicMove(src, dst string) error {
 }
 
 // ensureStagingDir creates <localDest>/.mediocresync/ if it does not exist.
+// It retries a few times to tolerate transient NFS errors.
 func ensureStagingDir(localDest string) error {
 	dir := filepath.Join(localDest, stagingDir)
-	return os.MkdirAll(dir, 0o755)
+	var lastErr error
+	for range 3 {
+		if err := os.MkdirAll(dir, 0o755); err == nil {
+			return nil
+		} else {
+			lastErr = err
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	return lastErr
 }
