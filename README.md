@@ -41,7 +41,7 @@ Start the Go server and Vite dev server concurrently:
 
 ```sh
 export DEV_MODE=true
-make dev
+make run-dev
 ```
 
 The React app runs at `http://localhost:5173` with `/api/*` proxied to the Go server at `:8080`.
@@ -79,4 +79,4 @@ The service listens on port `5000` and stores its database at `/var/lib/mediocre
 - On each run, files are compared by size and modification time against previously copied state. Only new or changed files are downloaded.
 - In-progress files are written to `<local-dest>/.mediocresync/<filename>` and atomically moved to their final path on success, so partial downloads never appear at the destination.
 - Live transfer progress is streamed to the browser via Server-Sent Events.
-- The scheduler runs inside the server process — no external queue or cron needed. If a job's interval fires while a run is still active, that interval is skipped.
+- The scheduler runs inside the server process — no external queue or cron needed. Jobs fire at clock-aligned boundaries (e.g. every 60 min → 00:00, 01:00, 02:00). If a slot fires while a run is still active, that slot is skipped.
