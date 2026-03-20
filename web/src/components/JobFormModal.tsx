@@ -122,6 +122,23 @@ export function JobFormModal({ editing, onClose }: Props) {
                       </div>
                     </Field>
                     <div className="flex gap-2">
+                      <Field label="Max Concurrent Downloads" className="w-48">
+                        <input className="input" type="number" min={1} max={20} value={form.concurrency} onChange={(e) => setForm({ ...form, concurrency: Number(e.target.value) })} required />
+                      </Field>
+                      <Field label="Max Retries" className="w-28">
+                        <input className="input" type="number" min={1} value={form.retry_attempts} onChange={(e) => setForm({ ...form, retry_attempts: Number(e.target.value) })} required />
+                      </Field>
+                      <Field label="Backoff (seconds)" className="w-36">
+                        <input className="input" type="number" min={0} value={form.retry_delay_seconds} onChange={(e) => setForm({ ...form, retry_delay_seconds: Number(e.target.value) })} required />
+                      </Field>
+                    </div>
+
+                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide pt-1">Autosync</p>
+                    <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                      <input type="checkbox" checked={form.enabled} onChange={(e) => setForm({ ...form, enabled: e.target.checked })} />
+                      Enabled
+                    </label>
+                    <div className="flex gap-2">
                       <Field label="Every" className="w-24">
                         <input className="input" type="number" min={1} value={form.interval_value} onChange={(e) => setForm({ ...form, interval_value: Number(e.target.value) })} required />
                       </Field>
@@ -132,22 +149,7 @@ export function JobFormModal({ editing, onClose }: Props) {
                           <option value="days">Days</option>
                         </select>
                       </Field>
-                      <Field label="Concurrency" className="w-28">
-                        <input className="input" type="number" min={1} max={20} value={form.concurrency} onChange={(e) => setForm({ ...form, concurrency: Number(e.target.value) })} required />
-                      </Field>
                     </div>
-                    <div className="flex gap-2">
-                      <Field label="Retries" className="w-28">
-                        <input className="input" type="number" min={1} value={form.retry_attempts} onChange={(e) => setForm({ ...form, retry_attempts: Number(e.target.value) })} required />
-                      </Field>
-                      <Field label="Delay (s)" className="w-28">
-                        <input className="input" type="number" min={0} value={form.retry_delay_seconds} onChange={(e) => setForm({ ...form, retry_delay_seconds: Number(e.target.value) })} required />
-                      </Field>
-                    </div>
-                    <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-                      <input type="checkbox" checked={form.enabled} onChange={(e) => setForm({ ...form, enabled: e.target.checked })} />
-                      Enabled
-                    </label>
                   </>
                 )}
 
