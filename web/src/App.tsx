@@ -5,6 +5,9 @@ import { ConnectionsPage } from './pages/ConnectionsPage'
 import { JobsPage } from './pages/JobsPage'
 import { JobDetailPage } from './pages/JobDetailPage'
 import { RunDetailPage } from './pages/RunDetailPage'
+import { LoginPage } from './pages/LoginPage'
+import { SetupPage } from './pages/SetupPage'
+import { SettingsGeneralPage } from './pages/SettingsGeneralPage'
 import { PlanProvider } from './context/PlanContext'
 
 const queryClient = new QueryClient({
@@ -17,12 +20,15 @@ export default function App() {
       <PlanProvider>
       <BrowserRouter>
         <Routes>
+          <Route path="login" element={<LoginPage />} />
+          <Route path="setup" element={<SetupPage />} />
           <Route element={<Layout />}>
             <Route index element={<Navigate to="/jobs" replace />} />
             <Route path="connections" element={<ConnectionsPage />} />
             <Route path="jobs" element={<JobsPage />} />
             <Route path="jobs/:id" element={<JobDetailPage />} />
             <Route path="runs/:id" element={<RunDetailPage />} />
+            <Route path="settings/general" element={<SettingsGeneralPage />} />
           </Route>
         </Routes>
       </BrowserRouter>
