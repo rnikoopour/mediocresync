@@ -615,7 +615,7 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Conne
 				errMsg := lastErr.Error()
 				if errors.Is(lastErr, errTransferStalled) {
 					errMsg = "transfer stalled: no data received"
-				} else if errors.Is(lastErr, context.Canceled) {
+				} else if errors.Is(lastErr, context.Canceled) || ctx.Err() != nil {
 					if e.appCtx.Err() != nil {
 						errMsg = "canceled by server"
 					} else {
