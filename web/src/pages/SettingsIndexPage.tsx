@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 
 const sections = [
   { to: '/settings/general', label: 'General', description: 'Username and password' },
+  { to: '/settings/logs', label: 'Logs', description: 'Live log stream' },
 ]
 
 export function SettingsIndexPage() {
