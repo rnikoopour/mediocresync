@@ -637,7 +637,7 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Conne
 				return e.downloadFile(ctx, c, job, run.ID, ent.transfer, ent.remote)
 			}
 
-			slog.Info("transfer started", "path", ent.remote.Path, "size", ent.remote.Size)
+			slog.Info("transfer started", "src", ent.remote.Path, "dst", finalPath(job.LocalDest, job.RemotePath, ent.remote.Path), "size", ent.remote.Size)
 			maxAttempts := max(job.RetryAttempts, 1)
 			var lastErr error
 			for attempt := 1; attempt <= maxAttempts; attempt++ {
@@ -646,7 +646,7 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Conne
 					break
 				}
 				if attempt > 1 {
-					slog.Warn("retrying transfer", "path", ent.remote.Path, "attempt", attempt, "err", lastErr)
+					slog.Warn("retrying transfer", "src", ent.remote.Path, "dst", finalPath(job.LocalDest, job.RemotePath, ent.remote.Path), "attempt", attempt, "err", lastErr)
 					select {
 					case <-time.After(time.Duration(job.RetryDelaySeconds) * time.Second):
 					case <-ctx.Done():
@@ -668,7 +668,7 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Conne
 				// All retries exhausted (or job cancelled) — remove the staging
 				// file that was preserved across retries for resume.
 				os.Remove(stagingPath(job.LocalDest, ent.remote.Path))
-				slog.Error("transfer failed", "path", ent.remote.Path, "err", lastErr)
+				slog.Error("transfer failed", "src", ent.remote.Path, "dst", finalPath(job.LocalDest, job.RemotePath, ent.remote.Path), "err", lastErr)
 				errMsg := lastErr.Error()
 				if errors.Is(lastErr, errTransferStalled) {
 					errMsg = "transfer stalled: no data received"
@@ -692,7 +692,7 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Conne
 				return
 			}
 
-			slog.Info("transfer complete", "path", ent.remote.Path, "size", ent.remote.Size)
+			slog.Info("transfer complete", "src", ent.remote.Path, "dst", finalPath(job.LocalDest, job.RemotePath, ent.remote.Path), "size", ent.remote.Size)
 			mu.Lock()
 			copied++
 			_ = e.runs.UpdateCounts(run.ID, len(entries), copied, skipped, failed)
