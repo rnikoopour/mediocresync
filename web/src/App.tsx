@@ -32,7 +32,7 @@ export default function App() {
             <Route path="runs/:id" element={<RunDetailPage />} />
             <Route path="settings" element={<SettingsIndexPage />} />
             <Route path="settings/general" element={<SettingsGeneralPage />} />
-            <Route path="logs" element={<LogsPage />} />
+            <Route path="settings/logs" element={<LogsPage />} />
           </Route>
         </Routes>
       </BrowserRouter>
