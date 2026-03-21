@@ -428,6 +428,8 @@ export function JobDetailPage() {
   const { plans, runPlan, subscribePlan, dismissPlan, unskipFile, skipFile } = usePlan()
   const planEntry = id ? plans[id] : undefined
   const [planOpen, setPlanOpen] = useState(true)
+  const [showAllRuns, setShowAllRuns] = useState(false)
+  const RUNS_LIMIT = 25
 
   // Auto-subscribe to plan events so plans started by other clients are visible.
   // The cleanup closes the EventSource when the page unmounts or id changes.
@@ -574,7 +576,17 @@ export function JobDetailPage() {
         </div>
       )}
 
-      <h2 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Run History</h2>
+      <div className="flex items-center gap-3 mb-3">
+        <h2 className="text-sm font-medium text-gray-700 dark:text-gray-300">Run History</h2>
+        {runs.length > RUNS_LIMIT && (
+          <button
+            onClick={() => setShowAllRuns((v) => !v)}
+            className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+          >
+            {showAllRuns ? 'Show less' : `Show all ${runs.length}`}
+          </button>
+        )}
+      </div>
 
       {isLoading && <p className="text-gray-500 dark:text-gray-400 text-sm">Loading…</p>}
       {!isLoading && runs.length === 0 && (
@@ -582,7 +594,7 @@ export function JobDetailPage() {
       )}
 
       <div className="space-y-2">
-        {runs.map((run) => (
+        {(showAllRuns ? runs : runs.slice(0, RUNS_LIMIT)).map((run) => (
           <RunRow key={run.id} run={run} remotePath={job?.remote_path ?? ''} jobId={id!} />
         ))}
       </div>
