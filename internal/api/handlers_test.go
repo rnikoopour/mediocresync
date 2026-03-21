@@ -331,6 +331,67 @@ func TestGetRunNotFound(t *testing.T) {
 	}
 }
 
+func TestPlanThenRunReturns202(t *testing.T) {
+	router, connRepo, jobRepo, _, session := setupRouter(t)
+
+	encrypted, _ := crypto.Encrypt(testEncKey, "pass")
+	conn := &db.Connection{Name: "c", Host: "h", Port: 21, Username: "u", Password: encrypted}
+	_ = connRepo.Create(conn)
+	job := &db.SyncJob{
+		Name: "j", ConnectionID: conn.ID, RemotePath: "/", LocalDest: "/tmp",
+		IntervalValue: 1, IntervalUnit: "hours", Concurrency: 1, Enabled: true,
+	}
+	_ = jobRepo.Create(job)
+
+	w := do(t, router, "POST", "/api/jobs/"+job.ID+"/planthenrun", nil, session)
+	if w.Code != http.StatusAccepted {
+		t.Errorf("planthenrun: got %d, want 202", w.Code)
+	}
+}
+
+func TestPlanThenRunJobNotFound(t *testing.T) {
+	router, _, _, _, session := setupRouter(t)
+
+	w := do(t, router, "POST", "/api/jobs/nonexistent/planthenrun", nil, session)
+	if w.Code != http.StatusNotFound {
+		t.Errorf("planthenrun nonexistent job: got %d, want 404", w.Code)
+	}
+}
+
+func TestRunErrorMsgPersistedOnFailure(t *testing.T) {
+	_, _, connRepo, jobRepo, runRepo, _ := setupRouterFull(t)
+
+	encrypted, _ := crypto.Encrypt(testEncKey, "pass")
+	conn := &db.Connection{Name: "c", Host: "h", Port: 21, Username: "u", Password: encrypted}
+	_ = connRepo.Create(conn)
+	job := &db.SyncJob{
+		Name: "j", ConnectionID: conn.ID, RemotePath: "/", LocalDest: "/tmp",
+		IntervalValue: 1, IntervalUnit: "hours", Concurrency: 1, Enabled: true,
+	}
+	_ = jobRepo.Create(job)
+
+	run := &db.Run{JobID: job.ID, Status: "running"}
+	if err := runRepo.Create(run); err != nil {
+		t.Fatalf("create run: %v", err)
+	}
+
+	errMsg := "dial tcp: connection refused"
+	if err := runRepo.UpdateStatus(run.ID, "failed", &errMsg); err != nil {
+		t.Fatalf("UpdateStatus: %v", err)
+	}
+
+	got, err := runRepo.Get(run.ID)
+	if err != nil {
+		t.Fatalf("Get run: %v", err)
+	}
+	if got.ErrorMsg == nil {
+		t.Fatal("expected error_msg to be set, got nil")
+	}
+	if *got.ErrorMsg != errMsg {
+		t.Errorf("error_msg: got %q, want %q", *got.ErrorMsg, errMsg)
+	}
+}
+
 func TestUpdateJobPrunesOldRuns(t *testing.T) {
 	database, router, connRepo, jobRepo, runRepo, session := setupRouterFull(t)
 
