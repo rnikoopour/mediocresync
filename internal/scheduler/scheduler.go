@@ -70,13 +70,12 @@ func (s *Scheduler) TriggerNow(ctx context.Context, jobID string) error {
 }
 
 func (s *Scheduler) tick(ctx context.Context) {
-	jobs, err := s.jobs.ListEnabled()
+	enabledJobs, err := s.jobs.ListEnabled()
 	if err != nil {
 		slog.Error("scheduler: list enabled jobs", "err", err)
 		return
 	}
-
-	for _, job := range jobs {
+	for _, job := range enabledJobs {
 		if isDue(job, s.lastRun(job.ID)) {
 			jobID := job.ID
 			go func() {
@@ -87,6 +86,14 @@ func (s *Scheduler) tick(ctx context.Context) {
 				}
 			}()
 		}
+	}
+
+	allJobs, err := s.jobs.List()
+	if err != nil {
+		slog.Error("scheduler: list all jobs for pruning", "err", err)
+		return
+	}
+	for _, job := range allJobs {
 		if job.RunRetentionDays > 0 {
 			if err := s.runs.PruneForJob(job.ID, job.RunRetentionDays); err != nil {
 				slog.Error("scheduler: prune run history", "job_id", job.ID, "err", err)
