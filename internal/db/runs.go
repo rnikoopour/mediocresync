@@ -83,11 +83,20 @@ func (r *RunRepository) UpdateStatus(id, status string) error {
 	return err
 }
 
-// CancelStaleRuns marks any runs still in "running" state as "server_stopped".
+// CancelStaleRuns marks any runs still in "running" state as "server_stopped"
+// and marks their in-progress transfers as "failed".
 // Call this on startup to clean up runs that were interrupted by an unclean shutdown.
 func (r *RunRepository) CancelStaleRuns() error {
 	finished := formatTime(time.Now().UTC())
 	_, err := r.db.Exec(
+		`UPDATE transfers SET status='failed'
+		 WHERE status='in_progress'
+		   AND run_id IN (SELECT id FROM runs WHERE status='running')`,
+	)
+	if err != nil {
+		return err
+	}
+	_, err = r.db.Exec(
 		`UPDATE runs SET status='server_stopped', finished_at=? WHERE status='running'`,
 		finished,
 	)

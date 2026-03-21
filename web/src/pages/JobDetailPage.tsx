@@ -179,15 +179,14 @@ function RunTreeView({ transfers, remotePath, liveEvents, runEnded }: {
   liveEvents: Map<string, { percent: number; speed_bps: number; status: string }>
   runEnded: boolean
 }) {
-  const [tab, setTab] = useState<RunTab>('active')
+  const [tab, setTab] = useState<RunTab>('planned')
   const filtered = tab === 'all' ? transfers : transfers.filter((t) => {
     const raw = liveEvents.get(t.id)?.status ?? t.status
     const status = runEnded && raw === 'pending' ? 'not_copied' : raw
-    if (tab === 'active')      return status !== 'skipped'
-    if (tab === 'in_progress') return status === 'in_progress'
+    if (tab === 'planned')      return status !== 'skipped'
+    if (tab === 'in_progress') return status === 'in_progress' || status === 'pending'
     if (tab === 'copied')      return status === 'done'
-    if (tab === 'not_copied')  return status === 'not_copied' || status === 'pending'
-    if (tab === 'failed')      return status === 'failed'
+    if (tab === 'not_copied')  return status === 'not_copied' || status === 'failed'
     return true
   })
   const nodes = buildRunTree(filtered, remotePath)
@@ -521,7 +520,7 @@ function FileRow({ node, onSkip, onUnskip }: { node: TreeFile; depth: number; on
 }
 
 type TreeTab = 'all' | 'copy' | 'skip'
-type RunTab = 'all' | 'active' | 'in_progress' | 'copied' | 'not_copied' | 'failed'
+type RunTab = 'all' | 'planned' | 'in_progress' | 'copied' | 'not_copied'
 
 function TabBtn<T extends string>({ value, current, label, onTab }: { value: T; current: T; label: string; onTab: (t: T) => void }) {
   return (
@@ -551,11 +550,10 @@ function TreeTabBar({ tab, onTab }: { tab: TreeTab; onTab: (t: TreeTab) => void 
 function RunTabBar({ tab, onTab, isRunning }: { tab: RunTab; onTab: (t: RunTab) => void; isRunning: boolean }) {
   return (
     <div className="flex flex-wrap items-center gap-1 px-3 py-2 border-b border-gray-100 dark:border-gray-700">
-      <TabBtn value="active"      current={tab} label="Active"      onTab={onTab} />
+      <TabBtn value="active"      current={tab} label="Planned"     onTab={onTab} />
       {isRunning && <TabBtn value="in_progress" current={tab} label="In Progress" onTab={onTab} />}
       <TabBtn value="copied"      current={tab} label="Copied"      onTab={onTab} />
       <TabBtn value="not_copied"  current={tab} label="Not Copied"  onTab={onTab} />
-      <TabBtn value="failed"      current={tab} label="Failed"      onTab={onTab} />
       <TabBtn value="all"         current={tab} label="All"         onTab={onTab} />
     </div>
   )
