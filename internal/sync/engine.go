@@ -469,8 +469,10 @@ func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanResult
 		for i, f := range plan.Files {
 			knownPaths[i] = f.RemotePath
 		}
-		if err := e.fileState.PruneStale(jobID, knownPaths); err != nil {
+		if pruned, err := e.fileState.PruneStale(jobID, knownPaths); err != nil {
 			slog.Error("prune stale file state", "job_id", jobID, "err", err)
+		} else if pruned > 0 {
+			slog.Info("pruned stale file state", "job_id", jobID, "count", pruned)
 		}
 	}
 	e.broker.Publish(run.ID, sse.Event{RunID: run.ID, RunStatus: finalStatus})

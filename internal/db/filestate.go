@@ -66,7 +66,7 @@ func (r *FileStateRepository) DeleteByJob(jobID string) error {
 // PruneStale removes file_state entries for jobID whose remote_path is not in
 // knownPaths. It fetches the current paths for the job, computes the diff in
 // Go, and deletes in batches of 500 to stay well under SQLite's bind-parameter limit.
-func (r *FileStateRepository) PruneStale(jobID string, knownPaths []string) error {
+func (r *FileStateRepository) PruneStale(jobID string, knownPaths []string) (int, error) {
 	known := make(map[string]struct{}, len(knownPaths))
 	for _, p := range knownPaths {
 		known[p] = struct{}{}
@@ -74,7 +74,7 @@ func (r *FileStateRepository) PruneStale(jobID string, knownPaths []string) erro
 
 	rows, err := r.db.Query(`SELECT remote_path FROM file_state WHERE job_id = ?`, jobID)
 	if err != nil {
-		return fmt.Errorf("prune file state: %w", err)
+		return 0, fmt.Errorf("prune file state: %w", err)
 	}
 	defer rows.Close()
 
@@ -82,14 +82,14 @@ func (r *FileStateRepository) PruneStale(jobID string, knownPaths []string) erro
 	for rows.Next() {
 		var path string
 		if err := rows.Scan(&path); err != nil {
-			return fmt.Errorf("prune file state: %w", err)
+			return 0, fmt.Errorf("prune file state: %w", err)
 		}
 		if _, ok := known[path]; !ok {
 			stale = append(stale, path)
 		}
 	}
 	if err := rows.Err(); err != nil {
-		return fmt.Errorf("prune file state: %w", err)
+		return 0, fmt.Errorf("prune file state: %w", err)
 	}
 
 	const batchSize = 500
@@ -106,8 +106,8 @@ func (r *FileStateRepository) PruneStale(jobID string, knownPaths []string) erro
 			`DELETE FROM file_state WHERE job_id = ? AND remote_path IN (`+placeholders+`)`,
 			args...,
 		); err != nil {
-			return fmt.Errorf("prune file state: %w", err)
+			return 0, fmt.Errorf("prune file state: %w", err)
 		}
 	}
-	return nil
+	return len(stale), nil
 }

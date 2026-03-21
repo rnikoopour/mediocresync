@@ -291,7 +291,7 @@ func TestFileStatePruneStale(t *testing.T) {
 	}
 
 	// Only /a.csv and /c.csv are still on the remote — /b.csv was deleted.
-	if err := fsRepo.PruneStale(job.ID, []string{"/a.csv", "/c.csv"}); err != nil {
+	if _, err := fsRepo.PruneStale(job.ID, []string{"/a.csv", "/c.csv"}); err != nil {
 		t.Fatalf("PruneStale: %v", err)
 	}
 
