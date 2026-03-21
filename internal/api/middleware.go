@@ -31,7 +31,7 @@ func requestLogger(next http.Handler) http.Handler {
 		start := time.Now()
 		rec := &responseRecorder{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(rec, r)
-		slog.Info("request",
+		slog.Debug("request",
 			"method", r.Method,
 			"path", r.URL.Path,
 			"status", rec.status,
