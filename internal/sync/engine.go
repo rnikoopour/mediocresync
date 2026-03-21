@@ -437,6 +437,7 @@ func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanResult
 	e.mu.Unlock()
 	// Notify all clients watching this job that a run has started.
 	e.broker.Publish(jobID, sse.Event{RunID: run.ID, Status: "started"})
+	slog.Info("job started", "job_name", job.Name, "job_id", jobID, "run_id", run.ID)
 
 	runErr := e.executeRun(jobCtx, job, conn, run, plan)
 
@@ -475,6 +476,7 @@ func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanResult
 			slog.Info("pruned stale file state", "job_id", jobID, "count", pruned)
 		}
 	}
+	slog.Info("job finished", "job_name", job.Name, "job_id", jobID, "run_id", run.ID, "status", finalStatus)
 	e.broker.Publish(run.ID, sse.Event{RunID: run.ID, RunStatus: finalStatus})
 	e.broker.Close(run.ID)
 	e.broker.Publish(jobID, sse.Event{RunID: run.ID, Status: "run_finished", RunStatus: finalStatus})
