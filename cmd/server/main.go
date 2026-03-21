@@ -19,8 +19,25 @@ import (
 	"github.com/rnikoopour/mediocresync/ui"
 )
 
+func initLogger(level config.LogLevel) *slog.LevelVar {
+	var lv slog.LevelVar
+	switch level {
+	case config.LogLevelDebug:
+		lv.Set(slog.LevelDebug)
+	case config.LogLevelWarn:
+		lv.Set(slog.LevelWarn)
+	case config.LogLevelError:
+		lv.Set(slog.LevelError)
+	default:
+		lv.Set(slog.LevelInfo)
+	}
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: &lv})))
+	return &lv
+}
+
 func main() {
 	cfg := config.Load()
+	logLevel := initLogger(cfg.LogLevel)
 
 	database, err := db.Open(cfg.DBPath)
 	if err != nil {
@@ -77,6 +94,7 @@ func main() {
 		broker,
 		encKey,
 		cfg.DevMode,
+		logLevel,
 		ui.FS(),
 	)
 

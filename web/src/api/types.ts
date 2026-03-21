@@ -122,3 +122,9 @@ export interface PlanResult {
   to_copy: number
   to_skip: number
 }
+
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
+
+export interface ServerSettings {
+  log_level: LogLevel
+}
