@@ -210,6 +210,75 @@ func TestFileStateUpsert(t *testing.T) {
 	}
 }
 
+// --- RunRepository.PruneForJob ---
+
+func TestPruneForJob(t *testing.T) {
+	cases := []struct {
+		name          string
+		retentionDays int
+		runAgeDays    int
+		wantPruned    bool
+	}{
+		{"zero retention is noop", 0, 3, false},
+		{"old run pruned", 1, 3, true},
+		{"run within window kept", 7, 3, false},
+		{"recent run kept", 1, 0, false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			database, err := Open(":memory:")
+			if err != nil {
+				t.Fatalf("open test DB: %v", err)
+			}
+			t.Cleanup(func() { database.Close() })
+
+			connRepo := NewConnectionRepository(database)
+			jobRepo := NewJobRepository(database)
+			runRepo := NewRunRepository(database)
+			transferRepo := NewTransferRepository(database)
+
+			conn := &Connection{Name: "c", Host: "h", Port: 21, Username: "u", Password: []byte("p")}
+			_ = connRepo.Create(conn)
+			job := &SyncJob{Name: "j", ConnectionID: conn.ID, RemotePath: "/", LocalDest: "/tmp", IntervalValue: 1, IntervalUnit: "hours", Concurrency: 1, Enabled: true}
+			_ = jobRepo.Create(job)
+
+			run := &Run{JobID: job.ID, Status: "completed"}
+			if err := runRepo.Create(run); err != nil {
+				t.Fatalf("create run: %v", err)
+			}
+			_, err = database.Exec(`UPDATE runs SET started_at=? WHERE id=?`,
+				formatTime(time.Now().UTC().AddDate(0, 0, -tc.runAgeDays)), run.ID)
+			if err != nil {
+				t.Fatalf("backdate run: %v", err)
+			}
+
+			transfer := &Transfer{RunID: run.ID, RemotePath: "/f.txt", LocalPath: "/tmp/f.txt", SizeBytes: 100, Status: "done"}
+			if err := transferRepo.Create(transfer); err != nil {
+				t.Fatalf("create transfer: %v", err)
+			}
+
+			if err := runRepo.PruneForJob(job.ID, tc.retentionDays); err != nil {
+				t.Fatalf("PruneForJob: %v", err)
+			}
+
+			got, _ := runRepo.Get(run.ID)
+			if tc.wantPruned && got != nil {
+				t.Error("run should have been pruned")
+			}
+			if !tc.wantPruned && got == nil {
+				t.Error("run should not have been pruned")
+			}
+
+			if tc.wantPruned {
+				if transfers, _ := transferRepo.ListByRun(run.ID); len(transfers) != 0 {
+					t.Errorf("transfers should be cascade-deleted, got %d", len(transfers))
+				}
+			}
+		})
+	}
+}
+
 func TestFileStateGetMissing(t *testing.T) {
 	connRepo, jobRepo, _, _, fsRepo := openAllRepos(t)
 	conn := &Connection{Name: "c", Host: "h", Port: 21, Username: "u", Password: []byte("p")}
