@@ -9,6 +9,7 @@ import { LoginPage } from './pages/LoginPage'
 import { SetupPage } from './pages/SetupPage'
 import { SettingsGeneralPage } from './pages/SettingsGeneralPage'
 import { SettingsIndexPage } from './pages/SettingsIndexPage'
+import { LogsPage } from './pages/LogsPage'
 import { PlanProvider } from './context/PlanContext'
 
 const queryClient = new QueryClient({
@@ -31,6 +32,7 @@ export default function App() {
             <Route path="runs/:id" element={<RunDetailPage />} />
             <Route path="settings" element={<SettingsIndexPage />} />
             <Route path="settings/general" element={<SettingsGeneralPage />} />
+            <Route path="logs" element={<LogsPage />} />
           </Route>
         </Routes>
       </BrowserRouter>
