@@ -3,11 +3,13 @@ package api
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/rnikoopour/mediocresync/internal/crypto"
 	"github.com/rnikoopour/mediocresync/internal/db"
@@ -16,6 +18,52 @@ import (
 )
 
 var testEncKey = bytes.Repeat([]byte{0x01}, 32)
+
+func setupRouterFull(t *testing.T) (*sql.DB, http.Handler, *db.ConnectionRepository, *db.JobRepository, *db.RunRepository, string) {
+	t.Helper()
+	database, err := db.Open(":memory:")
+	if err != nil {
+		t.Fatalf("open DB: %v", err)
+	}
+	t.Cleanup(func() { database.Close() })
+
+	auth := db.NewAuthRepository(database)
+	connections := db.NewConnectionRepository(database)
+	jobs := db.NewJobRepository(database)
+	runs := db.NewRunRepository(database)
+	transfers := db.NewTransferRepository(database)
+	fileState := db.NewFileStateRepository(database)
+	broker := sse.NewBroker()
+	engine := internalsync.NewEngine(connections, jobs, runs, transfers, fileState, testEncKey, broker, context.Background())
+
+	staticFS := fstest.MapFS{"index.html": {Data: []byte("<html></html>")}}
+	router := NewRouter(context.Background(), auth, connections, jobs, runs, transfers, fileState, engine, broker, testEncKey, true, staticFS)
+
+	w := do(t, router, "POST", "/api/auth/setup", map[string]any{
+		"username": "testuser", "password": "testpass", "password_confirm": "testpass",
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("test setup: got %d (body: %s)", w.Code, w.Body.String())
+	}
+	w = do(t, router, "POST", "/api/auth/login", map[string]any{
+		"username": "testuser", "password": "testpass",
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("test login: got %d (body: %s)", w.Code, w.Body.String())
+	}
+	var sessionToken string
+	for _, c := range w.Result().Cookies() {
+		if c.Name == sessionCookie {
+			sessionToken = c.Value
+			break
+		}
+	}
+	if sessionToken == "" {
+		t.Fatal("no session cookie after login")
+	}
+
+	return database, router, connections, jobs, runs, sessionToken
+}
 
 func setupRouter(t *testing.T) (http.Handler, *db.ConnectionRepository, *db.JobRepository, *db.RunRepository, string) {
 	t.Helper()
@@ -279,5 +327,44 @@ func TestGetRunNotFound(t *testing.T) {
 	w := do(t, router, "GET", "/api/runs/nonexistent", nil, session)
 	if w.Code != http.StatusNotFound {
 		t.Errorf("got %d, want 404", w.Code)
+	}
+}
+
+func TestUpdateJobPrunesOldRuns(t *testing.T) {
+	database, router, connRepo, jobRepo, runRepo, session := setupRouterFull(t)
+
+	encrypted, _ := crypto.Encrypt(testEncKey, "pass")
+	conn := &db.Connection{Name: "c", Host: "h", Port: 21, Username: "u", Password: encrypted}
+	_ = connRepo.Create(conn)
+	job := &db.SyncJob{
+		Name: "j", ConnectionID: conn.ID, RemotePath: "/", LocalDest: "/tmp",
+		IntervalValue: 1, IntervalUnit: "hours", Concurrency: 1, Enabled: true,
+	}
+	_ = jobRepo.Create(job)
+
+	// Insert an old run and a recent run directly
+	oldRun := &db.Run{JobID: job.ID, Status: "completed"}
+	_ = runRepo.Create(oldRun)
+	_, _ = database.Exec(`UPDATE runs SET started_at=? WHERE id=?`,
+		time.Now().UTC().AddDate(0, 0, -3).Format(time.RFC3339), oldRun.ID)
+
+	recentRun := &db.Run{JobID: job.ID, Status: "completed"}
+	_ = runRepo.Create(recentRun)
+
+	// Update job with 1-day retention — should prune the old run
+	w := do(t, router, "PUT", "/api/jobs/"+job.ID, map[string]any{
+		"name": job.Name, "connection_id": job.ConnectionID, "remote_path": job.RemotePath,
+		"local_dest": job.LocalDest, "interval_value": job.IntervalValue, "interval_unit": job.IntervalUnit,
+		"concurrency": job.Concurrency, "enabled": job.Enabled, "run_retention_days": 1,
+	}, session)
+	if w.Code != http.StatusOK {
+		t.Fatalf("update job: got %d (body: %s)", w.Code, w.Body.String())
+	}
+
+	if got, _ := runRepo.Get(oldRun.ID); got != nil {
+		t.Error("old run should have been pruned on save")
+	}
+	if got, _ := runRepo.Get(recentRun.ID); got == nil {
+		t.Error("recent run should not have been pruned")
 	}
 }

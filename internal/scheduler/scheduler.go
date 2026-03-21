@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/rnikoopour/mediocresync/internal/db"
+	"github.com/rnikoopour/mediocresync/internal/sse"
 	internalsync "github.com/rnikoopour/mediocresync/internal/sync"
 )
 
@@ -16,14 +17,16 @@ type Scheduler struct {
 	jobs   *db.JobRepository
 	runs   *db.RunRepository
 	engine *internalsync.Engine
+	broker *sse.Broker
 	stop   chan struct{}
 }
 
-func NewScheduler(jobs *db.JobRepository, runs *db.RunRepository, engine *internalsync.Engine) *Scheduler {
+func NewScheduler(jobs *db.JobRepository, runs *db.RunRepository, engine *internalsync.Engine, broker *sse.Broker) *Scheduler {
 	return &Scheduler{
 		jobs:   jobs,
 		runs:   runs,
 		engine: engine,
+		broker: broker,
 		stop:   make(chan struct{}),
 	}
 }
@@ -67,13 +70,12 @@ func (s *Scheduler) TriggerNow(ctx context.Context, jobID string) error {
 }
 
 func (s *Scheduler) tick(ctx context.Context) {
-	jobs, err := s.jobs.ListEnabled()
+	enabledJobs, err := s.jobs.ListEnabled()
 	if err != nil {
 		slog.Error("scheduler: list enabled jobs", "err", err)
 		return
 	}
-
-	for _, job := range jobs {
+	for _, job := range enabledJobs {
 		if isDue(job, s.lastRun(job.ID)) {
 			jobID := job.ID
 			go func() {
@@ -83,6 +85,21 @@ func (s *Scheduler) tick(ctx context.Context) {
 					}
 				}
 			}()
+		}
+	}
+
+	allJobs, err := s.jobs.List()
+	if err != nil {
+		slog.Error("scheduler: list all jobs for pruning", "err", err)
+		return
+	}
+	for _, job := range allJobs {
+		if job.RunRetentionDays > 0 {
+			if err := s.runs.PruneForJob(job.ID, job.RunRetentionDays); err != nil {
+				slog.Error("scheduler: prune run history", "job_id", job.ID, "err", err)
+			} else {
+				s.broker.Publish(job.ID, sse.Event{Status: "runs_pruned"})
+			}
 		}
 	}
 }

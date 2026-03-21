@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -28,6 +29,7 @@ type jobRequest struct {
 	IncludeNameFilters []string `json:"include_name_filters"`
 	ExcludePathFilters []string `json:"exclude_path_filters"`
 	ExcludeNameFilters []string `json:"exclude_name_filters"`
+	RunRetentionDays   int      `json:"run_retention_days"`
 }
 
 type jobResponse struct {
@@ -46,6 +48,7 @@ type jobResponse struct {
 	IncludeNameFilters []string `json:"include_name_filters"`
 	ExcludePathFilters []string `json:"exclude_path_filters"`
 	ExcludeNameFilters []string `json:"exclude_name_filters"`
+	RunRetentionDays   int      `json:"run_retention_days"`
 	CreatedAt          string   `json:"created_at"`
 	UpdatedAt          string   `json:"updated_at"`
 }
@@ -67,6 +70,7 @@ func toJobResponse(j *db.SyncJob) jobResponse {
 		IncludeNameFilters: j.IncludeNameFilters,
 		ExcludePathFilters: j.ExcludePathFilters,
 		ExcludeNameFilters: j.ExcludeNameFilters,
+		RunRetentionDays:   j.RunRetentionDays,
 		CreatedAt:          j.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		UpdatedAt:          j.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 	}
@@ -74,6 +78,7 @@ func toJobResponse(j *db.SyncJob) jobResponse {
 
 type jobsHandler struct {
 	repo      *db.JobRepository
+	runs      *db.RunRepository
 	fileState *db.FileStateRepository
 	engine    *internalsync.Engine
 	broker    *sse.Broker
@@ -131,6 +136,7 @@ func (h *jobsHandler) create(w http.ResponseWriter, r *http.Request) {
 		IncludeNameFilters: req.IncludeNameFilters,
 		ExcludePathFilters: req.ExcludePathFilters,
 		ExcludeNameFilters: req.ExcludeNameFilters,
+		RunRetentionDays:   max(req.RunRetentionDays, 0),
 	}
 	if err := h.repo.Create(job); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to create job")
@@ -179,10 +185,18 @@ func (h *jobsHandler) update(w http.ResponseWriter, r *http.Request) {
 	job.IncludeNameFilters = req.IncludeNameFilters
 	job.ExcludePathFilters = req.ExcludePathFilters
 	job.ExcludeNameFilters = req.ExcludeNameFilters
+	job.RunRetentionDays = max(req.RunRetentionDays, 0)
 
 	if err := h.repo.Update(job); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to update job")
 		return
+	}
+	if job.RunRetentionDays > 0 {
+		if err := h.runs.PruneForJob(job.ID, job.RunRetentionDays); err != nil {
+			slog.Error("prune runs on save", "job_id", job.ID, "err", err)
+		} else {
+			h.broker.Publish(job.ID, sse.Event{Status: "runs_pruned"})
+		}
 	}
 	writeJSON(w, http.StatusOK, toJobResponse(job))
 }
@@ -237,10 +251,6 @@ func (h *jobsHandler) deleteFileState(w http.ResponseWriter, r *http.Request) {
 
 func (h *jobsHandler) delete(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	if err := h.fileState.DeleteByJob(id); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to delete job state")
-		return
-	}
 	if err := h.repo.Delete(id); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to delete job")
 		return

@@ -94,6 +94,20 @@ func (r *RunRepository) CancelStaleRuns() error {
 	return err
 }
 
+// PruneForJob deletes runs (and their transfers) for the given job that started
+// more than retentionDays days ago. A retentionDays value of 0 is a no-op.
+func (r *RunRepository) PruneForJob(jobID string, retentionDays int) error {
+	if retentionDays <= 0 {
+		return nil
+	}
+	cutoff := formatTime(time.Now().UTC().AddDate(0, 0, -retentionDays))
+	_, err := r.db.Exec(
+		`DELETE FROM runs WHERE job_id = ? AND started_at < ?`,
+		jobID, cutoff,
+	)
+	return err
+}
+
 func (r *RunRepository) UpdateCounts(id string, total, copied, skipped, failed int) error {
 	_, err := r.db.Exec(
 		`UPDATE runs SET total_files=?, copied_files=?, skipped_files=?, failed_files=? WHERE id=?`,

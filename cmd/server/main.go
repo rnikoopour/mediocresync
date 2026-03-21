@@ -63,7 +63,7 @@ func main() {
 		ctx,
 	)
 
-	sched := scheduler.NewScheduler(jobs, runs, engine)
+	sched := scheduler.NewScheduler(jobs, runs, engine, broker)
 
 	router := api.NewRouter(
 		ctx,
