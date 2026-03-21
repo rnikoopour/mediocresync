@@ -251,10 +251,6 @@ func (h *jobsHandler) deleteFileState(w http.ResponseWriter, r *http.Request) {
 
 func (h *jobsHandler) delete(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	if err := h.fileState.DeleteByJob(id); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to delete job state")
-		return
-	}
 	if err := h.repo.Delete(id); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to delete job")
 		return

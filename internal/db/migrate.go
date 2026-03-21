@@ -107,6 +107,25 @@ var versionedMigrations = []struct {
 		},
 	},
 	{
+		key: "file_state_cascade_delete",
+		stmts: []string{
+			`PRAGMA foreign_keys=OFF`,
+			`DROP TABLE IF EXISTS file_state_new`,
+			`CREATE TABLE file_state_new (
+				job_id      TEXT NOT NULL REFERENCES sync_jobs(id) ON DELETE CASCADE,
+				remote_path TEXT NOT NULL,
+				size_bytes  INTEGER NOT NULL,
+				mtime       TEXT NOT NULL,
+				copied_at   TEXT NOT NULL,
+				PRIMARY KEY (job_id, remote_path)
+			)`,
+			`INSERT INTO file_state_new SELECT * FROM file_state`,
+			`DROP TABLE file_state`,
+			`ALTER TABLE file_state_new RENAME TO file_state`,
+			`PRAGMA foreign_keys=ON`,
+		},
+	},
+	{
 		key: "runs_cascade_delete",
 		stmts: []string{
 			`PRAGMA foreign_keys=OFF`,
