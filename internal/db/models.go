@@ -47,6 +47,7 @@ type Run struct {
 	SkippedFiles   int
 	FailedFiles    int
 	TotalSizeBytes int64
+	ErrorMsg       *string
 }
 
 type Transfer struct {

@@ -28,9 +28,10 @@ var versionedMigrations = []struct {
 				copied_files     INTEGER NOT NULL DEFAULT 0,
 				skipped_files    INTEGER NOT NULL DEFAULT 0,
 				failed_files     INTEGER NOT NULL DEFAULT 0,
-				total_size_bytes INTEGER NOT NULL DEFAULT 0
+				total_size_bytes INTEGER NOT NULL DEFAULT 0,
+				error_msg        TEXT
 			)`,
-			`INSERT INTO runs_new SELECT * FROM runs`,
+			`INSERT INTO runs_new SELECT id,job_id,status,started_at,finished_at,total_files,copied_files,skipped_files,failed_files,total_size_bytes,NULL FROM runs`,
 			`DROP TABLE runs`,
 			`ALTER TABLE runs_new RENAME TO runs`,
 			`PRAGMA foreign_keys=ON`,
@@ -51,9 +52,10 @@ var versionedMigrations = []struct {
 				copied_files     INTEGER NOT NULL DEFAULT 0,
 				skipped_files    INTEGER NOT NULL DEFAULT 0,
 				failed_files     INTEGER NOT NULL DEFAULT 0,
-				total_size_bytes INTEGER NOT NULL DEFAULT 0
+				total_size_bytes INTEGER NOT NULL DEFAULT 0,
+				error_msg        TEXT
 			)`,
-			`INSERT INTO runs_new SELECT * FROM runs`,
+			`INSERT INTO runs_new SELECT id,job_id,status,started_at,finished_at,total_files,copied_files,skipped_files,failed_files,total_size_bytes,NULL FROM runs`,
 			`DROP TABLE runs`,
 			`ALTER TABLE runs_new RENAME TO runs`,
 			`PRAGMA foreign_keys=ON`,
@@ -74,9 +76,10 @@ var versionedMigrations = []struct {
 				copied_files     INTEGER NOT NULL DEFAULT 0,
 				skipped_files    INTEGER NOT NULL DEFAULT 0,
 				failed_files     INTEGER NOT NULL DEFAULT 0,
-				total_size_bytes INTEGER NOT NULL DEFAULT 0
+				total_size_bytes INTEGER NOT NULL DEFAULT 0,
+				error_msg        TEXT
 			)`,
-			`INSERT INTO runs_new SELECT * FROM runs`,
+			`INSERT INTO runs_new SELECT id,job_id,status,started_at,finished_at,total_files,copied_files,skipped_files,failed_files,total_size_bytes,NULL FROM runs`,
 			`DROP TABLE runs`,
 			`ALTER TABLE runs_new RENAME TO runs`,
 			`PRAGMA foreign_keys=ON`,
@@ -140,9 +143,10 @@ var versionedMigrations = []struct {
 				copied_files     INTEGER NOT NULL DEFAULT 0,
 				skipped_files    INTEGER NOT NULL DEFAULT 0,
 				failed_files     INTEGER NOT NULL DEFAULT 0,
-				total_size_bytes INTEGER NOT NULL DEFAULT 0
+				total_size_bytes INTEGER NOT NULL DEFAULT 0,
+				error_msg        TEXT
 			)`,
-			`INSERT INTO runs_new SELECT * FROM runs`,
+			`INSERT INTO runs_new SELECT id,job_id,status,started_at,finished_at,total_files,copied_files,skipped_files,failed_files,total_size_bytes,error_msg FROM runs`,
 			`DROP TABLE runs`,
 			`ALTER TABLE runs_new RENAME TO runs`,
 			`PRAGMA foreign_keys=ON`,

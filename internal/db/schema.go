@@ -13,6 +13,7 @@ var alterations = []string{
 	`ALTER TABLE sync_jobs ADD COLUMN exclude_path_filters TEXT NOT NULL DEFAULT '[]'`,
 	`ALTER TABLE sync_jobs ADD COLUMN exclude_name_filters TEXT NOT NULL DEFAULT '[]'`,
 	`ALTER TABLE sync_jobs ADD COLUMN run_retention_days INTEGER NOT NULL DEFAULT 0`,
+	`ALTER TABLE runs ADD COLUMN error_msg TEXT`,
 }
 
 var schema = []string{
