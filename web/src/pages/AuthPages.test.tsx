@@ -19,6 +19,7 @@ import { SettingsGeneralPage } from './SettingsGeneralPage'
 
 const server = setupServer(
   http.get('/api/auth/me', () => HttpResponse.json({ username: 'testuser' })),
+  http.get('/api/settings', () => HttpResponse.json({ log_level: 'info' })),
 )
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
