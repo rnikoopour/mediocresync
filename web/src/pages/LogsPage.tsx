@@ -61,22 +61,22 @@ export function LogsPage() {
         </label>
       </div>
 
-      <div className="flex-1 bg-gray-950 rounded-lg overflow-y-auto font-mono text-xs p-4 space-y-0.5 min-h-0">
+      <div className="flex-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-y-auto font-mono text-xs p-4 space-y-0.5 min-h-0">
         {entries.length === 0 && (
-          <p className="text-gray-500">Waiting for log entries…</p>
+          <p className="text-gray-400 dark:text-gray-500">Waiting for log entries…</p>
         )}
         {entries.map((entry, i) => (
           <div key={i} className="flex gap-2 leading-5">
-            <span className="text-gray-500 shrink-0">
+            <span className="text-gray-400 dark:text-gray-500 shrink-0">
               {new Date(entry.time).toLocaleTimeString()}
             </span>
             <span className={`w-12 shrink-0 font-medium ${levelClass(entry.level)}`}>
               {entry.level.toUpperCase().slice(0, 4)}
             </span>
-            <span className="text-gray-200 break-all">
+            <span className="text-gray-800 dark:text-gray-200 break-all">
               {entry.msg}
               {entry.attrs && Object.keys(entry.attrs).length > 0 && (
-                <span className="text-gray-400"> {formatAttrs(entry.attrs)}</span>
+                <span className="text-gray-500 dark:text-gray-400"> {formatAttrs(entry.attrs)}</span>
               )}
             </span>
           </div>
