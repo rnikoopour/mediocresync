@@ -24,8 +24,14 @@ run-prod: build
 	./$(BINARY)
 
 test:
-	# web/node_modules contains Go files that confuse ./...; list packages explicitly instead
-	go test ./cmd/... ./internal/... ./ui/...
+	@# Stash ui/dist so stray files (e.g. .go files from node_modules copied by vite)
+	@# don't get picked up by go test ./..., then restore it when done.
+	@DIST_BACKUP=$$(mktemp -d) && \
+	  mv ui/dist $$DIST_BACKUP/ && \
+	  mkdir -p ui/dist && touch ui/dist/.gitkeep && \
+	  go test ./... ; GO_EXIT=$$? ; \
+	  rm -rf ui/dist && mv $$DIST_BACKUP/dist ui/dist && \
+	  exit $$GO_EXIT
 	cd web && npm test -- --run
 
 lint:
