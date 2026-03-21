@@ -68,6 +68,10 @@ export const api = {
     setLogLevel: (log_level: LogLevel) => request<void>('PUT', '/settings', { log_level }),
   },
 
+  version: {
+    get: () => request<{ version: string }>('GET', '/version'),
+  },
+
   auth: {
     setup: (body: { username: string; password: string; password_confirm: string }) =>
       request<void>('POST', '/auth/setup', body),

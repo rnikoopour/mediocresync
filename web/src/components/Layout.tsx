@@ -22,6 +22,12 @@ export function Layout() {
     queryFn: api.jobs.list,
   })
 
+  const { data: versionData } = useQuery({
+    queryKey: ['version'],
+    queryFn: api.version.get,
+    staleTime: Infinity,
+  })
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col sm:flex-row">
       {/* Mobile topbar */}
@@ -153,6 +159,9 @@ export function Layout() {
           >
             Sign out
           </button>
+          {versionData && (
+            <p className="px-3 py-1 text-xs text-gray-400 dark:text-gray-600">{versionData.version}</p>
+          )}
         </div>
       </nav>
 

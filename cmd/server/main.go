@@ -35,6 +35,9 @@ func initLogger(level config.LogLevel) *slog.LevelVar {
 	return &lv
 }
 
+// version is set at build time via -ldflags "-X main.version=vX.Y.Z".
+var version = "dev"
+
 func main() {
 	cfg := config.Load()
 	logLevel := initLogger(cfg.LogLevel)
@@ -84,6 +87,7 @@ func main() {
 
 	router := api.NewRouter(
 		ctx,
+		version,
 		auth,
 		connections,
 		jobs,

@@ -33,7 +33,7 @@ func setupUnconfiguredRouter(t *testing.T) (http.Handler, *db.AuthRepository) {
 	engine := internalsync.NewEngine(connections, jobs, runs, transfers, fileState, testEncKey, broker, context.Background())
 
 	staticFS := fstest.MapFS{"index.html": {Data: []byte("<html></html>")}}
-	router := NewRouter(context.Background(), auth, connections, jobs, runs, transfers, fileState, engine, broker, testEncKey, true, new(slog.LevelVar), staticFS)
+	router := NewRouter(context.Background(), "dev", auth, connections, jobs, runs, transfers, fileState, engine, broker, testEncKey, true, new(slog.LevelVar), staticFS)
 	return router, auth
 }
 

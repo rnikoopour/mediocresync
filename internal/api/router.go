@@ -15,6 +15,7 @@ import (
 
 func NewRouter(
 	appCtx context.Context,
+	version string,
 	auth *db.AuthRepository,
 	connections *db.ConnectionRepository,
 	jobs *db.JobRepository,
@@ -46,6 +47,10 @@ func NewRouter(
 
 	r.Route("/api", func(r chi.Router) {
 		r.Use(chiMiddleware.SetHeader("Content-Type", "application/json"))
+
+		r.Get("/version", func(w http.ResponseWriter, r *http.Request) {
+			writeJSON(w, http.StatusOK, map[string]string{"version": version})
+		})
 
 		// Unauthenticated auth endpoints.
 		r.Route("/auth", func(r chi.Router) {

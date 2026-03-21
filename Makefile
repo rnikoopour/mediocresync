@@ -7,10 +7,12 @@ GOOS   ?= $(shell go env GOOS)
 GOARCH ?= $(shell go env GOARCH)
 BINARY := bin/mediocresync-$(GOOS)-$(GOARCH)
 
+VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+
 build:
 	cd web && npm ci && npm run build
 	touch ui/dist/.gitkeep
-	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o $(BINARY) ./cmd/server
+	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -ldflags "-X main.version=$(VERSION)" -o $(BINARY) ./cmd/server
 
 LISTEN_ALL ?= false
 VITE_HOST_FLAG := $(if $(filter true,$(LISTEN_ALL)),-- --host,)
