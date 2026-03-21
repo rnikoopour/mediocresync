@@ -14,7 +14,7 @@ export function SettingsIndexPage() {
           <Link
             key={s.to}
             to={s.to}
-            className="flex items-center justify-between px-4 py-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            className="card-link flex items-center justify-between px-4 py-3"
           >
             <div>
               <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{s.label}</div>
