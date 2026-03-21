@@ -22,6 +22,7 @@ type runResponse struct {
 	SkippedFiles   int                `json:"skipped_files"`
 	FailedFiles    int                `json:"failed_files"`
 	TotalSizeBytes int64              `json:"total_size_bytes"`
+	ErrorMsg       *string            `json:"error_msg,omitempty"`
 	Transfers      []transferResponse `json:"transfers"`
 }
 
@@ -49,6 +50,7 @@ func toRunResponse(run *db.Run, transfers []*db.Transfer) runResponse {
 		SkippedFiles:   run.SkippedFiles,
 		FailedFiles:    run.FailedFiles,
 		TotalSizeBytes: run.TotalSizeBytes,
+		ErrorMsg:       run.ErrorMsg,
 		Transfers:      []transferResponse{},
 	}
 	if run.FinishedAt != nil {

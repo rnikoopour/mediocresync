@@ -398,16 +398,19 @@ func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanResult
 	runErr := e.executeRun(jobCtx, job, conn, run, plan)
 
 	finalStatus := "completed"
+	var finalErrMsg *string
 	if e.appCtx.Err() != nil {
 		finalStatus = "server_stopped"
 	} else if jobCtx.Err() != nil {
 		finalStatus = "canceled"
 	} else if runErr != nil {
 		finalStatus = "failed"
+		s := runErr.Error()
+		finalErrMsg = &s
 	} else if plan.ToCopy == 0 {
 		finalStatus = "nothing_to_sync"
 	}
-	if err := e.runs.UpdateStatus(run.ID, finalStatus); err != nil {
+	if err := e.runs.UpdateStatus(run.ID, finalStatus, finalErrMsg); err != nil {
 		slog.Error("update run status", "run_id", run.ID, "err", err)
 	}
 	e.broker.Publish(run.ID, sse.Event{RunID: run.ID, RunStatus: finalStatus})

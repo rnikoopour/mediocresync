@@ -70,6 +70,7 @@ export interface Run {
   skipped_files: number
   failed_files: number
   total_size_bytes: number
+  error_msg?: string
   transfers?: Transfer[]
 }
 

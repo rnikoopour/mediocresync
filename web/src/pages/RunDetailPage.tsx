@@ -1,22 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../api/client'
-import type { Transfer } from '../api/types'
 import { StatusBadge } from '../components/StatusBadge'
-import { ProgressBar } from '../components/ProgressBar'
+import { RunTreeView, formatBytes, formatSpeed } from '../components/RunTree'
 import { useSSE } from '../hooks/useSSE'
-
-function formatBytes(b: number): string {
-  if (b >= 1_000_000) return `${(b / 1_000_000).toFixed(1)} MB`
-  if (b >= 1_000)     return `${(b / 1_000).toFixed(1)} KB`
-  return `${b} B`
-}
-
-function formatSpeed(bps: number): string {
-  if (bps >= 1_000_000) return `${(bps / 1_000_000).toFixed(1)} MB/s`
-  if (bps >= 1_000)     return `${(bps / 1_000).toFixed(1)} KB/s`
-  return `${Math.round(bps)} B/s`
-}
 
 export function RunDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -24,100 +11,96 @@ export function RunDetailPage() {
   const { data: run, isLoading } = useQuery({
     queryKey: ['run', id],
     queryFn: () => api.runs.get(id!),
-    // Poll while running so counts update even without SSE
     refetchInterval: (query) => query.state.data?.status === 'running' ? 3000 : false,
   })
 
-  // Only subscribe to SSE while the run is active
+  const { data: job } = useQuery({
+    queryKey: ['job', run?.job_id],
+    queryFn: () => api.jobs.get(run!.job_id),
+    enabled: !!run,
+  })
+
   const { events: liveEvents } = useSSE(run?.status === 'running' ? id! : null)
 
   if (isLoading) return <p className="text-gray-500 dark:text-gray-400 text-sm">Loading…</p>
   if (!run) return <p className="text-red-500 text-sm">Run not found.</p>
+
+  const runEnded = run.status !== 'running'
+  const transfers = run.transfers ?? []
+
+  const duration = run.finished_at
+    ? formatDuration(new Date(run.finished_at).getTime() - new Date(run.started_at).getTime())
+    : null
+
+  const liveSpeedBps = !runEnded
+    ? Array.from(liveEvents.values()).reduce((s, e) => e.status === 'in_progress' ? s + e.speed_bps : s, 0)
+    : 0
+
+  const avgSpeedBps = runEnded && run.finished_at && run.total_size_bytes > 0
+    ? run.total_size_bytes / ((new Date(run.finished_at).getTime() - new Date(run.started_at).getTime()) / 1000)
+    : null
 
   return (
     <div>
       <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-6">
         <Link to="/jobs" className="hover:text-gray-700 dark:hover:text-gray-300">Jobs</Link>
         <span>/</span>
-        <Link to={`/jobs/${run.job_id}`} className="hover:text-gray-700 dark:hover:text-gray-300">{run.job_id}</Link>
+        <Link to={`/jobs/${run.job_id}`} className="hover:text-gray-700 dark:hover:text-gray-300">{job?.name ?? run.job_id}</Link>
         <span>/</span>
-        <span className="text-gray-900 dark:text-gray-100 font-medium">Run</span>
+        <span className="text-gray-900 dark:text-gray-100 font-medium">{new Date(run.started_at).toLocaleString()}</span>
       </div>
 
-      <div className="flex flex-wrap items-center gap-4 mb-6">
-        <StatusBadge status={run.status} />
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          Started {new Date(run.started_at).toLocaleString()}
-          {run.finished_at && ` · Finished ${new Date(run.finished_at).toLocaleString()}`}
-        </p>
-        <div className="flex gap-4 text-sm text-gray-600 dark:text-gray-400">
-          <span>{run.total_files} total</span>
-          <span className="text-green-600 dark:text-green-400">{run.copied_files} copied</span>
-          <span className="text-yellow-600 dark:text-yellow-400">{run.skipped_files} skipped</span>
-          {run.failed_files > 0 && <span className="text-red-600 dark:text-red-400">{run.failed_files} failed</span>}
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden mb-6">
+        <div className="flex flex-wrap items-center gap-4 px-4 py-3">
+          <StatusBadge status={run.status} />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Started {new Date(run.started_at).toLocaleString()}
+              {duration && ` · ${duration}`}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-4 text-xs text-gray-500 dark:text-gray-400">
+            {run.total_size_bytes > 0 && <span>{formatBytes(run.total_size_bytes)}</span>}
+            {liveSpeedBps > 0 && <span className="text-blue-600 dark:text-blue-400">{formatSpeed(liveSpeedBps)}</span>}
+            {avgSpeedBps !== null && <span>avg {formatSpeed(avgSpeedBps)}</span>}
+            <span>{run.total_files} total</span>
+            <span className="text-green-600 dark:text-green-400">{run.copied_files} copied</span>
+            <span className="text-yellow-600 dark:text-yellow-400">{run.skipped_files} skipped</span>
+            {run.failed_files > 0 && <span className="text-red-600 dark:text-red-400">{run.failed_files} failed</span>}
+          </div>
         </div>
-      </div>
 
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
-              <th className="text-left px-4 py-2 font-medium text-gray-600 dark:text-gray-400 text-xs">File</th>
-              <th className="text-left px-4 py-2 font-medium text-gray-600 dark:text-gray-400 text-xs w-32">Size</th>
-              <th className="text-left px-4 py-2 font-medium text-gray-600 dark:text-gray-400 text-xs w-56">Progress</th>
-              <th className="text-left px-4 py-2 font-medium text-gray-600 dark:text-gray-400 text-xs w-24">Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-            {(run.transfers ?? []).map((t) => (
-              <TransferRow key={t.id} transfer={t} liveEvent={liveEvents.get(t.id)} />
-            ))}
-            {(run.transfers ?? []).length === 0 && (
-              <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-gray-400 dark:text-gray-500 text-xs">
-                  {run.status === 'running' ? 'Enumerating files…' : 'No transfers recorded.'}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-        </div>
+        {run.error_msg && (
+          <div className="border-t border-gray-100 dark:border-gray-700 px-4 py-3">
+            <p className="text-xs text-red-500 dark:text-red-400 font-mono break-all">{run.error_msg}</p>
+          </div>
+        )}
+
+        {transfers.length > 0 && (
+          <RunTreeView
+            transfers={transfers}
+            remotePath={job?.remote_path ?? ''}
+            liveEvents={liveEvents}
+            runEnded={runEnded}
+            scrollable={false}
+          />
+        )}
+        {transfers.length === 0 && !run.error_msg && (
+          <p className="border-t border-gray-100 dark:border-gray-700 px-4 py-4 text-xs text-center text-gray-400 dark:text-gray-500">
+            {run.status === 'running' ? 'Enumerating files…' : 'No transfers recorded.'}
+          </p>
+        )}
       </div>
     </div>
   )
 }
 
-function TransferRow({ transfer, liveEvent }: {
-  transfer: Transfer
-  liveEvent?: { percent: number; speed_bps: number; bytes_xferred: number; status: string } | undefined
-}) {
-  const status = liveEvent?.status ?? transfer.status
-  const percent = liveEvent?.percent ?? (transfer.status === 'done' ? 100 : 0)
-  const speed = liveEvent?.speed_bps
-
-  return (
-    <tr className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-      <td className="px-4 py-2 font-mono text-xs text-gray-700 dark:text-gray-300 truncate max-w-xs" title={transfer.remote_path}>
-        {transfer.remote_path}
-      </td>
-      <td className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400">{formatBytes(transfer.size_bytes)}</td>
-      <td className="px-4 py-2 text-xs text-gray-400 dark:text-gray-500 text-right w-16">
-        {status === 'in_progress' && speed !== undefined && speed > 0 ? formatSpeed(speed) : null}
-      </td>
-      <td className="px-4 py-2">
-        {(status === 'in_progress' || status === 'done') ? (
-          <ProgressBar percent={percent} />
-        ) : (
-          <span className="text-xs text-gray-400 dark:text-gray-500">—</span>
-        )}
-      </td>
-      <td className="px-4 py-2">
-        <StatusBadge status={status} />
-        {transfer.error_msg && (
-          <p className="text-xs text-red-500 mt-0.5 truncate" title={transfer.error_msg}>{transfer.error_msg}</p>
-        )}
-      </td>
-    </tr>
-  )
+function formatDuration(ms: number): string {
+  const s = Math.floor(ms / 1000)
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  const sec = s % 60
+  if (h > 0) return `${h}h ${m}m ${sec}s`
+  if (m > 0) return `${m}m ${sec}s`
+  return `${sec}s`
 }
