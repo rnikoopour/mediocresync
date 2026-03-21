@@ -20,6 +20,15 @@ import (
 // ErrJobAlreadyRunning is returned by RunJob when a run for the job is already active.
 var ErrJobAlreadyRunning = fmt.Errorf("job is already running")
 
+// partialTransferError is returned by executeRun when at least one file failed
+// but others succeeded. Distinct from a total failure so the run can be marked
+// "partial" rather than "failed".
+type partialTransferError struct{ failed int }
+
+func (e partialTransferError) Error() string {
+	return fmt.Sprintf("%d file(s) failed to transfer", e.failed)
+}
+
 const stallTimeout = 30 * time.Second
 
 var errTransferStalled = errors.New("transfer stalled: no data received for 30s")
@@ -438,7 +447,12 @@ func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanResult
 	} else if jobCtx.Err() != nil {
 		finalStatus = "canceled"
 	} else if runErr != nil {
-		finalStatus = "failed"
+		var partial partialTransferError
+		if errors.As(runErr, &partial) {
+			finalStatus = "partial"
+		} else {
+			finalStatus = "failed"
+		}
 		s := runErr.Error()
 		finalErrMsg = &s
 	} else if plan.ToCopy == 0 {
@@ -685,7 +699,7 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Conne
 	wg.Wait()
 
 	if failed > 0 {
-		return fmt.Errorf("%d file(s) failed to transfer", failed)
+		return partialTransferError{failed: failed}
 	}
 	return nil
 }
