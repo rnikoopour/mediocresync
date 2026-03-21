@@ -101,19 +101,11 @@ func (r *RunRepository) PruneForJob(jobID string, retentionDays int) error {
 		return nil
 	}
 	cutoff := formatTime(time.Now().UTC().AddDate(0, 0, -retentionDays))
-	if _, err := r.db.Exec(
-		`DELETE FROM transfers WHERE run_id IN (SELECT id FROM runs WHERE job_id = ? AND started_at < ?)`,
-		jobID, cutoff,
-	); err != nil {
-		return fmt.Errorf("prune transfers: %w", err)
-	}
-	if _, err := r.db.Exec(
+	_, err := r.db.Exec(
 		`DELETE FROM runs WHERE job_id = ? AND started_at < ?`,
 		jobID, cutoff,
-	); err != nil {
-		return fmt.Errorf("prune runs: %w", err)
-	}
-	return nil
+	)
+	return err
 }
 
 func (r *RunRepository) UpdateCounts(id string, total, copied, skipped, failed int) error {
