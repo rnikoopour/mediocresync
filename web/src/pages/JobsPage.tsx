@@ -68,22 +68,24 @@ function JobRunPreview({ jobId, triggeredAt, onDismiss }: { jobId: string; trigg
   const { data: runs = [] } = useQuery({
     queryKey: ['runs', jobId, 'preview'],
     queryFn: () => api.jobs.listRuns(jobId),
-    refetchInterval: (q) => {
-      const newRun = q.state.data?.find(r => new Date(r.started_at).getTime() >= triggeredAt)
-      return (!newRun || newRun.status === 'running') ? 2000 : false
-    },
   })
 
   const runId = runs.find(r => new Date(r.started_at).getTime() >= triggeredAt)?.id
+
+  const qc = useQueryClient()
 
   const { data: run } = useQuery({
     queryKey: ['run', runId],
     queryFn: () => api.runs.get(runId!),
     enabled: !!runId,
-    refetchInterval: (q) => q.state.data?.status === 'running' ? 3000 : false,
   })
 
-  const { events: liveEvents } = useSSE(run?.status === 'running' ? runId! : null)
+  const { events: liveEvents, runStatus } = useSSE(run?.status === 'running' ? runId! : null)
+
+  // When the run finishes (SSE run_status fires), fetch the final state.
+  useEffect(() => {
+    if (runStatus && runId) qc.invalidateQueries({ queryKey: ['run', runId] })
+  }, [runStatus, runId, qc])
 
   if (!run) {
     if (planEntry?.status === 'running') {
@@ -168,6 +170,7 @@ function JobRow({ job, onEdit, onDelete }: { job: SyncJob; onEdit: () => void; o
           } else if (ev.status === 'started') {
             setIsPlanning(false)
             setIsRunning(true)
+            qc.invalidateQueries({ queryKey: ['runs', job.id, 'preview'] })
           } else if (ev.status === 'run_finished') {
             setIsPlanning(false)
             setIsRunning(false)

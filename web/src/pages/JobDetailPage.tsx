@@ -49,7 +49,6 @@ function RunRow({ run: initialRun, remotePath, jobId }: { run: Run; remotePath: 
     queryKey: ['run', initialRun.id],
     queryFn: () => api.runs.get(initialRun.id),
     enabled: open,
-    refetchInterval: (q) => q.state.data?.status === 'running' ? 3000 : false,
   })
 
   const [cancelling, setCancelling] = useState(false)
@@ -64,6 +63,11 @@ function RunRow({ run: initialRun, remotePath, jobId }: { run: Run; remotePath: 
   })
 
   const { events: liveEvents, runStatus } = useSSE(open && run.status === 'running' ? run.id : null)
+
+  // When the run finishes (SSE run_status fires), fetch the final state.
+  useEffect(() => {
+    if (runStatus) qc.invalidateQueries({ queryKey: ['run', initialRun.id] })
+  }, [runStatus, initialRun.id, qc])
   const effectiveStatus = (runStatus && runStatus !== 'canceling') ? runStatus : run.status
   const isRunning = effectiveStatus === 'running'
   // Cancelling if this client requested it OR if the server broadcast that
@@ -420,7 +424,6 @@ export function JobDetailPage() {
   const { data: runs = [], isLoading } = useQuery({
     queryKey: ['runs', id],
     queryFn: () => api.jobs.listRuns(id!),
-    refetchInterval: (q) => q.state.data?.[0]?.status === 'running' ? 3000 : 15000,
   })
   const { plans, runPlan, subscribePlan, dismissPlan, unskipFile, skipFile } = usePlan()
   const planEntry = id ? plans[id] : undefined

@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../api/client'
 import { StatusBadge } from '../components/StatusBadge'
@@ -7,11 +8,11 @@ import { useSSE } from '../hooks/useSSE'
 
 export function RunDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const qc = useQueryClient()
 
   const { data: run, isLoading } = useQuery({
     queryKey: ['run', id],
     queryFn: () => api.runs.get(id!),
-    refetchInterval: (query) => query.state.data?.status === 'running' ? 3000 : false,
   })
 
   const { data: job } = useQuery({
@@ -20,7 +21,12 @@ export function RunDetailPage() {
     enabled: !!run,
   })
 
-  const { events: liveEvents } = useSSE(run?.status === 'running' ? id! : null)
+  const { events: liveEvents, runStatus } = useSSE(run?.status === 'running' ? id! : null)
+
+  // When the run finishes (SSE run_status fires), fetch the final state.
+  useEffect(() => {
+    if (runStatus) qc.invalidateQueries({ queryKey: ['run', id] })
+  }, [runStatus, id, qc])
 
   if (isLoading) return <p className="text-gray-500 dark:text-gray-400 text-sm">Loading…</p>
   if (!run) return <p className="text-red-500 text-sm">Run not found.</p>
