@@ -13,13 +13,14 @@ import (
 	"github.com/rnikoopour/mediocresync/internal/api"
 	"github.com/rnikoopour/mediocresync/internal/config"
 	"github.com/rnikoopour/mediocresync/internal/db"
+	"github.com/rnikoopour/mediocresync/internal/logbuffer"
 	"github.com/rnikoopour/mediocresync/internal/scheduler"
 	internalsync "github.com/rnikoopour/mediocresync/internal/sync"
 	"github.com/rnikoopour/mediocresync/internal/sse"
 	"github.com/rnikoopour/mediocresync/ui"
 )
 
-func initLogger(level config.LogLevel) *slog.LevelVar {
+func initLogger(level config.LogLevel) (*slog.LevelVar, *logbuffer.Buffer) {
 	var lv slog.LevelVar
 	switch level {
 	case config.LogLevelDebug:
@@ -31,8 +32,10 @@ func initLogger(level config.LogLevel) *slog.LevelVar {
 	default:
 		lv.Set(slog.LevelInfo)
 	}
-	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: &lv})))
-	return &lv
+	opts := &slog.HandlerOptions{Level: &lv}
+	buf := logbuffer.New(logbuffer.DefaultSize, slog.NewTextHandler(os.Stderr, opts))
+	slog.SetDefault(slog.New(buf))
+	return &lv, buf
 }
 
 // version is set at build time via -ldflags "-X main.version=vX.Y.Z".
@@ -40,7 +43,7 @@ var version = "dev"
 
 func main() {
 	cfg := config.Load()
-	logLevel := initLogger(cfg.LogLevel)
+	logLevel, logBuf := initLogger(cfg.LogLevel)
 
 	database, err := db.Open(cfg.DBPath)
 	if err != nil {
@@ -99,6 +102,7 @@ func main() {
 		encKey,
 		cfg.DevMode,
 		logLevel,
+		logBuf,
 		ui.FS(),
 	)
 

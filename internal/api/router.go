@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/rnikoopour/mediocresync/internal/db"
+	"github.com/rnikoopour/mediocresync/internal/logbuffer"
 	internalsync "github.com/rnikoopour/mediocresync/internal/sync"
 	"github.com/rnikoopour/mediocresync/internal/sse"
 )
@@ -27,6 +28,7 @@ func NewRouter(
 	encKey []byte,
 	devMode bool,
 	logLevel *slog.LevelVar,
+	logBuf *logbuffer.Buffer,
 	staticFiles fs.FS,
 ) http.Handler {
 	r := chi.NewRouter()
@@ -44,6 +46,7 @@ func NewRouter(
 	runsH := &runsHandler{runs: runs, transfers: transfers, broker: broker, appCtx: appCtx}
 	authH := &authHandler{repo: auth}
 	settingsH := &settingsHandler{logLevel: logLevel}
+	logsH := &logsHandler{buf: logBuf}
 
 	r.Route("/api", func(r chi.Router) {
 		r.Use(chiMiddleware.SetHeader("Content-Type", "application/json"))
@@ -101,6 +104,8 @@ func NewRouter(
 				r.Get("/", settingsH.get)
 				r.Put("/", settingsH.update)
 			})
+
+			r.Get("/logs/stream", logsH.stream)
 
 			r.Route("/runs", func(r chi.Router) {
 				r.Get("/{id}", runsH.get)

@@ -130,20 +130,36 @@ export function Layout() {
             </NavLink>
           </li>
           {settingsExpanded && (
-            <li>
-              <NavLink
-                to="/settings/general"
-                className={({ isActive }) =>
-                  `block pl-7 pr-4 py-1.5 text-xs rounded-md mx-2 ${
-                    isActive
-                      ? 'bg-blue-50 dark:bg-gray-700 text-blue-700 dark:text-gray-100 font-medium'
-                      : 'text-gray-500 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
-                  }`
-                }
-              >
-                General
-              </NavLink>
-            </li>
+            <>
+              <li>
+                <NavLink
+                  to="/settings/general"
+                  className={({ isActive }) =>
+                    `block pl-7 pr-4 py-1.5 text-xs rounded-md mx-2 ${
+                      isActive
+                        ? 'bg-blue-50 dark:bg-gray-700 text-blue-700 dark:text-gray-100 font-medium'
+                        : 'text-gray-500 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`
+                  }
+                >
+                  General
+                </NavLink>
+              </li>
+              <li>
+                <NavLink
+                  to="/settings/logs"
+                  className={({ isActive }) =>
+                    `block pl-7 pr-4 py-1.5 text-xs rounded-md mx-2 ${
+                      isActive
+                        ? 'bg-blue-50 dark:bg-gray-700 text-blue-700 dark:text-gray-100 font-medium'
+                        : 'text-gray-500 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`
+                  }
+                >
+                  Logs
+                </NavLink>
+              </li>
+            </>
           )}
         </ul>
         <div className="px-3 py-3 border-t border-gray-200 dark:border-gray-700 space-y-1">
