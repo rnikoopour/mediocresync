@@ -54,10 +54,9 @@ make test
 
 ## Deploying on Linux (systemd)
 
-Create a dedicated user, then run the install script as root:
+Run the install script as root:
 
 ```sh
-sudo useradd -r -s /bin/false mediocresync
 curl -fsSL https://raw.githubusercontent.com/rnikoopour/mediocresync/main/install-with-systemd.sh | sudo bash
 ```
 

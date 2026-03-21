@@ -2,10 +2,10 @@
 set -euo pipefail
 
 REPO="rnikoopour/mediocresync"
-BINARY_NAME="mediocresync-linux-amd64"
-INSTALL_PATH="/usr/local/bin/mediocresync"
-UNIT_NAME="mediocresync"
-UNIT_PATH="/etc/systemd/system/${UNIT_NAME}.service"
+APP_NAME="mediocresync"
+BINARY_NAME="${APP_NAME}-linux-amd64"
+INSTALL_PATH="/usr/local/bin/${APP_NAME}"
+UNIT_PATH="/etc/systemd/system/${APP_NAME}.service"
 
 # Resolve latest release download URLs via GitHub API.
 LATEST_URL="https://api.github.com/repos/${REPO}/releases/latest"
@@ -22,10 +22,16 @@ if [ -z "$UNIT_URL" ]; then
   exit 1
 fi
 
+# Create the service user if it doesn't already exist.
+if ! id -u "${APP_NAME}" &>/dev/null; then
+  echo "Creating user ${APP_NAME}..."
+  useradd -r -s /bin/false "${APP_NAME}"
+fi
+
 # Stop the unit if it is currently running.
-if systemctl is-active --quiet "${UNIT_NAME}"; then
-  echo "Stopping ${UNIT_NAME}..."
-  systemctl stop "${UNIT_NAME}"
+if systemctl is-active --quiet "${APP_NAME}"; then
+  echo "Stopping ${APP_NAME}..."
+  systemctl stop "${APP_NAME}"
 fi
 
 # Download and install the binary.
@@ -39,6 +45,6 @@ curl -fsSL "$UNIT_URL" -o "$UNIT_PATH"
 
 # Reload systemd and (re)start the service.
 systemctl daemon-reload
-systemctl enable --now "${UNIT_NAME}"
+systemctl enable --now "${APP_NAME}"
 
-echo "Done. ${UNIT_NAME} is running."
+echo "Done. ${APP_NAME} is running."
