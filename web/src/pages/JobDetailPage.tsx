@@ -399,11 +399,14 @@ function PlanTreeView({ files, remotePath, onSkip, onUnskip }: { files: PlanFile
     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
       <TreeTabBar tab={tab} onTab={setTab} />
       <div className="py-1">
-        {nodes.map((n, i) =>
-          n.type === 'folder'
-            ? <FolderNode key={n.name + i} node={n} depth={0} onSkip={onSkip} onUnskip={onUnskip} />
-            : <FileRow key={n.name + i} node={n} depth={0} onSkip={onSkip} onUnskip={onUnskip} />
-        )}
+        {nodes.length === 0
+          ? <p className="px-4 py-4 text-xs text-center text-gray-400 dark:text-gray-500">No items to copy</p>
+          : nodes.map((n, i) =>
+              n.type === 'folder'
+                ? <FolderNode key={n.name + i} node={n} depth={0} onSkip={onSkip} onUnskip={onUnskip} />
+                : <FileRow key={n.name + i} node={n} depth={0} onSkip={onSkip} onUnskip={onUnskip} />
+            )
+        }
       </div>
     </div>
   )
