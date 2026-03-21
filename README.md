@@ -62,7 +62,20 @@ curl -fsSL https://raw.githubusercontent.com/rnikoopour/mediocresync/main/instal
 
 The script downloads the latest `mediocresync-linux-amd64` binary and `mediocresync.service` from the GitHub release, installs them, and starts the service. Re-running it will stop the service, upgrade the binary, and restart.
 
-The service listens on port `5000` and stores its database at `/var/lib/mediocresync/mediocresync.db` (created automatically by systemd). To override, edit the `Environment=` lines in `/etc/systemd/system/mediocresync.service` and run `sudo systemctl daemon-reload && sudo systemctl restart mediocresync`.
+The service listens on port `5000` and stores its database at `/var/lib/mediocresync/mediocresync.db` (created automatically by systemd). To override environment variables without editing the unit file directly (so your changes survive upgrades), use:
+
+```sh
+sudo systemctl edit mediocresync
+```
+
+Add your overrides in the `[Service]` section, for example:
+
+```ini
+[Service]
+Environment=LISTEN_ADDR=:8080
+```
+
+Then reload and restart: `sudo systemctl daemon-reload && sudo systemctl restart mediocresync`.
 
 ## How it works
 
