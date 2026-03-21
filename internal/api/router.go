@@ -79,6 +79,7 @@ func NewRouter(
 				r.Put("/{id}", jobsH.update)
 				r.Delete("/{id}", jobsH.delete)
 				r.Post("/{id}/run", jobsH.triggerRun)
+				r.Post("/{id}/planthenrun", jobsH.planThenRun)
 				r.Delete("/{id}/run", jobsH.cancelRun)
 				r.Post("/{id}/plan", jobsH.planStart)
 				r.Delete("/{id}/plan", jobsH.planDismiss)

@@ -55,9 +55,10 @@ type Engine struct {
 	storedPlansMu sync.Mutex
 	runWG         sync.WaitGroup // tracks all in-flight runWithPlan calls
 
-	planMu     sync.Mutex
-	planActive map[string]bool
-	planSubs   map[string][]chan PlanEvent
+	planMu       sync.Mutex
+	planActive   map[string]bool
+	planProgress map[string]PlanEvent // latest progress event per active plan
+	planSubs     map[string][]chan PlanEvent
 }
 
 func NewEngine(
@@ -83,8 +84,9 @@ func NewEngine(
 		activeRunIDs: make(map[string]string),
 		cancelFuncs:  make(map[string]context.CancelFunc),
 		storedPlans: make(map[string]*PlanResult),
-		planActive:  make(map[string]bool),
-		planSubs:    make(map[string][]chan PlanEvent),
+		planActive:   make(map[string]bool),
+		planProgress: make(map[string]PlanEvent),
+		planSubs:     make(map[string][]chan PlanEvent),
 	}
 }
 
@@ -206,14 +208,40 @@ func (e *Engine) RunJob(jobID string) error {
 // PlanThenRun plans and immediately runs the given job without user interaction.
 // Used by the scheduler for automated runs.
 func (e *Engine) PlanThenRun(ctx context.Context, jobID string) error {
-	plan, err := e.PlanJobStream(ctx, jobID, nil)
+	// Signal job-level clients (e.g. jobs list page) that planning has started.
+	e.broker.Publish(jobID, sse.Event{Status: "planning"})
+
+	// Mark the plan as active and broadcast an initial event so plan subscribers
+	// (e.g. job detail page) immediately see the "running" state.
+	e.planMu.Lock()
+	e.planActive[jobID] = true
+	e.planMu.Unlock()
+	e.broadcastPlanEvent(jobID, PlanEvent{})
+
+	plan, err := e.PlanJobStream(ctx, jobID, func(files, dirs int) {
+		e.broadcastPlanEvent(jobID, PlanEvent{Files: files, Folders: dirs})
+	})
+
+	e.planMu.Lock()
+	delete(e.planActive, jobID)
+	e.planMu.Unlock()
+
 	if err != nil {
+		e.broadcastPlanEvent(jobID, PlanEvent{Error: err.Error()})
 		return fmt.Errorf("plan: %w", err)
 	}
-	// discard stored copy — we use the result directly
+
+	// Broadcast the completed plan so job detail page can display it briefly.
+	e.broadcastPlanEvent(jobID, PlanEvent{Done: true, Result: plan})
+
+	// Discard stored copy — we use the result directly rather than requiring
+	// a separate RunJob call. Also dismiss the plan from connected clients
+	// so it clears from the job detail page when the run begins.
 	e.storedPlansMu.Lock()
 	delete(e.storedPlans, jobID)
 	e.storedPlansMu.Unlock()
+	e.broadcastPlanEvent(jobID, PlanEvent{Dismissed: true})
+
 	return e.runWithPlan(ctx, jobID, plan)
 }
 
@@ -279,9 +307,9 @@ func (e *Engine) SubscribePlan(jobID string) (<-chan PlanEvent, func()) {
 		// future plans and dismissed events flow through the same connection.
 		ch <- PlanEvent{Done: true, Result: result}
 	} else if e.planActive[jobID] {
-		// If a plan is already running, push an immediate event so the subscriber
-		// knows to show the "running" state before the next progress tick arrives.
-		ch <- PlanEvent{}
+		// Deliver the latest progress so the subscriber immediately shows current
+		// counts rather than starting from zero.
+		ch <- e.planProgress[jobID]
 	}
 	e.planMu.Unlock()
 
@@ -335,6 +363,12 @@ func (e *Engine) UpdateStoredPlanAction(jobID, remotePath, action string) {
 
 func (e *Engine) broadcastPlanEvent(jobID string, evt PlanEvent) {
 	e.planMu.Lock()
+	// Track the latest progress event so late subscribers receive current counts.
+	if !evt.Done && !evt.Dismissed && evt.Error == "" {
+		e.planProgress[jobID] = evt
+	} else {
+		delete(e.planProgress, jobID)
+	}
 	subs := make([]chan PlanEvent, len(e.planSubs[jobID]))
 	copy(subs, e.planSubs[jobID])
 	e.planMu.Unlock()
@@ -415,6 +449,7 @@ func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanResult
 	}
 	e.broker.Publish(run.ID, sse.Event{RunID: run.ID, RunStatus: finalStatus})
 	e.broker.Close(run.ID)
+	e.broker.Publish(jobID, sse.Event{RunID: run.ID, Status: "run_finished", RunStatus: finalStatus})
 	return runErr
 }
 
