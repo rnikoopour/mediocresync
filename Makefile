@@ -5,11 +5,12 @@ export PATH := $(dir $(NODE_BIN)):$(PATH)
 
 GOOS   ?= $(shell go env GOOS)
 GOARCH ?= $(shell go env GOARCH)
+BINARY := bin/mediocresync-$(GOOS)-$(GOARCH)
 
 build:
 	cd web && npm ci && npm run build
 	touch ui/dist/.gitkeep
-	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o bin/mediocresync ./cmd/server
+	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o $(BINARY) ./cmd/server
 
 LISTEN_ALL ?= false
 VITE_HOST_FLAG := $(if $(filter true,$(LISTEN_ALL)),-- --host,)
@@ -20,7 +21,7 @@ run-dev:
 	DEV_MODE=true go run ./cmd/server
 
 run-prod: build
-	./bin/mediocresync
+	./$(BINARY)
 
 test:
 	# web/node_modules contains Go files that confuse ./...; list packages explicitly instead
