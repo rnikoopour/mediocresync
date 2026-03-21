@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -60,4 +61,53 @@ func (r *FileStateRepository) Delete(jobID, remotePath string) error {
 func (r *FileStateRepository) DeleteByJob(jobID string) error {
 	_, err := r.db.Exec(`DELETE FROM file_state WHERE job_id=?`, jobID)
 	return err
+}
+
+// PruneStale removes file_state entries for jobID whose remote_path is not in
+// knownPaths. It fetches the current paths for the job, computes the diff in
+// Go, and deletes in batches of 500 to stay well under SQLite's bind-parameter limit.
+func (r *FileStateRepository) PruneStale(jobID string, knownPaths []string) error {
+	known := make(map[string]struct{}, len(knownPaths))
+	for _, p := range knownPaths {
+		known[p] = struct{}{}
+	}
+
+	rows, err := r.db.Query(`SELECT remote_path FROM file_state WHERE job_id = ?`, jobID)
+	if err != nil {
+		return fmt.Errorf("prune file state: %w", err)
+	}
+	defer rows.Close()
+
+	var stale []string
+	for rows.Next() {
+		var path string
+		if err := rows.Scan(&path); err != nil {
+			return fmt.Errorf("prune file state: %w", err)
+		}
+		if _, ok := known[path]; !ok {
+			stale = append(stale, path)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("prune file state: %w", err)
+	}
+
+	const batchSize = 500
+	for i := 0; i < len(stale); i += batchSize {
+		batch := stale[i:min(i+batchSize, len(stale))]
+		placeholders := strings.Repeat("?,", len(batch))
+		placeholders = placeholders[:len(placeholders)-1]
+		args := make([]any, 1+len(batch))
+		args[0] = jobID
+		for j, p := range batch {
+			args[j+1] = p
+		}
+		if _, err := r.db.Exec(
+			`DELETE FROM file_state WHERE job_id = ? AND remote_path IN (`+placeholders+`)`,
+			args...,
+		); err != nil {
+			return fmt.Errorf("prune file state: %w", err)
+		}
+	}
+	return nil
 }

@@ -68,7 +68,7 @@ func (r *TransferRepository) CreateBatch(transfers []*Transfer) error {
 
 func (r *TransferRepository) UpdateStatus(id, status string, errMsg *string, durationMs *int64) error {
 	var finishedAt *string
-	if status == "done" || status == "failed" || status == "skipped" {
+	if status == TransferStatusDone || status == TransferStatusFailed || status == TransferStatusSkipped {
 		s := formatTime(time.Now().UTC())
 		finishedAt = &s
 	}

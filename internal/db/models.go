@@ -2,6 +2,26 @@ package db
 
 import "time"
 
+// Run status values.
+const (
+	RunStatusRunning      = "running"
+	RunStatusCompleted    = "completed"
+	RunStatusNothingToSync = "nothing_to_sync"
+	RunStatusFailed       = "failed"
+	RunStatusPartial      = "partial"
+	RunStatusCanceled     = "canceled"
+	RunStatusServerStopped = "server_stopped"
+)
+
+// Transfer status values.
+const (
+	TransferStatusPending    = "pending"
+	TransferStatusInProgress = "in_progress"
+	TransferStatusDone       = "done"
+	TransferStatusSkipped    = "skipped"
+	TransferStatusFailed     = "failed"
+)
+
 type Connection struct {
 	ID            string
 	Name          string

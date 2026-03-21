@@ -370,13 +370,13 @@ func TestRunErrorMsgPersistedOnFailure(t *testing.T) {
 	}
 	_ = jobRepo.Create(job)
 
-	run := &db.Run{JobID: job.ID, Status: "running"}
+	run := &db.Run{JobID: job.ID, Status: db.RunStatusRunning}
 	if err := runRepo.Create(run); err != nil {
 		t.Fatalf("create run: %v", err)
 	}
 
 	errMsg := "dial tcp: connection refused"
-	if err := runRepo.UpdateStatus(run.ID, "failed", &errMsg); err != nil {
+	if err := runRepo.UpdateStatus(run.ID, db.RunStatusFailed, &errMsg); err != nil {
 		t.Fatalf("UpdateStatus: %v", err)
 	}
 
@@ -405,12 +405,12 @@ func TestUpdateJobPrunesOldRuns(t *testing.T) {
 	_ = jobRepo.Create(job)
 
 	// Insert an old run and a recent run directly
-	oldRun := &db.Run{JobID: job.ID, Status: "completed"}
+	oldRun := &db.Run{JobID: job.ID, Status: db.RunStatusCompleted}
 	_ = runRepo.Create(oldRun)
 	_, _ = database.Exec(`UPDATE runs SET started_at=? WHERE id=?`,
 		time.Now().UTC().AddDate(0, 0, -3).Format(time.RFC3339), oldRun.ID)
 
-	recentRun := &db.Run{JobID: job.ID, Status: "completed"}
+	recentRun := &db.Run{JobID: job.ID, Status: db.RunStatusCompleted}
 	_ = runRepo.Create(recentRun)
 
 	// Update job with 1-day retention — should prune the old run

@@ -72,7 +72,7 @@ func (r *RunRepository) ListByJob(jobID string) ([]*Run, error) {
 
 func (r *RunRepository) UpdateStatus(id, status string, errMsg *string) error {
 	var finishedAt *string
-	if status == "completed" || status == "nothing_to_sync" || status == "failed" || status == "canceled" || status == "server_stopped" {
+	if status == RunStatusCompleted || status == RunStatusNothingToSync || status == RunStatusFailed || status == RunStatusCanceled || status == RunStatusServerStopped || status == RunStatusPartial {
 		s := formatTime(time.Now().UTC())
 		finishedAt = &s
 	}
@@ -89,15 +89,15 @@ func (r *RunRepository) UpdateStatus(id, status string, errMsg *string) error {
 func (r *RunRepository) CancelStaleRuns() error {
 	finished := formatTime(time.Now().UTC())
 	_, err := r.db.Exec(
-		`UPDATE transfers SET status='failed'
-		 WHERE status='in_progress'
-		   AND run_id IN (SELECT id FROM runs WHERE status='running')`,
+		fmt.Sprintf(`UPDATE transfers SET status='%s' WHERE status='%s' AND run_id IN (SELECT id FROM runs WHERE status='%s')`,
+			TransferStatusFailed, TransferStatusInProgress, RunStatusRunning),
 	)
 	if err != nil {
 		return err
 	}
 	_, err = r.db.Exec(
-		`UPDATE runs SET status='server_stopped', finished_at=? WHERE status='running'`,
+		fmt.Sprintf(`UPDATE runs SET status='%s', finished_at=? WHERE status='%s'`,
+			RunStatusServerStopped, RunStatusRunning),
 		finished,
 	)
 	return err

@@ -136,7 +136,7 @@ func TestRunLifecycle(t *testing.T) {
 	job := &SyncJob{Name: "j", ConnectionID: conn.ID, RemotePath: "/", LocalDest: "/tmp", IntervalValue: 1, IntervalUnit: "hours", Concurrency: 1, Enabled: true}
 	_ = jobRepo.Create(job)
 
-	run := &Run{JobID: job.ID, Status: "running"}
+	run := &Run{JobID: job.ID, Status: RunStatusRunning}
 	if err := runRepo.Create(run); err != nil {
 		t.Fatalf("Create run: %v", err)
 	}
@@ -144,7 +144,7 @@ func TestRunLifecycle(t *testing.T) {
 	if err := runRepo.UpdateCounts(run.ID, 10, 8, 1, 1); err != nil {
 		t.Fatalf("UpdateCounts: %v", err)
 	}
-	if err := runRepo.UpdateStatus(run.ID, "completed", nil); err != nil {
+	if err := runRepo.UpdateStatus(run.ID, RunStatusCompleted, nil); err != nil {
 		t.Fatalf("UpdateStatus: %v", err)
 	}
 
@@ -152,7 +152,7 @@ func TestRunLifecycle(t *testing.T) {
 	if err != nil || got == nil {
 		t.Fatalf("Get run: %v", err)
 	}
-	if got.Status != "completed" || got.TotalFiles != 10 {
+	if got.Status != RunStatusCompleted || got.TotalFiles != 10 {
 		t.Errorf("unexpected run data: %+v", got)
 	}
 	if got.FinishedAt == nil {
@@ -243,7 +243,7 @@ func TestPruneForJob(t *testing.T) {
 			job := &SyncJob{Name: "j", ConnectionID: conn.ID, RemotePath: "/", LocalDest: "/tmp", IntervalValue: 1, IntervalUnit: "hours", Concurrency: 1, Enabled: true}
 			_ = jobRepo.Create(job)
 
-			run := &Run{JobID: job.ID, Status: "completed"}
+			run := &Run{JobID: job.ID, Status: RunStatusCompleted}
 			if err := runRepo.Create(run); err != nil {
 				t.Fatalf("create run: %v", err)
 			}
@@ -276,6 +276,33 @@ func TestPruneForJob(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestFileStatePruneStale(t *testing.T) {
+	connRepo, jobRepo, _, _, fsRepo := openAllRepos(t)
+	conn := &Connection{Name: "c", Host: "h", Port: 21, Username: "u", Password: []byte("p")}
+	_ = connRepo.Create(conn)
+	job := &SyncJob{Name: "j", ConnectionID: conn.ID, RemotePath: "/", LocalDest: "/tmp", IntervalValue: 1, IntervalUnit: "hours", Concurrency: 1, Enabled: true}
+	_ = jobRepo.Create(job)
+
+	for _, path := range []string{"/a.csv", "/b.csv", "/c.csv"} {
+		_ = fsRepo.Upsert(&FileState{JobID: job.ID, RemotePath: path, SizeBytes: 1, MTime: time.Now(), CopiedAt: time.Now()})
+	}
+
+	// Only /a.csv and /c.csv are still on the remote — /b.csv was deleted.
+	if err := fsRepo.PruneStale(job.ID, []string{"/a.csv", "/c.csv"}); err != nil {
+		t.Fatalf("PruneStale: %v", err)
+	}
+
+	if got, _ := fsRepo.Get(job.ID, "/a.csv"); got == nil {
+		t.Error("/a.csv should be retained")
+	}
+	if got, _ := fsRepo.Get(job.ID, "/c.csv"); got == nil {
+		t.Error("/c.csv should be retained")
+	}
+	if got, _ := fsRepo.Get(job.ID, "/b.csv"); got != nil {
+		t.Error("/b.csv should have been pruned")
 	}
 }
 

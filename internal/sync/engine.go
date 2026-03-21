@@ -428,7 +428,7 @@ func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanResult
 		return fmt.Errorf("load connection %s: %w", job.ConnectionID, err)
 	}
 
-	run := &db.Run{JobID: jobID, Status: "running"}
+	run := &db.Run{JobID: jobID, Status: db.RunStatusRunning}
 	if err := e.runs.Create(run); err != nil {
 		return fmt.Errorf("create run: %w", err)
 	}
@@ -440,26 +440,38 @@ func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanResult
 
 	runErr := e.executeRun(jobCtx, job, conn, run, plan)
 
-	finalStatus := "completed"
+	finalStatus := db.RunStatusCompleted
 	var finalErrMsg *string
 	if e.appCtx.Err() != nil {
-		finalStatus = "server_stopped"
+		finalStatus = db.RunStatusServerStopped
 	} else if jobCtx.Err() != nil {
-		finalStatus = "canceled"
+		finalStatus = db.RunStatusCanceled
 	} else if runErr != nil {
 		var partial partialTransferError
 		if errors.As(runErr, &partial) {
-			finalStatus = "partial"
+			finalStatus = db.RunStatusPartial
 		} else {
-			finalStatus = "failed"
+			finalStatus = db.RunStatusFailed
 		}
 		s := runErr.Error()
 		finalErrMsg = &s
 	} else if plan.ToCopy == 0 {
-		finalStatus = "nothing_to_sync"
+		finalStatus = db.RunStatusNothingToSync
 	}
 	if err := e.runs.UpdateStatus(run.ID, finalStatus, finalErrMsg); err != nil {
 		slog.Error("update run status", "run_id", run.ID, "err", err)
+	}
+
+	// Prune file_state entries for files no longer present on the remote.
+	// Only when the walk completed — skip on cancel or server stop.
+	if finalStatus == db.RunStatusCompleted || finalStatus == db.RunStatusNothingToSync || finalStatus == db.RunStatusPartial {
+		knownPaths := make([]string, len(plan.Files))
+		for i, f := range plan.Files {
+			knownPaths[i] = f.RemotePath
+		}
+		if err := e.fileState.PruneStale(jobID, knownPaths); err != nil {
+			slog.Error("prune stale file state", "job_id", jobID, "err", err)
+		}
 	}
 	e.broker.Publish(run.ID, sse.Event{RunID: run.ID, RunStatus: finalStatus})
 	e.broker.Close(run.ID)
@@ -561,9 +573,9 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Conne
 	batch := make([]*db.Transfer, 0, len(orderedFiles))
 	for _, pf := range orderedFiles {
 		remote := ftpes.RemoteFile{Path: pf.RemotePath, Size: pf.SizeBytes, MTime: pf.MTime}
-		initialStatus := "pending"
+		initialStatus := db.TransferStatusPending
 		if pf.Action == "skip" {
-			initialStatus = "skipped"
+			initialStatus = db.TransferStatusSkipped
 		}
 		t := &db.Transfer{
 			RunID:      run.ID,
@@ -679,11 +691,11 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Conne
 						errMsg = "canceled by client"
 					}
 				}
-				_ = e.transfers.UpdateStatus(ent.transfer.ID, "failed", &errMsg, nil)
+				_ = e.transfers.UpdateStatus(ent.transfer.ID, db.TransferStatusFailed, &errMsg, nil)
 				e.broker.Publish(run.ID, sse.Event{
 					RunID: run.ID, TransferID: ent.transfer.ID,
 					RemotePath: ent.remote.Path, SizeBytes: ent.remote.Size,
-					Status: "failed", Error: errMsg,
+					Status: db.TransferStatusFailed, Error: errMsg,
 				})
 				mu.Lock()
 				failed++
@@ -772,7 +784,7 @@ func (e *Engine) downloadFile(
 			BytesXferred: total,
 			Percent:      pct,
 			SpeedBPS:     speed,
-			Status:       "in_progress",
+			Status:       db.TransferStatusInProgress,
 		})
 	})
 
@@ -854,14 +866,14 @@ func (e *Engine) downloadFile(
 		CopiedAt:   time.Now().UTC(),
 	})
 
-	_ = e.transfers.UpdateStatus(t.ID, "done", nil, &durationMs)
+	_ = e.transfers.UpdateStatus(t.ID, db.TransferStatusDone, nil, &durationMs)
 	e.broker.Publish(runID, sse.Event{
 		RunID: runID, TransferID: t.ID,
 		RemotePath:   remote.Path,
 		SizeBytes:    remote.Size,
 		BytesXferred: remote.Size,
 		Percent:      100,
-		Status:       "done",
+		Status:       db.TransferStatusDone,
 	})
 	return nil
 }
