@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -112,6 +113,7 @@ func main() {
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 0, // SSE streams are long-lived; no write timeout
 		IdleTimeout:  120 * time.Second,
+		BaseContext:  func(_ net.Listener) context.Context { return ctx },
 	}
 
 	sched.Start(ctx)

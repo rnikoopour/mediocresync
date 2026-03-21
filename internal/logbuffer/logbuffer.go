@@ -108,6 +108,14 @@ func (b *Buffer) Enabled(ctx context.Context, level slog.Level) bool {
 	return b.wrapped.Enabled(ctx, level)
 }
 
+func jsonValue(v slog.Value) any {
+	a := v.Any()
+	if err, ok := a.(error); ok {
+		return err.Error()
+	}
+	return a
+}
+
 func (b *Buffer) Handle(ctx context.Context, r slog.Record) error {
 	entry := Entry{
 		Time:  r.Time,
@@ -118,10 +126,10 @@ func (b *Buffer) Handle(ctx context.Context, r slog.Record) error {
 	if total > 0 {
 		attrs := make(map[string]any, total)
 		for _, a := range b.attrs {
-			attrs[a.Key] = a.Value.Any()
+			attrs[a.Key] = jsonValue(a.Value)
 		}
 		r.Attrs(func(a slog.Attr) bool {
-			attrs[a.Key] = a.Value.Any()
+			attrs[a.Key] = jsonValue(a.Value)
 			return true
 		})
 		entry.Attrs = attrs
