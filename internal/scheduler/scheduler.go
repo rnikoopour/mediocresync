@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/rnikoopour/mediocresync/internal/db"
+	"github.com/rnikoopour/mediocresync/internal/sse"
 	internalsync "github.com/rnikoopour/mediocresync/internal/sync"
 )
 
@@ -16,14 +17,16 @@ type Scheduler struct {
 	jobs   *db.JobRepository
 	runs   *db.RunRepository
 	engine *internalsync.Engine
+	broker *sse.Broker
 	stop   chan struct{}
 }
 
-func NewScheduler(jobs *db.JobRepository, runs *db.RunRepository, engine *internalsync.Engine) *Scheduler {
+func NewScheduler(jobs *db.JobRepository, runs *db.RunRepository, engine *internalsync.Engine, broker *sse.Broker) *Scheduler {
 	return &Scheduler{
 		jobs:   jobs,
 		runs:   runs,
 		engine: engine,
+		broker: broker,
 		stop:   make(chan struct{}),
 	}
 }
@@ -87,6 +90,8 @@ func (s *Scheduler) tick(ctx context.Context) {
 		if job.RunRetentionDays > 0 {
 			if err := s.runs.PruneForJob(job.ID, job.RunRetentionDays); err != nil {
 				slog.Error("scheduler: prune run history", "job_id", job.ID, "err", err)
+			} else {
+				s.broker.Publish(job.ID, sse.Event{Status: "runs_pruned"})
 			}
 		}
 	}

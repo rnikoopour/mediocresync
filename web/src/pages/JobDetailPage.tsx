@@ -612,7 +612,7 @@ export function JobDetailPage() {
       }
       es.onmessage = (e) => {
         const ev = JSON.parse(e.data)
-        if (ev.status === 'started') {
+        if (ev.status === 'started' || ev.status === 'runs_pruned') {
           qc.invalidateQueries({ queryKey: ['runs', id] })
         } else if (ev.status === 'plan_file_updated') {
           if (ev.plan_action === 'skip') skipFile(id, ev.plan_path)
