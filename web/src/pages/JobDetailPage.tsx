@@ -95,7 +95,7 @@ function RunRow({ run: initialRun, remotePath, jobId }: { run: Run; remotePath: 
     : null
 
   return (
-    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+    <div className="card overflow-hidden">
       <div className="flex flex-wrap items-center gap-4 px-4 py-3">
         <button
           onClick={() => setOpen((o) => !o)}
@@ -258,7 +258,7 @@ function FolderNode({ node, depth, onSkip, onUnskip }: { node: TreeFolder; depth
       {menu && (
         <div
           ref={menuRef}
-          className="fixed z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 min-w-[140px]"
+          className="fixed z-50 card shadow-lg py-1 min-w-[140px]"
           style={{ top: menu.y, left: menu.x }}
         >
           {hasCopy && (
@@ -343,7 +343,7 @@ function FileRow({ node, onSkip, onUnskip }: { node: TreeFile; depth: number; on
       {menu && (
         <div
           ref={menuRef}
-          className="fixed z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 min-w-[140px]"
+          className="fixed z-50 card shadow-lg py-1 min-w-[140px]"
           style={{ top: menu.y, left: menu.x }}
         >
           {node.action === 'copy' && (
@@ -400,7 +400,7 @@ function PlanTreeView({ files, remotePath, onSkip, onUnskip }: { files: PlanFile
   const filtered = tab === 'all' ? files : files.filter((f) => tab === 'copy' ? f.action === 'copy' : f.action === 'skip')
   const nodes = buildTree(filtered, remotePath)
   return (
-    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+    <div className="card overflow-hidden">
       <TreeTabBar tab={tab} onTab={setTab} />
       <div className="py-1">
         {nodes.length === 0
@@ -535,7 +535,7 @@ export function JobDetailPage() {
       )}
 
       {planEntry && planEntry.status !== 'error' && (
-        <div className="mb-8 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+        <div className="mb-8 card overflow-hidden">
           <div className="flex items-center gap-4 px-4 py-3">
             <button
               onClick={() => setPlanOpen((o) => !o)}

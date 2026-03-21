@@ -61,7 +61,7 @@ export function LogsPage() {
         </label>
       </div>
 
-      <div className="flex-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-y-auto font-mono text-xs p-4 space-y-0.5 min-h-0">
+      <div className="flex-1 card overflow-y-auto font-mono text-xs p-4 space-y-0.5 min-h-0">
         {entries.length === 0 && (
           <p className="text-gray-400 dark:text-gray-500">Waiting for log entries…</p>
         )}

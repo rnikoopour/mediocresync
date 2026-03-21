@@ -204,7 +204,7 @@ function JobRow({ job, onEdit, onDelete }: { job: SyncJob; onEdit: () => void; o
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+    <div className="card overflow-hidden">
       <div className="px-4 py-3 flex items-center gap-4">
         <div className="flex-1 min-w-0">
           <Link to={`/jobs/${job.id}`} className="font-medium text-gray-900 dark:text-gray-100 text-sm hover:text-blue-600 dark:hover:text-gray-200">
