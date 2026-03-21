@@ -52,25 +52,18 @@ The React app runs at `http://localhost:5173` with `/api/*` proxied to the Go se
 make test
 ```
 
-## Deploying on Ubuntu
+## Deploying on Linux (systemd)
 
-Download the latest `mediocresync` binary from the [GitHub releases page](https://github.com/rnikoopour/mediocresync/releases), then:
+Create a dedicated user, then run the install script as root:
 
 ```sh
-# Create a dedicated user
 sudo useradd -r -s /bin/false mediocresync
-
-# Install the binary
-sudo cp mediocresync /usr/local/bin/mediocresync
-sudo chmod +x /usr/local/bin/mediocresync
-
-# Install and enable the systemd service
-sudo cp mediocresync.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now mediocresync
+curl -fsSL https://raw.githubusercontent.com/rnikoopour/mediocresync/main/install-with-systemd.sh | sudo bash
 ```
 
-The service listens on port `5000` and stores its database at `/var/lib/mediocresync/mediocresync.db` (created automatically by systemd). To override, edit the `Environment=` lines in the unit file before enabling.
+The script downloads the latest `mediocresync-linux-amd64` binary and `mediocresync.service` from the GitHub release, installs them, and starts the service. Re-running it will stop the service, upgrade the binary, and restart.
+
+The service listens on port `5000` and stores its database at `/var/lib/mediocresync/mediocresync.db` (created automatically by systemd). To override, edit the `Environment=` lines in `/etc/systemd/system/mediocresync.service` and run `sudo systemctl daemon-reload && sudo systemctl restart mediocresync`.
 
 ## How it works
 
