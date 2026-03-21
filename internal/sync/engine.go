@@ -637,6 +637,7 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Conne
 				return e.downloadFile(ctx, c, job, run.ID, ent.transfer, ent.remote)
 			}
 
+			slog.Info("transfer started", "path", ent.remote.Path, "size", ent.remote.Size)
 			maxAttempts := max(job.RetryAttempts, 1)
 			var lastErr error
 			for attempt := 1; attempt <= maxAttempts; attempt++ {
@@ -691,6 +692,7 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Conne
 				return
 			}
 
+			slog.Info("transfer complete", "path", ent.remote.Path, "size", ent.remote.Size)
 			mu.Lock()
 			copied++
 			_ = e.runs.UpdateCounts(run.ID, len(entries), copied, skipped, failed)
