@@ -1,9 +1,18 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client'
+import type { LogLevel } from '../api/types'
+
+const logLevels: LogLevel[] = ['debug', 'info', 'warn', 'error']
 
 export function SettingsGeneralPage() {
+  const qc = useQueryClient()
   const { data: me } = useQuery({ queryKey: ['auth', 'me'], queryFn: api.auth.me })
+  const { data: settings } = useQuery({ queryKey: ['settings'], queryFn: api.settings.get })
+  const setLogLevel = useMutation({
+    mutationFn: (level: LogLevel) => api.settings.setLogLevel(level),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['settings'] }),
+  })
 
   const [newUsername, setNewUsername] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -117,6 +126,30 @@ export function SettingsGeneralPage() {
             {loading ? 'Saving…' : 'Save changes'}
           </button>
         </form>
+      </div>
+
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 mt-6">
+        <h2 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-4">Logging</h2>
+        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Log Level</label>
+        <div className="flex gap-2">
+          {logLevels.map((level) => (
+            <button
+              key={level}
+              onClick={() => setLogLevel.mutate(level)}
+              disabled={setLogLevel.isPending}
+              className={`px-3 py-1.5 rounded text-sm font-medium capitalize transition-colors ${
+                settings?.log_level === level
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+              }`}
+            >
+              {level}
+            </button>
+          ))}
+        </div>
+        {setLogLevel.isError && (
+          <p className="mt-2 text-xs text-red-600 dark:text-red-400">{(setLogLevel.error as Error).message}</p>
+        )}
       </div>
     </div>
   )

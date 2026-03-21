@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"io/fs"
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -24,6 +25,7 @@ func NewRouter(
 	broker *sse.Broker,
 	encKey []byte,
 	devMode bool,
+	logLevel *slog.LevelVar,
 	staticFiles fs.FS,
 ) http.Handler {
 	r := chi.NewRouter()
@@ -40,6 +42,7 @@ func NewRouter(
 	jobsH := &jobsHandler{repo: jobs, runs: runs, fileState: fileState, engine: engine, broker: broker, appCtx: appCtx}
 	runsH := &runsHandler{runs: runs, transfers: transfers, broker: broker, appCtx: appCtx}
 	authH := &authHandler{repo: auth}
+	settingsH := &settingsHandler{logLevel: logLevel}
 
 	r.Route("/api", func(r chi.Router) {
 		r.Use(chiMiddleware.SetHeader("Content-Type", "application/json"))
@@ -87,6 +90,11 @@ func NewRouter(
 			})
 
 			r.Get("/browse/local", localBrowse)
+
+			r.Route("/settings", func(r chi.Router) {
+				r.Get("/", settingsH.get)
+				r.Put("/", settingsH.update)
+			})
 
 			r.Route("/runs", func(r chi.Router) {
 				r.Get("/{id}", runsH.get)

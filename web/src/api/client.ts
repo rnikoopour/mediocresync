@@ -2,6 +2,7 @@ import type {
   Connection, ConnectionRequest,
   SyncJob, JobRequest,
   Run, TestResult, PlanResult, BrowseEntry,
+  ServerSettings, LogLevel,
 } from './types'
 
 async function request<T>(method: string, path: string, body?: unknown, throw401 = false): Promise<T> {
@@ -59,6 +60,11 @@ export const api = {
 
   local: {
     browse: (path: string) => request<BrowseEntry[]>('GET', `/browse/local?path=${encodeURIComponent(path)}`),
+  },
+
+  settings: {
+    get: () => request<ServerSettings>('GET', '/settings'),
+    setLogLevel: (log_level: LogLevel) => request<void>('PUT', '/settings', { log_level }),
   },
 
   auth: {
