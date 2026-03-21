@@ -281,6 +281,25 @@ func (h *jobsHandler) triggerRun(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
+func (h *jobsHandler) planThenRun(w http.ResponseWriter, r *http.Request) {
+	jobID := chi.URLParam(r, "id")
+
+	job, err := h.repo.Get(jobID)
+	if err != nil || job == nil {
+		writeError(w, http.StatusNotFound, "job not found")
+		return
+	}
+
+	if h.engine.IsRunning(jobID) {
+		writeError(w, http.StatusConflict, "job is already running")
+		return
+	}
+
+	go h.engine.PlanThenRun(h.appCtx, jobID) //nolint:errcheck
+
+	w.WriteHeader(http.StatusAccepted)
+}
+
 func (h *jobsHandler) cancelRun(w http.ResponseWriter, r *http.Request) {
 	jobID := chi.URLParam(r, "id")
 	if err := h.engine.CancelJob(jobID); err != nil {

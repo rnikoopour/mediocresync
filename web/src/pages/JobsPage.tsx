@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
@@ -7,6 +7,8 @@ import { JobFormModal } from '../components/JobFormModal'
 import { StatusBadge } from '../components/StatusBadge'
 import { ProgressBar } from '../components/ProgressBar'
 import { useSSE } from '../hooks/useSSE'
+import { openEventSource } from '../hooks/eventSource'
+import { usePlan } from '../context/PlanContext'
 
 function formatBytes(b: number): string {
   if (b >= 1_000_000) return `${(b / 1_000_000).toFixed(1)} MB`
@@ -51,15 +53,28 @@ function TransferRow({ transfer, liveEvent }: {
   )
 }
 
-function JobRunPreview({ jobId, onDismiss }: { jobId: string; onDismiss: () => void }) {
-  // Poll the job's run list until a run appears, then poll the run detail for transfers.
+function JobRunPreview({ jobId, triggeredAt, onDismiss }: { jobId: string; triggeredAt: number; onDismiss: () => void }) {
+  const { plans, subscribePlan } = usePlan()
+
+  // Subscribe to plan events so we can show planning progress before the run starts.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => subscribePlan(jobId), [jobId])
+
+  const planEntry = plans[jobId]
+
+  // Poll the job's run list until a run that started at or after triggeredAt
+  // appears, then poll the run detail for transfers. This prevents stale failed
+  // runs from a previous trigger showing up immediately.
   const { data: runs = [] } = useQuery({
     queryKey: ['runs', jobId, 'preview'],
     queryFn: () => api.jobs.listRuns(jobId),
-    refetchInterval: (q) => (!q.state.data?.[0] || q.state.data[0].status === 'running') ? 2000 : false,
+    refetchInterval: (q) => {
+      const newRun = q.state.data?.find(r => new Date(r.started_at).getTime() >= triggeredAt)
+      return (!newRun || newRun.status === 'running') ? 2000 : false
+    },
   })
 
-  const runId = runs[0]?.id
+  const runId = runs.find(r => new Date(r.started_at).getTime() >= triggeredAt)?.id
 
   const { data: run } = useQuery({
     queryKey: ['run', runId],
@@ -71,10 +86,26 @@ function JobRunPreview({ jobId, onDismiss }: { jobId: string; onDismiss: () => v
   const { events: liveEvents } = useSSE(run?.status === 'running' ? runId! : null)
 
   if (!run) {
+    if (planEntry?.status === 'running') {
+      return (
+        <div className="border-t border-gray-100 dark:border-gray-700 px-4 py-3 flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
+          <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin shrink-0" />
+          Planning… {planEntry.scannedFiles} files, {planEntry.scannedFolders} folders scanned
+        </div>
+      )
+    }
+    if (planEntry?.status === 'done' && planEntry.result) {
+      return (
+        <div className="border-t border-gray-100 dark:border-gray-700 px-4 py-3 flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
+          <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin shrink-0" />
+          Run will start after plan · {planEntry.result.to_copy} to copy · {planEntry.result.to_skip} to skip
+        </div>
+      )
+    }
     return (
       <div className="border-t border-gray-100 dark:border-gray-700 px-4 py-3 flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
         <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin shrink-0" />
-        Starting run…
+        Starting…
       </div>
     )
   }
@@ -120,15 +151,54 @@ function JobRunPreview({ jobId, onDismiss }: { jobId: string; onDismiss: () => v
 
 function JobRow({ job, onEdit, onDelete }: { job: SyncJob; onEdit: () => void; onDelete: () => void }) {
   const [showPreview, setShowPreview] = useState(false)
+  const [triggeredAt, setTriggeredAt] = useState(0)
+  const [isPlanning, setIsPlanning] = useState(false)
+  const [isRunning, setIsRunning] = useState(false)
   const qc = useQueryClient()
 
-  const trigger = useMutation({
-    mutationFn: () => api.jobs.trigger(job.id),
+  // Subscribe to job-level SSE events to track planning/running state.
+  useEffect(() => {
+    return openEventSource(`/api/jobs/${job.id}/events`, (es) => {
+      es.onmessage = (e) => {
+        try {
+          const ev = JSON.parse(e.data) as { status: string }
+          if (ev.status === 'planning') {
+            setIsPlanning(true)
+            setIsRunning(false)
+          } else if (ev.status === 'started') {
+            setIsPlanning(false)
+            setIsRunning(true)
+          } else if (ev.status === 'run_finished') {
+            setIsPlanning(false)
+            setIsRunning(false)
+            qc.invalidateQueries({ queryKey: ['runs', job.id, 'preview'] })
+          }
+        } catch {
+          // malformed event — ignore
+        }
+      }
+    })
+  }, [job.id, qc])
+
+  const run = useMutation({
+    mutationFn: () => api.jobs.planThenRun(job.id),
     onSuccess: () => {
+      const now = Date.now()
+      setTriggeredAt(now)
+      // Invalidate the cached run list so the preview doesn't show a stale
+      // failed run from before this trigger.
       qc.invalidateQueries({ queryKey: ['runs', job.id, 'preview'] })
       setShowPreview(true)
     },
   })
+
+  const isBusy = run.isPending || isPlanning || isRunning
+
+  function runLabel() {
+    if (run.isPending || isPlanning) return 'Planning…'
+    if (isRunning) return 'Running…'
+    return 'Run Now'
+  }
 
   return (
     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
@@ -146,20 +216,20 @@ function JobRow({ job, onEdit, onDelete }: { job: SyncJob; onEdit: () => void; o
         <div className="shrink-0 flex flex-wrap gap-2">
           <button onClick={onEdit} className="btn-secondary text-xs">Edit</button>
           <button
-            onClick={() => trigger.mutate()}
-            disabled={trigger.isPending}
+            onClick={() => run.mutate()}
+            disabled={isBusy}
             className="btn-secondary text-xs"
           >
-            {trigger.isPending ? 'Starting…' : 'Run Now'}
+            {runLabel()}
           </button>
           <button onClick={onDelete} className="btn-danger text-xs">Delete</button>
         </div>
       </div>
-      {trigger.isError && (
-        <p className="text-red-600 dark:text-red-400 text-xs px-4 pb-2">{(trigger.error as Error).message}</p>
+      {run.isError && (
+        <p className="text-red-600 dark:text-red-400 text-xs px-4 pb-2">{(run.error as Error).message}</p>
       )}
       {showPreview && (
-        <JobRunPreview jobId={job.id} onDismiss={() => setShowPreview(false)} />
+        <JobRunPreview jobId={job.id} triggeredAt={triggeredAt} onDismiss={() => setShowPreview(false)} />
       )}
     </div>
   )

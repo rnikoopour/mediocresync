@@ -431,7 +431,7 @@ export function JobDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
-  // Subscribe to job-level events so runs triggered by other clients (including
+  // Subscribe to job-level events so runs runed by other clients (including
   // the scheduler) are discovered immediately. On reconnect after a visibility
   // change or error, refetch runs to catch any events missed while disconnected.
   useEffect(() => {
@@ -442,7 +442,7 @@ export function JobDetailPage() {
       }
       es.onmessage = (e) => {
         const ev = JSON.parse(e.data)
-        if (ev.status === 'started' || ev.status === 'runs_pruned') {
+        if (ev.status === 'started' || ev.status === 'run_finished' || ev.status === 'runs_pruned') {
           qc.invalidateQueries({ queryKey: ['runs', id] })
         } else if (ev.status === 'plan_file_updated') {
           if (ev.plan_action === 'skip') skipFile(id, ev.plan_path)
@@ -455,8 +455,8 @@ export function JobDetailPage() {
   const [editOpen, setEditOpen] = useState(false)
   const jobIsRunning = runs[0]?.status === 'running'
 
-  const trigger = useMutation({
-    mutationFn: () => api.jobs.trigger(id!),
+  const run = useMutation({
+    mutationFn: () => api.jobs.run(id!),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['runs', id] })
       if (id) dismissPlan(id)
@@ -509,18 +509,18 @@ export function JobDetailPage() {
             {planEntry?.status === 'running' ? 'Planning…' : 'Plan'}
           </button>
           <button
-            onClick={() => trigger.mutate()}
-            disabled={trigger.isPending || planEntry?.status !== 'done' || jobIsRunning}
+            onClick={() => run.mutate()}
+            disabled={run.isPending || planEntry?.status !== 'done' || jobIsRunning}
             title={jobIsRunning ? 'A run is already in progress' : planEntry?.status !== 'done' ? 'Plan first before running' : undefined}
             className="btn-primary"
           >
-            {trigger.isPending ? 'Starting…' : 'Run Now'}
+            {run.isPending ? 'Starting…' : 'Run Now'}
           </button>
         </div>
       </div>
 
-      {trigger.isError && (
-        <p className="text-red-600 dark:text-red-400 text-sm mb-4">{(trigger.error as Error).message}</p>
+      {run.isError && (
+        <p className="text-red-600 dark:text-red-400 text-sm mb-4">{(run.error as Error).message}</p>
       )}
       {planEntry?.status === 'error' && (
         <p className="text-red-600 dark:text-red-400 text-sm mb-4">{planEntry.error}</p>
