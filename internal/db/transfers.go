@@ -38,6 +38,34 @@ func (r *TransferRepository) UpdateProgress(id string, bytesXferred int64) error
 	return err
 }
 
+
+// CreateBatch inserts multiple transfer records in a single transaction.
+func (r *TransferRepository) CreateBatch(transfers []*Transfer) error {
+	if len(transfers) == 0 {
+		return nil
+	}
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin batch insert: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+	stmt, err := tx.Prepare(
+		`INSERT INTO transfers (id, run_id, remote_path, local_path, size_bytes, bytes_xferred, status)
+		 VALUES (?, ?, ?, ?, ?, 0, ?)`,
+	)
+	if err != nil {
+		return fmt.Errorf("prepare batch insert: %w", err)
+	}
+	defer stmt.Close()
+	for _, t := range transfers {
+		t.ID = uuid.New().String()
+		if _, err := stmt.Exec(t.ID, t.RunID, t.RemotePath, t.LocalPath, t.SizeBytes, t.Status); err != nil {
+			return fmt.Errorf("insert transfer: %w", err)
+		}
+	}
+	return tx.Commit()
+}
+
 func (r *TransferRepository) UpdateStatus(id, status string, errMsg *string, durationMs *int64) error {
 	var finishedAt *string
 	if status == "done" || status == "failed" || status == "skipped" {

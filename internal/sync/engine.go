@@ -558,6 +558,7 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Conne
 		skip     bool
 	}
 	entries := make([]transferEntry, 0, len(orderedFiles))
+	batch := make([]*db.Transfer, 0, len(orderedFiles))
 	for _, pf := range orderedFiles {
 		remote := ftpes.RemoteFile{Path: pf.RemotePath, Size: pf.SizeBytes, MTime: pf.MTime}
 		initialStatus := "pending"
@@ -571,10 +572,11 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Conne
 			SizeBytes:  pf.SizeBytes,
 			Status:     initialStatus,
 		}
-		if err := e.transfers.Create(t); err != nil {
-			return fmt.Errorf("create transfer record: %w", err)
-		}
+		batch = append(batch, t)
 		entries = append(entries, transferEntry{transfer: t, remote: remote, skip: pf.Action == "skip"})
+	}
+	if err := e.transfers.CreateBatch(batch); err != nil {
+		return fmt.Errorf("create transfer records: %w", err)
 	}
 
 	var totalSizeBytes int64
