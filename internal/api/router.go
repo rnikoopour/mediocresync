@@ -37,7 +37,7 @@ func NewRouter(
 	r.Use(requireSetup(auth))
 
 	conns := &connectionsHandler{repo: connections, encKey: encKey}
-	jobsH := &jobsHandler{repo: jobs, fileState: fileState, engine: engine, broker: broker, appCtx: appCtx}
+	jobsH := &jobsHandler{repo: jobs, runs: runs, fileState: fileState, engine: engine, broker: broker, appCtx: appCtx}
 	runsH := &runsHandler{runs: runs, transfers: transfers, broker: broker, appCtx: appCtx}
 	authH := &authHandler{repo: auth}
 

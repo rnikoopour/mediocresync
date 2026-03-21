@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -77,6 +78,7 @@ func toJobResponse(j *db.SyncJob) jobResponse {
 
 type jobsHandler struct {
 	repo      *db.JobRepository
+	runs      *db.RunRepository
 	fileState *db.FileStateRepository
 	engine    *internalsync.Engine
 	broker    *sse.Broker
@@ -188,6 +190,13 @@ func (h *jobsHandler) update(w http.ResponseWriter, r *http.Request) {
 	if err := h.repo.Update(job); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to update job")
 		return
+	}
+	if job.RunRetentionDays > 0 {
+		if err := h.runs.PruneForJob(job.ID, job.RunRetentionDays); err != nil {
+			slog.Error("prune runs on save", "job_id", job.ID, "err", err)
+		} else {
+			h.broker.Publish(job.ID, sse.Event{Status: "runs_pruned"})
+		}
 	}
 	writeJSON(w, http.StatusOK, toJobResponse(job))
 }
