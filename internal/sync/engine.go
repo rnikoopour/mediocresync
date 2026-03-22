@@ -633,7 +633,9 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Conne
 			if ent.skip {
 				mu.Lock()
 				skipped++
-				_ = e.runs.UpdateCounts(run.ID, len(entries), copied, skipped, failed)
+				if err := e.runs.UpdateCounts(run.ID, len(entries), copied, skipped, failed); err != nil {
+					slog.Error("update run counts", "run_id", run.ID, "err", err)
+				}
 				mu.Unlock()
 				return
 			}
@@ -705,7 +707,9 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Conne
 				})
 				mu.Lock()
 				failed++
-				_ = e.runs.UpdateCounts(run.ID, len(entries), copied, skipped, failed)
+				if err := e.runs.UpdateCounts(run.ID, len(entries), copied, skipped, failed); err != nil {
+					slog.Error("update run counts", "run_id", run.ID, "err", err)
+				}
 				mu.Unlock()
 				return
 			}
@@ -713,7 +717,9 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Conne
 			slog.Info("transfer complete", "src", ent.remote.Path, "dst", finalPath(job.LocalDest, job.RemotePath, ent.remote.Path), "size", ent.remote.Size)
 			mu.Lock()
 			copied++
-			_ = e.runs.UpdateCounts(run.ID, len(entries), copied, skipped, failed)
+			if err := e.runs.UpdateCounts(run.ID, len(entries), copied, skipped, failed); err != nil {
+				slog.Error("update run counts", "run_id", run.ID, "err", err)
+			}
 			mu.Unlock()
 		})
 	}
@@ -772,7 +778,9 @@ func (e *Engine) downloadFile(
 		// bytesRead counts bytes read in this attempt only; add resumeOffset
 		// to report total bytes transferred across all attempts.
 		total := resumeOffset + bytesRead
-		_ = e.transfers.UpdateProgress(t.ID, total)
+		if err := e.transfers.UpdateProgress(t.ID, total); err != nil {
+			slog.Error("update transfer progress", "transfer_id", t.ID, "path", remote.Path, "err", err)
+		}
 
 		var pct float64
 		if remote.Size > 0 {
