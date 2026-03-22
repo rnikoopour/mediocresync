@@ -695,7 +695,9 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Conne
 						errMsg = "canceled by client"
 					}
 				}
-				_ = e.transfers.UpdateStatus(ent.transfer.ID, db.TransferStatusFailed, &errMsg, nil)
+				if err := e.transfers.UpdateStatus(ent.transfer.ID, db.TransferStatusFailed, &errMsg, nil); err != nil {
+					slog.Error("update transfer status", "transfer_id", ent.transfer.ID, "path", ent.remote.Path, "err", err)
+				}
 				e.broker.Publish(run.ID, sse.Event{
 					RunID: run.ID, TransferID: ent.transfer.ID,
 					RemotePath: ent.remote.Path, SizeBytes: ent.remote.Size,
