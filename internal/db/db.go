@@ -21,6 +21,11 @@ func Open(path string) (*sql.DB, error) {
 		return nil, fmt.Errorf("open sqlite: %w", err)
 	}
 
+	// SQLite only supports one writer at a time. A single connection avoids
+	// "database is locked" (SQLITE_BUSY) errors that occur when multiple
+	// connections compete for the write lock.
+	db.SetMaxOpenConns(1)
+
 	if _, err := db.Exec(`PRAGMA journal_mode=WAL`); err != nil {
 		return nil, fmt.Errorf("set WAL mode: %w", err)
 	}

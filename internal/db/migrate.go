@@ -152,6 +152,30 @@ var versionedMigrations = []struct {
 			`PRAGMA foreign_keys=ON`,
 		},
 	},
+	{
+		key: "runs_allow_partial",
+		stmts: []string{
+			`PRAGMA foreign_keys=OFF`,
+			`DROP TABLE IF EXISTS runs_new`,
+			`CREATE TABLE runs_new (
+				id               TEXT PRIMARY KEY,
+				job_id           TEXT NOT NULL REFERENCES sync_jobs(id) ON DELETE CASCADE,
+				status           TEXT NOT NULL CHECK(status IN ('running','completed','nothing_to_sync','failed','partial','canceled','server_stopped')),
+				started_at       TEXT NOT NULL,
+				finished_at      TEXT,
+				total_files      INTEGER NOT NULL DEFAULT 0,
+				copied_files     INTEGER NOT NULL DEFAULT 0,
+				skipped_files    INTEGER NOT NULL DEFAULT 0,
+				failed_files     INTEGER NOT NULL DEFAULT 0,
+				total_size_bytes INTEGER NOT NULL DEFAULT 0,
+				error_msg        TEXT
+			)`,
+			`INSERT INTO runs_new SELECT id,job_id,status,started_at,finished_at,total_files,copied_files,skipped_files,failed_files,total_size_bytes,error_msg FROM runs`,
+			`DROP TABLE runs`,
+			`ALTER TABLE runs_new RENAME TO runs`,
+			`PRAGMA foreign_keys=ON`,
+		},
+	},
 }
 
 func migrate(db *sql.DB) error {

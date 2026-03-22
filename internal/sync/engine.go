@@ -633,7 +633,9 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Conne
 			if ent.skip {
 				mu.Lock()
 				skipped++
-				_ = e.runs.UpdateCounts(run.ID, len(entries), copied, skipped, failed)
+				if err := e.runs.UpdateCounts(run.ID, len(entries), copied, skipped, failed); err != nil {
+					slog.Error("update run counts", "run_id", run.ID, "err", err)
+				}
 				mu.Unlock()
 				return
 			}
@@ -695,7 +697,9 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Conne
 						errMsg = "canceled by client"
 					}
 				}
-				_ = e.transfers.UpdateStatus(ent.transfer.ID, db.TransferStatusFailed, &errMsg, nil)
+				if err := e.transfers.UpdateStatus(ent.transfer.ID, db.TransferStatusFailed, &errMsg, nil); err != nil {
+					slog.Error("update transfer status", "transfer_id", ent.transfer.ID, "path", ent.remote.Path, "err", err)
+				}
 				e.broker.Publish(run.ID, sse.Event{
 					RunID: run.ID, TransferID: ent.transfer.ID,
 					RemotePath: ent.remote.Path, SizeBytes: ent.remote.Size,
@@ -703,7 +707,9 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Conne
 				})
 				mu.Lock()
 				failed++
-				_ = e.runs.UpdateCounts(run.ID, len(entries), copied, skipped, failed)
+				if err := e.runs.UpdateCounts(run.ID, len(entries), copied, skipped, failed); err != nil {
+					slog.Error("update run counts", "run_id", run.ID, "err", err)
+				}
 				mu.Unlock()
 				return
 			}
@@ -711,7 +717,9 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Conne
 			slog.Info("transfer complete", "src", ent.remote.Path, "dst", finalPath(job.LocalDest, job.RemotePath, ent.remote.Path), "size", ent.remote.Size)
 			mu.Lock()
 			copied++
-			_ = e.runs.UpdateCounts(run.ID, len(entries), copied, skipped, failed)
+			if err := e.runs.UpdateCounts(run.ID, len(entries), copied, skipped, failed); err != nil {
+				slog.Error("update run counts", "run_id", run.ID, "err", err)
+			}
 			mu.Unlock()
 		})
 	}
@@ -770,7 +778,9 @@ func (e *Engine) downloadFile(
 		// bytesRead counts bytes read in this attempt only; add resumeOffset
 		// to report total bytes transferred across all attempts.
 		total := resumeOffset + bytesRead
-		_ = e.transfers.UpdateProgress(t.ID, total)
+		if err := e.transfers.UpdateProgress(t.ID, total); err != nil {
+			slog.Error("update transfer progress", "transfer_id", t.ID, "path", remote.Path, "err", err)
+		}
 
 		var pct float64
 		if remote.Size > 0 {
@@ -862,15 +872,19 @@ func (e *Engine) downloadFile(
 		return err
 	}
 
-	_ = e.fileState.Upsert(&db.FileState{
+	if err := e.fileState.Upsert(&db.FileState{
 		JobID:      job.ID,
 		RemotePath: remote.Path,
 		SizeBytes:  remote.Size,
 		MTime:      remote.MTime,
 		CopiedAt:   time.Now().UTC(),
-	})
+	}); err != nil {
+		slog.Error("upsert file state", "path", remote.Path, "err", err)
+	}
 
-	_ = e.transfers.UpdateStatus(t.ID, db.TransferStatusDone, nil, &durationMs)
+	if err := e.transfers.UpdateStatus(t.ID, db.TransferStatusDone, nil, &durationMs); err != nil {
+		slog.Error("update transfer status", "transfer_id", t.ID, "path", remote.Path, "err", err)
+	}
 	e.broker.Publish(runID, sse.Event{
 		RunID: runID, TransferID: t.ID,
 		RemotePath:   remote.Path,
