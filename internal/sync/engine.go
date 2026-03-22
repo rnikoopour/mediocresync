@@ -862,15 +862,19 @@ func (e *Engine) downloadFile(
 		return err
 	}
 
-	_ = e.fileState.Upsert(&db.FileState{
+	if err := e.fileState.Upsert(&db.FileState{
 		JobID:      job.ID,
 		RemotePath: remote.Path,
 		SizeBytes:  remote.Size,
 		MTime:      remote.MTime,
 		CopiedAt:   time.Now().UTC(),
-	})
+	}); err != nil {
+		slog.Error("upsert file state", "path", remote.Path, "err", err)
+	}
 
-	_ = e.transfers.UpdateStatus(t.ID, db.TransferStatusDone, nil, &durationMs)
+	if err := e.transfers.UpdateStatus(t.ID, db.TransferStatusDone, nil, &durationMs); err != nil {
+		slog.Error("update transfer status", "transfer_id", t.ID, "path", remote.Path, "err", err)
+	}
 	e.broker.Publish(runID, sse.Event{
 		RunID: runID, TransferID: t.ID,
 		RemotePath:   remote.Path,
