@@ -20,7 +20,7 @@ import (
 
 var testEncKey = bytes.Repeat([]byte{0x01}, 32)
 
-func setupRouterFull(t *testing.T) (*sql.DB, http.Handler, *db.ConnectionRepository, *db.JobRepository, *db.RunRepository, string) {
+func setupRouterFull(t *testing.T) (*sql.DB, http.Handler, *db.SourceRepository, *db.JobRepository, *db.RunRepository, string) {
 	t.Helper()
 	database, err := db.Open(":memory:")
 	if err != nil {
@@ -29,16 +29,16 @@ func setupRouterFull(t *testing.T) (*sql.DB, http.Handler, *db.ConnectionReposit
 	t.Cleanup(func() { database.Close() })
 
 	auth := db.NewAuthRepository(database)
-	connections := db.NewConnectionRepository(database)
+	sources := db.NewSourceRepository(database)
 	jobs := db.NewJobRepository(database)
 	runs := db.NewRunRepository(database)
 	transfers := db.NewTransferRepository(database)
-	fileState := db.NewFileStateRepository(database)
+	syncState := db.NewSyncStateRepository(database)
 	broker := sse.NewBroker()
-	engine := internalsync.NewEngine(connections, jobs, runs, transfers, fileState, testEncKey, broker, context.Background())
+	engine := internalsync.NewEngine(sources, jobs, runs, transfers, syncState, testEncKey, broker, context.Background())
 
 	staticFS := fstest.MapFS{"index.html": {Data: []byte("<html></html>")}}
-	router := NewRouter(context.Background(), "dev", auth, connections, jobs, runs, transfers, fileState, engine, broker, testEncKey, true, new(slog.LevelVar), nil, staticFS)
+	router := NewRouter(context.Background(), "dev", auth, sources, jobs, runs, transfers, syncState, engine, broker, testEncKey, true, new(slog.LevelVar), nil, staticFS)
 
 	w := do(t, router, "POST", "/api/auth/setup", map[string]any{
 		"username": "testuser", "password": "testpass", "password_confirm": "testpass",
@@ -63,10 +63,10 @@ func setupRouterFull(t *testing.T) (*sql.DB, http.Handler, *db.ConnectionReposit
 		t.Fatal("no session cookie after login")
 	}
 
-	return database, router, connections, jobs, runs, sessionToken
+	return database, router, sources, jobs, runs, sessionToken
 }
 
-func setupRouter(t *testing.T) (http.Handler, *db.ConnectionRepository, *db.JobRepository, *db.RunRepository, string) {
+func setupRouter(t *testing.T) (http.Handler, *db.SourceRepository, *db.JobRepository, *db.RunRepository, string) {
 	t.Helper()
 	database, err := db.Open(":memory:")
 	if err != nil {
@@ -75,16 +75,16 @@ func setupRouter(t *testing.T) (http.Handler, *db.ConnectionRepository, *db.JobR
 	t.Cleanup(func() { database.Close() })
 
 	auth := db.NewAuthRepository(database)
-	connections := db.NewConnectionRepository(database)
+	sources := db.NewSourceRepository(database)
 	jobs := db.NewJobRepository(database)
 	runs := db.NewRunRepository(database)
 	transfers := db.NewTransferRepository(database)
-	fileState := db.NewFileStateRepository(database)
+	syncState := db.NewSyncStateRepository(database)
 	broker := sse.NewBroker()
-	engine := internalsync.NewEngine(connections, jobs, runs, transfers, fileState, testEncKey, broker, context.Background())
+	engine := internalsync.NewEngine(sources, jobs, runs, transfers, syncState, testEncKey, broker, context.Background())
 
 	staticFS := fstest.MapFS{"index.html": {Data: []byte("<html></html>")}}
-	router := NewRouter(context.Background(), "dev", auth, connections, jobs, runs, transfers, fileState, engine, broker, testEncKey, true, new(slog.LevelVar), nil, staticFS)
+	router := NewRouter(context.Background(), "dev", auth, sources, jobs, runs, transfers, syncState, engine, broker, testEncKey, true, new(slog.LevelVar), nil, staticFS)
 
 	// Configure credentials and log in so tests can hit protected endpoints.
 	w := do(t, router, "POST", "/api/auth/setup", map[string]any{
@@ -110,7 +110,7 @@ func setupRouter(t *testing.T) (http.Handler, *db.ConnectionRepository, *db.JobR
 		t.Fatal("no session cookie after login")
 	}
 
-	return router, connections, jobs, runs, sessionToken
+	return router, sources, jobs, runs, sessionToken
 }
 
 // do performs an HTTP request against the router. Pass a session token as the
@@ -140,36 +140,36 @@ func decodeJSON(t *testing.T, w *httptest.ResponseRecorder, v any) {
 	}
 }
 
-// --- Connections ---
+// --- Sources ---
 
-func TestListConnectionsEmpty(t *testing.T) {
+func TestListSourcesEmpty(t *testing.T) {
 	router, _, _, _, session := setupRouter(t)
-	w := do(t, router, "GET", "/api/connections", nil, session)
+	w := do(t, router, "GET", "/api/sources", nil, session)
 	if w.Code != http.StatusOK {
 		t.Fatalf("got %d, want 200", w.Code)
 	}
-	var list []connectionResponse
+	var list []sourceResponse
 	decodeJSON(t, w, &list)
 	if len(list) != 0 {
 		t.Errorf("expected empty list, got %d items", len(list))
 	}
 }
 
-func TestCreateAndGetConnection(t *testing.T) {
+func TestCreateAndGetSource(t *testing.T) {
 	router, _, _, _, session := setupRouter(t)
 
-	w := do(t, router, "POST", "/api/connections", map[string]any{
-		"name": "test", "host": "ftp.example.com", "port": 21,
+	w := do(t, router, "POST", "/api/sources", map[string]any{
+		"name": "test", "type": "ftpes", "host": "ftp.example.com", "port": 21,
 		"username": "user", "password": "secret", "skip_tls_verify": false,
 	}, session)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("create: got %d, want 201 (body: %s)", w.Code, w.Body.String())
 	}
 
-	var created connectionResponse
+	var created sourceResponse
 	decodeJSON(t, w, &created)
 	if created.ID == "" {
-		t.Fatal("no ID in created connection")
+		t.Fatal("no ID in created source")
 	}
 	// Password must never be in the response
 	if w.Body.String() != "" {
@@ -181,66 +181,66 @@ func TestCreateAndGetConnection(t *testing.T) {
 	}
 
 	// GET by ID
-	w2 := do(t, router, "GET", "/api/connections/"+created.ID, nil, session)
+	w2 := do(t, router, "GET", "/api/sources/"+created.ID, nil, session)
 	if w2.Code != http.StatusOK {
 		t.Fatalf("get: got %d, want 200", w2.Code)
 	}
 }
 
-func TestCreateConnectionMissingFields(t *testing.T) {
+func TestCreateSourceMissingFields(t *testing.T) {
 	router, _, _, _, session := setupRouter(t)
-	w := do(t, router, "POST", "/api/connections", map[string]any{"name": "incomplete"}, session)
+	w := do(t, router, "POST", "/api/sources", map[string]any{"name": "incomplete", "type": "ftpes"}, session)
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("got %d, want 400", w.Code)
 	}
 }
 
-func TestDeleteConnection(t *testing.T) {
+func TestDeleteSource(t *testing.T) {
 	router, _, _, _, session := setupRouter(t)
 
-	w := do(t, router, "POST", "/api/connections", map[string]any{
-		"name": "del", "host": "h", "port": 21, "username": "u", "password": "p",
+	w := do(t, router, "POST", "/api/sources", map[string]any{
+		"name": "del", "type": "ftpes", "host": "h", "port": 21, "username": "u", "password": "p",
 	}, session)
-	var created connectionResponse
+	var created sourceResponse
 	decodeJSON(t, w, &created)
 
-	w2 := do(t, router, "DELETE", "/api/connections/"+created.ID, nil, session)
+	w2 := do(t, router, "DELETE", "/api/sources/"+created.ID, nil, session)
 	if w2.Code != http.StatusNoContent {
 		t.Errorf("delete: got %d, want 204", w2.Code)
 	}
 
-	w3 := do(t, router, "GET", "/api/connections/"+created.ID, nil, session)
+	w3 := do(t, router, "GET", "/api/sources/"+created.ID, nil, session)
 	if w3.Code != http.StatusNotFound {
 		t.Errorf("after delete, get should return 404, got %d", w3.Code)
 	}
 }
 
-func TestGetConnectionNotFound(t *testing.T) {
+func TestGetSourceNotFound(t *testing.T) {
 	router, _, _, _, session := setupRouter(t)
-	w := do(t, router, "GET", "/api/connections/nonexistent", nil, session)
+	w := do(t, router, "GET", "/api/sources/nonexistent", nil, session)
 	if w.Code != http.StatusNotFound {
 		t.Errorf("got %d, want 404", w.Code)
 	}
 }
 
-func TestUpdateConnectionPasswordOptional(t *testing.T) {
-	router, connRepo, _, _, session := setupRouter(t)
+func TestUpdateSourcePasswordOptional(t *testing.T) {
+	router, srcRepo, _, _, session := setupRouter(t)
 
 	// Create with known password
 	encrypted, _ := crypto.Encrypt(testEncKey, "original")
-	conn := &db.Connection{Name: "c", Host: "h", Port: 21, Username: "u", Password: encrypted}
-	_ = connRepo.Create(conn)
+	src := &db.Source{Name: "c", Type: db.SourceTypeFTPES, Host: "h", Port: 21, Username: "u", Password: encrypted}
+	_ = srcRepo.Create(src)
 
 	// Update without providing a new password
-	w := do(t, router, "PUT", "/api/connections/"+conn.ID, map[string]any{
-		"name": "updated", "host": "h", "port": 21, "username": "u", "password": "",
+	w := do(t, router, "PUT", "/api/sources/"+src.ID, map[string]any{
+		"name": "updated", "type": "ftpes", "host": "h", "port": 21, "username": "u", "password": "",
 	}, session)
 	if w.Code != http.StatusOK {
 		t.Fatalf("update: got %d (body: %s)", w.Code, w.Body.String())
 	}
 
 	// Password in DB should be unchanged
-	got, _ := connRepo.Get(conn.ID)
+	got, _ := srcRepo.Get(src.ID)
 	decrypted, err := crypto.Decrypt(testEncKey, got.Password)
 	if err != nil || decrypted != "original" {
 		t.Errorf("password should be unchanged, got %q (err: %v)", decrypted, err)
@@ -250,14 +250,14 @@ func TestUpdateConnectionPasswordOptional(t *testing.T) {
 // --- Jobs ---
 
 func TestCreateAndListJobs(t *testing.T) {
-	router, connRepo, _, _, session := setupRouter(t)
+	router, srcRepo, _, _, session := setupRouter(t)
 
 	encrypted, _ := crypto.Encrypt(testEncKey, "pass")
-	conn := &db.Connection{Name: "c", Host: "h", Port: 21, Username: "u", Password: encrypted}
-	_ = connRepo.Create(conn)
+	src := &db.Source{Name: "c", Type: db.SourceTypeFTPES, Host: "h", Port: 21, Username: "u", Password: encrypted}
+	_ = srcRepo.Create(src)
 
 	w := do(t, router, "POST", "/api/jobs", map[string]any{
-		"name": "myjob", "connection_id": conn.ID, "remote_path": "/",
+		"name": "myjob", "source_id": src.ID, "remote_path": "/",
 		"local_dest": "/tmp", "interval_value": 30, "interval_unit": "minutes",
 		"concurrency": 3, "enabled": true,
 	}, session)
@@ -280,13 +280,13 @@ func TestCreateAndListJobs(t *testing.T) {
 }
 
 func TestTriggerRunAlreadyRunning(t *testing.T) {
-	router, connRepo, jobRepo, _, session := setupRouter(t)
+	router, srcRepo, jobRepo, _, session := setupRouter(t)
 
 	encrypted, _ := crypto.Encrypt(testEncKey, "pass")
-	conn := &db.Connection{Name: "c", Host: "h", Port: 21, Username: "u", Password: encrypted}
-	_ = connRepo.Create(conn)
+	src := &db.Source{Name: "c", Type: db.SourceTypeFTPES, Host: "h", Port: 21, Username: "u", Password: encrypted}
+	_ = srcRepo.Create(src)
 	job := &db.SyncJob{
-		Name: "j", ConnectionID: conn.ID, RemotePath: "/", LocalDest: "/tmp",
+		Name: "j", SourceID: src.ID, RemotePath: "/", LocalDest: "/tmp",
 		IntervalValue: 1, IntervalUnit: "hours", Concurrency: 1, Enabled: true,
 	}
 	_ = jobRepo.Create(job)
@@ -301,13 +301,13 @@ func TestTriggerRunAlreadyRunning(t *testing.T) {
 // --- Runs ---
 
 func TestListRunsEmpty(t *testing.T) {
-	router, connRepo, jobRepo, _, session := setupRouter(t)
+	router, srcRepo, jobRepo, _, session := setupRouter(t)
 
 	encrypted, _ := crypto.Encrypt(testEncKey, "pass")
-	conn := &db.Connection{Name: "c", Host: "h", Port: 21, Username: "u", Password: encrypted}
-	_ = connRepo.Create(conn)
+	src := &db.Source{Name: "c", Type: db.SourceTypeFTPES, Host: "h", Port: 21, Username: "u", Password: encrypted}
+	_ = srcRepo.Create(src)
 	job := &db.SyncJob{
-		Name: "j", ConnectionID: conn.ID, RemotePath: "/", LocalDest: "/tmp",
+		Name: "j", SourceID: src.ID, RemotePath: "/", LocalDest: "/tmp",
 		IntervalValue: 1, IntervalUnit: "hours", Concurrency: 1, Enabled: true,
 	}
 	_ = jobRepo.Create(job)
@@ -332,13 +332,13 @@ func TestGetRunNotFound(t *testing.T) {
 }
 
 func TestPlanThenRunReturns202(t *testing.T) {
-	router, connRepo, jobRepo, _, session := setupRouter(t)
+	router, srcRepo, jobRepo, _, session := setupRouter(t)
 
 	encrypted, _ := crypto.Encrypt(testEncKey, "pass")
-	conn := &db.Connection{Name: "c", Host: "h", Port: 21, Username: "u", Password: encrypted}
-	_ = connRepo.Create(conn)
+	src := &db.Source{Name: "c", Type: db.SourceTypeFTPES, Host: "h", Port: 21, Username: "u", Password: encrypted}
+	_ = srcRepo.Create(src)
 	job := &db.SyncJob{
-		Name: "j", ConnectionID: conn.ID, RemotePath: "/", LocalDest: "/tmp",
+		Name: "j", SourceID: src.ID, RemotePath: "/", LocalDest: "/tmp",
 		IntervalValue: 1, IntervalUnit: "hours", Concurrency: 1, Enabled: true,
 	}
 	_ = jobRepo.Create(job)
@@ -359,13 +359,13 @@ func TestPlanThenRunJobNotFound(t *testing.T) {
 }
 
 func TestRunErrorMsgPersistedOnFailure(t *testing.T) {
-	_, _, connRepo, jobRepo, runRepo, _ := setupRouterFull(t)
+	_, _, srcRepo, jobRepo, runRepo, _ := setupRouterFull(t)
 
 	encrypted, _ := crypto.Encrypt(testEncKey, "pass")
-	conn := &db.Connection{Name: "c", Host: "h", Port: 21, Username: "u", Password: encrypted}
-	_ = connRepo.Create(conn)
+	src := &db.Source{Name: "c", Type: db.SourceTypeFTPES, Host: "h", Port: 21, Username: "u", Password: encrypted}
+	_ = srcRepo.Create(src)
 	job := &db.SyncJob{
-		Name: "j", ConnectionID: conn.ID, RemotePath: "/", LocalDest: "/tmp",
+		Name: "j", SourceID: src.ID, RemotePath: "/", LocalDest: "/tmp",
 		IntervalValue: 1, IntervalUnit: "hours", Concurrency: 1, Enabled: true,
 	}
 	_ = jobRepo.Create(job)
@@ -393,13 +393,13 @@ func TestRunErrorMsgPersistedOnFailure(t *testing.T) {
 }
 
 func TestUpdateJobPrunesOldRuns(t *testing.T) {
-	database, router, connRepo, jobRepo, runRepo, session := setupRouterFull(t)
+	database, router, srcRepo, jobRepo, runRepo, session := setupRouterFull(t)
 
 	encrypted, _ := crypto.Encrypt(testEncKey, "pass")
-	conn := &db.Connection{Name: "c", Host: "h", Port: 21, Username: "u", Password: encrypted}
-	_ = connRepo.Create(conn)
+	src := &db.Source{Name: "c", Type: db.SourceTypeFTPES, Host: "h", Port: 21, Username: "u", Password: encrypted}
+	_ = srcRepo.Create(src)
 	job := &db.SyncJob{
-		Name: "j", ConnectionID: conn.ID, RemotePath: "/", LocalDest: "/tmp",
+		Name: "j", SourceID: src.ID, RemotePath: "/", LocalDest: "/tmp",
 		IntervalValue: 1, IntervalUnit: "hours", Concurrency: 1, Enabled: true,
 	}
 	_ = jobRepo.Create(job)
@@ -415,7 +415,7 @@ func TestUpdateJobPrunesOldRuns(t *testing.T) {
 
 	// Update job with 1-day retention — should prune the old run
 	w := do(t, router, "PUT", "/api/jobs/"+job.ID, map[string]any{
-		"name": job.Name, "connection_id": job.ConnectionID, "remote_path": job.RemotePath,
+		"name": job.Name, "source_id": job.SourceID, "remote_path": job.RemotePath,
 		"local_dest": job.LocalDest, "interval_value": job.IntervalValue, "interval_unit": job.IntervalUnit,
 		"concurrency": job.Concurrency, "enabled": job.Enabled, "run_retention_days": 1,
 	}, session)

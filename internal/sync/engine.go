@@ -58,14 +58,14 @@ type PlanEvent struct {
 }
 
 type Engine struct {
-	connections *db.ConnectionRepository
-	jobs        *db.JobRepository
-	runs        *db.RunRepository
-	transfers   *db.TransferRepository
-	fileState   *db.FileStateRepository
-	encKey      []byte
-	broker      *sse.Broker
-	appCtx      context.Context // cancelled on server shutdown
+	sources   *db.SourceRepository
+	jobs      *db.JobRepository
+	runs      *db.RunRepository
+	transfers *db.TransferRepository
+	syncState *db.SyncStateRepository
+	encKey    []byte
+	broker    *sse.Broker
+	appCtx    context.Context // cancelled on server shutdown
 
 	mu            sync.Mutex
 	active        map[string]bool // jobID → running
@@ -82,24 +82,24 @@ type Engine struct {
 }
 
 func NewEngine(
-	connections *db.ConnectionRepository,
+	sources *db.SourceRepository,
 	jobs *db.JobRepository,
 	runs *db.RunRepository,
 	transfers *db.TransferRepository,
-	fileState *db.FileStateRepository,
+	syncState *db.SyncStateRepository,
 	encKey []byte,
 	broker *sse.Broker,
 	appCtx context.Context,
 ) *Engine {
 	return &Engine{
-		connections: connections,
-		jobs:        jobs,
-		runs:        runs,
-		transfers:   transfers,
-		fileState:   fileState,
-		encKey:      encKey,
-		broker:      broker,
-		appCtx:      appCtx,
+		sources:   sources,
+		jobs:      jobs,
+		runs:      runs,
+		transfers: transfers,
+		syncState: syncState,
+		encKey:    encKey,
+		broker:    broker,
+		appCtx:    appCtx,
 		active:       make(map[string]bool),
 		activeRunIDs: make(map[string]string),
 		cancelFuncs:  make(map[string]context.CancelFunc),
@@ -140,23 +140,23 @@ func (e *Engine) PlanJobStream(ctx context.Context, jobID string, progress func(
 		return nil, fmt.Errorf("load job %s: %w", jobID, err)
 	}
 
-	conn, err := e.connections.Get(job.ConnectionID)
-	if err != nil || conn == nil {
-		return nil, fmt.Errorf("load connection %s: %w", job.ConnectionID, err)
+	src, err := e.sources.Get(job.SourceID)
+	if err != nil || src == nil {
+		return nil, fmt.Errorf("load source %s: %w", job.SourceID, err)
 	}
 
-	password, err := crypto.Decrypt(e.encKey, conn.Password)
+	password, err := crypto.Decrypt(e.encKey, src.Password)
 	if err != nil {
 		return nil, fmt.Errorf("decrypt password: %w", err)
 	}
 
-	client, err := ftpes.Dial(conn.Host, conn.Port, conn.SkipTLSVerify, conn.EnableEPSV)
+	client, err := ftpes.Dial(src.Host, src.Port, src.SkipTLSVerify, src.EnableEPSV)
 	if err != nil {
 		return nil, fmt.Errorf("dial: %w", err)
 	}
 	defer client.Close()
 
-	if err := client.Login(conn.Username, password); err != nil {
+	if err := client.Login(src.Username, password); err != nil {
 		return nil, fmt.Errorf("login: %w", err)
 	}
 
@@ -179,7 +179,7 @@ func (e *Engine) PlanJobStream(ctx context.Context, jobID string, progress func(
 		if !applyFilters(f.Path, job.RemotePath, job.IncludePathFilters, job.IncludeNameFilters, job.ExcludePathFilters, job.ExcludeNameFilters) {
 			continue
 		}
-		state, _ := e.fileState.Get(jobID, f.Path)
+		state, _ := e.syncState.Get(jobID, f.Path)
 		action := "copy"
 		if Matches(state, f) {
 			action = "skip"
@@ -434,9 +434,9 @@ func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanResult
 		return fmt.Errorf("load job %s: %w", jobID, err)
 	}
 
-	conn, err := e.connections.Get(job.ConnectionID)
-	if err != nil || conn == nil {
-		return fmt.Errorf("load connection %s: %w", job.ConnectionID, err)
+	src, err := e.sources.Get(job.SourceID)
+	if err != nil || src == nil {
+		return fmt.Errorf("load source %s: %w", job.SourceID, err)
 	}
 
 	run := &db.Run{JobID: jobID, Status: db.RunStatusRunning}
@@ -450,7 +450,7 @@ func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanResult
 	e.broker.Publish(jobID, sse.Event{RunID: run.ID, Status: "started"})
 	slog.Info("job started", "job_name", job.Name, "job_id", jobID, "run_id", run.ID)
 
-	runErr := e.executeRun(jobCtx, job, conn, run, plan)
+	runErr := e.executeRun(jobCtx, job, src, run, plan)
 
 	finalStatus := db.RunStatusCompleted
 	var finalErrMsg *string
@@ -481,10 +481,10 @@ func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanResult
 		for i, f := range plan.Files {
 			knownPaths[i] = f.RemotePath
 		}
-		if pruned, err := e.fileState.PruneStale(jobID, knownPaths); err != nil {
-			slog.Error("prune stale file state", "job_id", jobID, "err", err)
+		if pruned, err := e.syncState.PruneStale(jobID, knownPaths); err != nil {
+			slog.Error("prune stale sync state", "job_id", jobID, "err", err)
 		} else if pruned > 0 {
-			slog.Info("pruned stale file state", "job_id", jobID, "count", pruned)
+			slog.Info("pruned stale sync state", "job_id", jobID, "count", pruned)
 		}
 	}
 	slog.Info("job finished", "job_name", job.Name, "job_id", jobID, "run_id", run.ID, "status", finalStatus)
@@ -566,8 +566,8 @@ func makePruner(base string, includePathFilters []string) func(string) bool {
 	}
 }
 
-func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Connection, run *db.Run, plan *PlanResult) error {
-	password, err := crypto.Decrypt(e.encKey, conn.Password)
+func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, src *db.Source, run *db.Run, plan *PlanResult) error {
+	password, err := crypto.Decrypt(e.encKey, src.Password)
 	if err != nil {
 		return fmt.Errorf("decrypt password: %w", err)
 	}
@@ -655,12 +655,12 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Conne
 			// concurrent use on a single connection (PASV/RETR responses interleave).
 			// tryOnce wraps dial+login+download so defer c.Close() fires on every exit path.
 			tryOnce := func() error {
-				c, err := ftpes.Dial(conn.Host, conn.Port, conn.SkipTLSVerify, conn.EnableEPSV)
+				c, err := ftpes.Dial(src.Host, src.Port, src.SkipTLSVerify, src.EnableEPSV)
 				if err != nil {
 					return err
 				}
 				defer c.Close()
-				if err := c.Login(conn.Username, password); err != nil {
+				if err := c.Login(src.Username, password); err != nil {
 					return err
 				}
 				return e.downloadFile(ctx, c, job, run.ID, ent.transfer, ent.remote)
@@ -886,14 +886,15 @@ func (e *Engine) downloadFile(
 		return err
 	}
 
-	if err := e.fileState.Upsert(&db.FileState{
+	mtime := remote.MTime
+	if err := e.syncState.Upsert(&db.SyncState{
 		JobID:      job.ID,
 		RemotePath: remote.Path,
 		SizeBytes:  remote.Size,
-		MTime:      remote.MTime,
+		MTime:      &mtime,
 		CopiedAt:   time.Now().UTC(),
 	}); err != nil {
-		slog.Error("upsert file state", "path", remote.Path, "err", err)
+		slog.Error("upsert sync state", "path", remote.Path, "err", err)
 	}
 
 	if err := e.transfers.UpdateStatus(t.ID, db.TransferStatusDone, nil, &durationMs); err != nil {

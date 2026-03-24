@@ -16,7 +16,7 @@ import (
 
 type jobRequest struct {
 	Name               string   `json:"name"`
-	ConnectionID       string   `json:"connection_id"`
+	SourceID           string   `json:"source_id"`
 	RemotePath         string   `json:"remote_path"`
 	LocalDest          string   `json:"local_dest"`
 	IntervalValue      int      `json:"interval_value"`
@@ -35,7 +35,7 @@ type jobRequest struct {
 type jobResponse struct {
 	ID                 string   `json:"id"`
 	Name               string   `json:"name"`
-	ConnectionID       string   `json:"connection_id"`
+	SourceID           string   `json:"source_id"`
 	RemotePath         string   `json:"remote_path"`
 	LocalDest          string   `json:"local_dest"`
 	IntervalValue      int      `json:"interval_value"`
@@ -57,7 +57,7 @@ func toJobResponse(j *db.SyncJob) jobResponse {
 	return jobResponse{
 		ID:                 j.ID,
 		Name:               j.Name,
-		ConnectionID:       j.ConnectionID,
+		SourceID:           j.SourceID,
 		RemotePath:         j.RemotePath,
 		LocalDest:          j.LocalDest,
 		IntervalValue:      j.IntervalValue,
@@ -79,7 +79,7 @@ func toJobResponse(j *db.SyncJob) jobResponse {
 type jobsHandler struct {
 	repo      *db.JobRepository
 	runs      *db.RunRepository
-	fileState *db.FileStateRepository
+	syncState *db.SyncStateRepository
 	engine    *internalsync.Engine
 	broker    *sse.Broker
 	appCtx    context.Context
@@ -104,8 +104,8 @@ func (h *jobsHandler) create(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if req.Name == "" || req.ConnectionID == "" || req.LocalDest == "" {
-		writeError(w, http.StatusBadRequest, "name, connection_id, and local_dest are required")
+	if req.Name == "" || req.SourceID == "" || req.LocalDest == "" {
+		writeError(w, http.StatusBadRequest, "name, source_id, and local_dest are required")
 		return
 	}
 	if req.RemotePath == "" {
@@ -123,7 +123,7 @@ func (h *jobsHandler) create(w http.ResponseWriter, r *http.Request) {
 
 	job := &db.SyncJob{
 		Name:               req.Name,
-		ConnectionID:       req.ConnectionID,
+		SourceID:           req.SourceID,
 		RemotePath:         req.RemotePath,
 		LocalDest:          req.LocalDest,
 		IntervalValue:      req.IntervalValue,
@@ -172,7 +172,7 @@ func (h *jobsHandler) update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	job.Name = req.Name
-	job.ConnectionID = req.ConnectionID
+	job.SourceID = req.SourceID
 	job.RemotePath = req.RemotePath
 	job.LocalDest = req.LocalDest
 	job.IntervalValue = req.IntervalValue
@@ -217,14 +217,14 @@ func (h *jobsHandler) putFileState(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid mtime format")
 		return
 	}
-	fs := &db.FileState{
+	ss := &db.SyncState{
 		JobID:      jobID,
 		RemotePath: body.Path,
 		SizeBytes:  body.SizeBytes,
-		MTime:      mtime,
+		MTime:      &mtime,
 		CopiedAt:   time.Now(),
 	}
-	if err := h.fileState.Upsert(fs); err != nil {
+	if err := h.syncState.Upsert(ss); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to set file state")
 		return
 	}
@@ -240,7 +240,7 @@ func (h *jobsHandler) deleteFileState(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "path query parameter is required")
 		return
 	}
-	if err := h.fileState.Delete(jobID, remotePath); err != nil {
+	if err := h.syncState.Delete(jobID, remotePath); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to clear file state")
 		return
 	}

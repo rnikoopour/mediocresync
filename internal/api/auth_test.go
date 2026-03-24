@@ -24,16 +24,16 @@ func setupUnconfiguredRouter(t *testing.T) (http.Handler, *db.AuthRepository) {
 	t.Cleanup(func() { database.Close() })
 
 	auth := db.NewAuthRepository(database)
-	connections := db.NewConnectionRepository(database)
+	sources := db.NewSourceRepository(database)
 	jobs := db.NewJobRepository(database)
 	runs := db.NewRunRepository(database)
 	transfers := db.NewTransferRepository(database)
-	fileState := db.NewFileStateRepository(database)
+	syncState := db.NewSyncStateRepository(database)
 	broker := sse.NewBroker()
-	engine := internalsync.NewEngine(connections, jobs, runs, transfers, fileState, testEncKey, broker, context.Background())
+	engine := internalsync.NewEngine(sources, jobs, runs, transfers, syncState, testEncKey, broker, context.Background())
 
 	staticFS := fstest.MapFS{"index.html": {Data: []byte("<html></html>")}}
-	router := NewRouter(context.Background(), "dev", auth, connections, jobs, runs, transfers, fileState, engine, broker, testEncKey, true, new(slog.LevelVar), nil, staticFS)
+	router := NewRouter(context.Background(), "dev", auth, sources, jobs, runs, transfers, syncState, engine, broker, testEncKey, true, new(slog.LevelVar), nil, staticFS)
 	return router, auth
 }
 
@@ -101,7 +101,7 @@ func TestSetupMissingFields(t *testing.T) {
 
 func TestRequireSetupBlocksAPIWhenNotConfigured(t *testing.T) {
 	router, _ := setupUnconfiguredRouter(t)
-	w := do(t, router, "GET", "/api/connections", nil)
+	w := do(t, router, "GET", "/api/sources", nil)
 	if w.Code != http.StatusServiceUnavailable {
 		t.Errorf("got %d, want 503", w.Code)
 	}
@@ -184,7 +184,7 @@ func TestRequireAuthNoCookie(t *testing.T) {
 	do(t, router, "POST", "/api/auth/setup", map[string]any{
 		"username": "admin", "password": "pass", "password_confirm": "pass",
 	})
-	w := do(t, router, "GET", "/api/connections", nil)
+	w := do(t, router, "GET", "/api/sources", nil)
 	if w.Code != http.StatusUnauthorized {
 		t.Errorf("got %d, want 401", w.Code)
 	}
@@ -195,7 +195,7 @@ func TestRequireAuthInvalidToken(t *testing.T) {
 	do(t, router, "POST", "/api/auth/setup", map[string]any{
 		"username": "admin", "password": "pass", "password_confirm": "pass",
 	})
-	w := do(t, router, "GET", "/api/connections", nil, "not-a-real-token")
+	w := do(t, router, "GET", "/api/sources", nil, "not-a-real-token")
 	if w.Code != http.StatusUnauthorized {
 		t.Errorf("got %d, want 401", w.Code)
 	}
@@ -214,7 +214,7 @@ func TestRequireAuthExpiredSession(t *testing.T) {
 		t.Fatalf("backdate session: %v", err)
 	}
 
-	w := do(t, router, "GET", "/api/connections", nil, session)
+	w := do(t, router, "GET", "/api/sources", nil, session)
 	if w.Code != http.StatusUnauthorized {
 		t.Errorf("got %d, want 401 for expired session", w.Code)
 	}
@@ -226,7 +226,7 @@ func TestValidSessionPassesThrough(t *testing.T) {
 		"username": "admin", "password": "pass", "password_confirm": "pass",
 	})
 	session := loginAs(t, router, "admin", "pass")
-	w := do(t, router, "GET", "/api/connections", nil, session)
+	w := do(t, router, "GET", "/api/sources", nil, session)
 	if w.Code != http.StatusOK {
 		t.Errorf("got %d, want 200", w.Code)
 	}
@@ -254,7 +254,7 @@ func TestLogoutInvalidatesSession(t *testing.T) {
 	router, _, _, _, _ := setupRouter(t)
 	session := loginAs(t, router, "testuser", "testpass")
 	do(t, router, "POST", "/api/auth/logout", nil, session)
-	w := do(t, router, "GET", "/api/connections", nil, session)
+	w := do(t, router, "GET", "/api/sources", nil, session)
 	if w.Code != http.StatusUnauthorized {
 		t.Errorf("got %d, want 401 after logout", w.Code)
 	}
@@ -309,7 +309,7 @@ func TestUpdateCredentialsInvalidatesAllSessions(t *testing.T) {
 	}, s1)
 
 	for _, s := range []string{s1, s2} {
-		w := do(t, router, "GET", "/api/connections", nil, s)
+		w := do(t, router, "GET", "/api/sources", nil, s)
 		if w.Code != http.StatusUnauthorized {
 			t.Errorf("session %s: got %d, want 401 after credential update", s[:8], w.Code)
 		}
