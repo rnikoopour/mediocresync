@@ -3,8 +3,10 @@ package ftpes
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"sync"
 	"time"
 
@@ -72,6 +74,13 @@ func (c *client) Download(ctx context.Context, remotePath string, dst io.Writer,
 	close(stop)
 
 	if copyErr != nil {
+		// When ctx is already done, net.ErrClosed is an expected artifact of
+		// closeResp() closing r while io.Copy was still reading. Translate it
+		// to the context error so callers never see "use of closed network
+		// connection" due to deliberate cancellation.
+		if ctx.Err() != nil && errors.Is(copyErr, net.ErrClosed) {
+			return ctx.Err()
+		}
 		return fmt.Errorf("read %s: %w", remotePath, copyErr)
 	}
 	return ctx.Err()
