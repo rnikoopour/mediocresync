@@ -21,8 +21,8 @@ import (
 var ErrJobAlreadyRunning = fmt.Errorf("job is already running")
 
 // partialTransferError is returned by executeRun when at least one file failed
-// but others succeeded. Distinct from a total failure so the run can be marked
-// "partial" rather than "failed".
+// but at least one other was successfully transferred. Distinct from a total
+// failure so the run can be marked "partial" rather than "failed".
 type partialTransferError struct{ failed int }
 
 func (e partialTransferError) Error() string {
@@ -727,6 +727,9 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, conn *db.Conne
 	wg.Wait()
 
 	if failed > 0 {
+		if copied == 0 {
+			return fmt.Errorf("%d file(s) failed to transfer", failed)
+		}
 		return partialTransferError{failed: failed}
 	}
 	return nil
