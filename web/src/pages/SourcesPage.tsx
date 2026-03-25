@@ -126,20 +126,9 @@ export function SourcesPage() {
         <Modal>
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
-              <div className="flex items-center gap-3">
-                <h2 className="font-semibold text-gray-900 dark:text-gray-100">
-                  {modal.editing ? 'Edit Source' : 'Add Source'}
-                </h2>
-                <select
-                  className="input py-1 text-sm w-28"
-                  value={form.type}
-                  onChange={(e) => setForm({ ...form, type: e.target.value as SourceRequest['type'], host: '', port: e.target.value === 'ftpes' ? 21 : 0, username: '', password: '', auth_type: 'none', auth_credential: '' })}
-                  disabled={!!modal.editing}
-                >
-                  <option value="ftpes">FTPES</option>
-                  <option value="git">Git</option>
-                </select>
-              </div>
+              <h2 className="font-semibold text-gray-900 dark:text-gray-100">
+                {modal.editing ? 'Edit Source' : 'Add Source'}
+              </h2>
               <button onClick={closeModal} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">&times;</button>
             </div>
 
@@ -184,6 +173,18 @@ export function SourcesPage() {
                 <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
                   {activeTab === 'general' && (
                     <>
+                      <Field label="Type">
+                        <select
+                          className="input"
+                          value={form.type}
+                          onChange={(e) => setForm({ ...form, type: e.target.value as SourceRequest['type'], host: '', port: e.target.value === 'ftpes' ? 21 : 0, username: '', password: '', auth_type: 'none', auth_credential: '' })}
+                          disabled={!!modal.editing}
+                        >
+                          <option value="ftpes">FTPES</option>
+                          <option value="git">Git</option>
+                        </select>
+                      </Field>
+                      <hr className="border-gray-200 dark:border-gray-700" />
                       <Field label="Name">
                         <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
                       </Field>
