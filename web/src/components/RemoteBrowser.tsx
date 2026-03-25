@@ -2,19 +2,19 @@ import { api } from '../api/client'
 import { FileBrowser } from './FileBrowser'
 
 interface Props {
-  connectionId: string
+  sourceId: string
   initialPath?: string
   onSelect: (path: string) => void
   onClose: () => void
 }
 
-export function RemoteBrowser({ connectionId, initialPath = '/', onSelect, onClose }: Props) {
+export function RemoteBrowser({ sourceId, initialPath = '/', onSelect, onClose }: Props) {
   return (
     <FileBrowser
       title="Browse Remote"
       initialPath={initialPath}
-      queryKey={['browse', 'remote', connectionId]}
-      fetcher={(path) => api.connections.browse(connectionId, path)}
+      queryKey={['browse', 'remote', sourceId]}
+      fetcher={(path) => api.sources.browse(sourceId, path)}
       onSelect={onSelect}
       onClose={onClose}
     />

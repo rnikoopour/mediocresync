@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client'
-import type { SyncJob, JobRequest } from '../api/types'
+import type { SyncJob, JobRequest, GitRepoRequest } from '../api/types'
 import { RemoteBrowser } from './RemoteBrowser'
 import { LocalBrowser } from './LocalBrowser'
 import { Modal } from './Modal'
@@ -13,17 +13,18 @@ interface Props {
 }
 
 const empty: JobRequest = {
-  name: '', connection_id: '', remote_path: '/', local_dest: '',
+  name: '', source_id: '', remote_path: '/', local_dest: '',
   interval_value: 60, interval_unit: 'minutes', concurrency: 1,
   retry_attempts: 3, retry_delay_seconds: 2, enabled: true,
   include_path_filters: [], include_name_filters: [],
   exclude_path_filters: [], exclude_name_filters: [],
   run_retention_days: 0,
+  git_repos: [],
 }
 
 function jobToForm(j: SyncJob): JobRequest {
   return {
-    name: j.name, connection_id: j.connection_id, remote_path: j.remote_path,
+    name: j.name, source_id: j.source_id, remote_path: j.remote_path,
     local_dest: j.local_dest, interval_value: j.interval_value, interval_unit: j.interval_unit,
     concurrency: j.concurrency, retry_attempts: j.retry_attempts, retry_delay_seconds: j.retry_delay_seconds,
     enabled: j.enabled,
@@ -32,6 +33,7 @@ function jobToForm(j: SyncJob): JobRequest {
     exclude_path_filters: j.exclude_path_filters ?? [],
     exclude_name_filters: j.exclude_name_filters ?? [],
     run_retention_days: j.run_retention_days ?? 0,
+    git_repos: (j.git_repos ?? []).map((r) => ({ url: r.url, branch: r.branch })),
   }
 }
 
@@ -43,7 +45,9 @@ export function JobFormModal({ editing, onClose }: Props) {
   const [browserOpen, setBrowserOpen] = useState(false)
   const [localBrowserOpen, setLocalBrowserOpen] = useState(false)
 
-  const { data: connections = [] } = useQuery({ queryKey: ['connections'], queryFn: api.connections.list })
+  const { data: sources = [] } = useQuery({ queryKey: ['sources'], queryFn: api.sources.list })
+  const selectedSource = sources.find((s) => s.id === form.source_id)
+  const isGit = selectedSource?.type === 'git'
 
   const save = useMutation({
     mutationFn: (req: JobRequest) =>
@@ -109,26 +113,39 @@ export function JobFormModal({ editing, onClose }: Props) {
                     <Field label="Name">
                       <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
                     </Field>
-                    <Field label="Connection">
-                      <select className="input" value={form.connection_id} onChange={(e) => setForm({ ...form, connection_id: e.target.value })} required>
-                        <option value="">Select a connection…</option>
-                        {connections.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    <Field label="Source">
+                      <select className="input" value={form.source_id} onChange={(e) => setForm({ ...form, source_id: e.target.value })} required>
+                        <option value="">Select a source…</option>
+                        {sources.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.type})</option>)}
                       </select>
                     </Field>
-                    <Field label="Remote Path">
-                      <div className="flex gap-2">
-                        <input className="input flex-1" value={form.remote_path} onChange={(e) => setForm({ ...form, remote_path: e.target.value })} required />
-                        <button
-                          type="button"
-                          onClick={() => setBrowserOpen(true)}
-                          disabled={!form.connection_id}
-                          className="btn-secondary text-xs shrink-0"
-                          title={form.connection_id ? 'Browse remote server' : 'Select a connection first'}
-                        >
-                          Browse
-                        </button>
-                      </div>
-                    </Field>
+
+                    {!isGit && (
+                      <Field label="Remote Path">
+                        <div className="flex gap-2">
+                          <input className="input flex-1" value={form.remote_path} onChange={(e) => setForm({ ...form, remote_path: e.target.value })} required />
+                          <button
+                            type="button"
+                            onClick={() => setBrowserOpen(true)}
+                            disabled={!form.source_id}
+                            className="btn-secondary text-xs shrink-0"
+                            title={form.source_id ? 'Browse remote server' : 'Select a source first'}
+                          >
+                            Browse
+                          </button>
+                        </div>
+                      </Field>
+                    )}
+
+                    {isGit && (
+                      <Field label="Git Repositories">
+                        <RepoList
+                          repos={form.git_repos}
+                          onChange={(repos) => setForm({ ...form, git_repos: repos })}
+                        />
+                      </Field>
+                    )}
+
                     <Field label="Local Destination">
                       <div className="flex gap-2">
                         <input className="input flex-1" value={form.local_dest} onChange={(e) => setForm({ ...form, local_dest: e.target.value })} required />
@@ -145,12 +162,16 @@ export function JobFormModal({ editing, onClose }: Props) {
                       <Field label="Max Concurrent Downloads" className="w-48">
                         <input className="input" type="number" min={1} max={20} value={form.concurrency} onChange={(e) => setForm({ ...form, concurrency: Number(e.target.value) })} required />
                       </Field>
-                      <Field label="Max Retries" className="w-28">
-                        <input className="input" type="number" min={1} value={form.retry_attempts} onChange={(e) => setForm({ ...form, retry_attempts: Number(e.target.value) })} required />
-                      </Field>
-                      <Field label="Backoff (seconds)" className="w-36">
-                        <input className="input" type="number" min={0} value={form.retry_delay_seconds} onChange={(e) => setForm({ ...form, retry_delay_seconds: Number(e.target.value) })} required />
-                      </Field>
+                      {!isGit && (
+                        <>
+                          <Field label="Max Retries" className="w-28">
+                            <input className="input" type="number" min={1} value={form.retry_attempts} onChange={(e) => setForm({ ...form, retry_attempts: Number(e.target.value) })} required />
+                          </Field>
+                          <Field label="Backoff (seconds)" className="w-36">
+                            <input className="input" type="number" min={0} value={form.retry_delay_seconds} onChange={(e) => setForm({ ...form, retry_delay_seconds: Number(e.target.value) })} required />
+                          </Field>
+                        </>
+                      )}
                     </div>
 
                     <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide pt-1">Autosync</p>
@@ -245,9 +266,9 @@ export function JobFormModal({ editing, onClose }: Props) {
           </form>
       </Modal>
 
-      {browserOpen && form.connection_id && (
+      {browserOpen && form.source_id && !isGit && (
         <RemoteBrowser
-          connectionId={form.connection_id}
+          sourceId={form.source_id}
           initialPath={form.remote_path || '/'}
           onSelect={(path) => setForm({ ...form, remote_path: path })}
           onClose={() => setBrowserOpen(false)}
@@ -262,6 +283,54 @@ export function JobFormModal({ editing, onClose }: Props) {
         />
       )}
     </>
+  )
+}
+
+function RepoList({ repos, onChange }: { repos: GitRepoRequest[]; onChange: (v: GitRepoRequest[]) => void }) {
+  const [draftUrl, setDraftUrl] = useState('')
+  const [draftBranch, setDraftBranch] = useState('')
+
+  function add() {
+    const url = draftUrl.trim()
+    if (!url) return
+    onChange([...repos, { url, branch: draftBranch.trim() || 'main' }])
+    setDraftUrl('')
+    setDraftBranch('')
+  }
+
+  return (
+    <div className="space-y-1">
+      {repos.map((r, i) => (
+        <div key={i} className="flex items-center gap-2 bg-gray-50 dark:bg-gray-700 rounded px-2 py-1">
+          <span className="flex-1 font-mono text-xs text-gray-700 dark:text-gray-300 truncate">{r.url}</span>
+          <span className="text-xs text-gray-400 dark:text-gray-500 font-mono shrink-0">{r.branch}</span>
+          <button
+            type="button"
+            onClick={() => onChange(repos.filter((_, idx) => idx !== i))}
+            className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 text-xs leading-none shrink-0"
+          >
+            &times;
+          </button>
+        </div>
+      ))}
+      <div className="flex gap-2">
+        <input
+          className="input flex-1 text-xs font-mono"
+          value={draftUrl}
+          onChange={(e) => setDraftUrl(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add() } }}
+          placeholder="https://github.com/org/repo"
+        />
+        <input
+          className="input w-24 text-xs font-mono"
+          value={draftBranch}
+          onChange={(e) => setDraftBranch(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add() } }}
+          placeholder="main"
+        />
+        <button type="button" onClick={add} className="btn-secondary text-xs shrink-0">Add</button>
+      </div>
+    </div>
   )
 }
 

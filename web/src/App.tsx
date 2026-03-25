@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Layout } from './components/Layout'
-import { ConnectionsPage } from './pages/ConnectionsPage'
+import { SourcesPage } from './pages/SourcesPage'
 import { JobsPage } from './pages/JobsPage'
 import { JobDetailPage } from './pages/JobDetailPage'
 import { RunDetailPage } from './pages/RunDetailPage'
@@ -26,7 +26,7 @@ export default function App() {
           <Route path="setup" element={<SetupPage />} />
           <Route element={<Layout />}>
             <Route index element={<Navigate to="/jobs" replace />} />
-            <Route path="connections" element={<ConnectionsPage />} />
+            <Route path="sources" element={<SourcesPage />} />
             <Route path="jobs" element={<JobsPage />} />
             <Route path="jobs/:id" element={<JobDetailPage />} />
             <Route path="runs/:id" element={<RunDetailPage />} />

@@ -1,29 +1,45 @@
-export interface Connection {
+export interface Source {
   id: string
   name: string
+  type: 'ftpes' | 'git'
   host: string
   port: number
   username: string
+  auth_type: string
   skip_tls_verify: boolean
   enable_epsv: boolean
   created_at: string
   updated_at: string
 }
 
-export interface ConnectionRequest {
+export interface SourceRequest {
   name: string
+  type: 'ftpes' | 'git'
   host: string
   port: number
   username: string
   password: string
+  auth_type: string
+  auth_credential: string
   skip_tls_verify: boolean
   enable_epsv: boolean
+}
+
+export interface GitRepo {
+  id: string
+  url: string
+  branch: string
+}
+
+export interface GitRepoRequest {
+  url: string
+  branch: string
 }
 
 export interface SyncJob {
   id: string
   name: string
-  connection_id: string
+  source_id: string
   remote_path: string
   local_dest: string
   interval_value: number
@@ -37,13 +53,14 @@ export interface SyncJob {
   exclude_path_filters: string[]
   exclude_name_filters: string[]
   run_retention_days: number
+  git_repos: GitRepo[]
   created_at: string
   updated_at: string
 }
 
 export interface JobRequest {
   name: string
-  connection_id: string
+  source_id: string
   remote_path: string
   local_dest: string
   interval_value: number
@@ -57,6 +74,7 @@ export interface JobRequest {
   exclude_path_filters: string[]
   exclude_name_filters: string[]
   run_retention_days: number
+  git_repos: GitRepoRequest[]
 }
 
 export interface Run {
