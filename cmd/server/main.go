@@ -96,6 +96,7 @@ func main() {
 		version,
 		auth,
 		sources,
+		gitRepos,
 		jobs,
 		runs,
 		transfers,

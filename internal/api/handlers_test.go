@@ -39,7 +39,7 @@ func setupRouterFull(t *testing.T) (*sql.DB, http.Handler, *db.SourceRepository,
 	engine := internalsync.NewEngine(sources, gitRepos, jobs, runs, transfers, syncState, testEncKey, broker, context.Background())
 
 	staticFS := fstest.MapFS{"index.html": {Data: []byte("<html></html>")}}
-	router := NewRouter(context.Background(), "dev", auth, sources, jobs, runs, transfers, syncState, engine, broker, testEncKey, true, new(slog.LevelVar), nil, staticFS)
+	router := NewRouter(context.Background(), "dev", auth, sources, gitRepos, jobs, runs, transfers, syncState, engine, broker, testEncKey, true, new(slog.LevelVar), nil, staticFS)
 
 	w := do(t, router, "POST", "/api/auth/setup", map[string]any{
 		"username": "testuser", "password": "testpass", "password_confirm": "testpass",
@@ -86,7 +86,7 @@ func setupRouter(t *testing.T) (http.Handler, *db.SourceRepository, *db.JobRepos
 	engine := internalsync.NewEngine(sources, gitRepos, jobs, runs, transfers, syncState, testEncKey, broker, context.Background())
 
 	staticFS := fstest.MapFS{"index.html": {Data: []byte("<html></html>")}}
-	router := NewRouter(context.Background(), "dev", auth, sources, jobs, runs, transfers, syncState, engine, broker, testEncKey, true, new(slog.LevelVar), nil, staticFS)
+	router := NewRouter(context.Background(), "dev", auth, sources, gitRepos, jobs, runs, transfers, syncState, engine, broker, testEncKey, true, new(slog.LevelVar), nil, staticFS)
 
 	// Configure credentials and log in so tests can hit protected endpoints.
 	w := do(t, router, "POST", "/api/auth/setup", map[string]any{

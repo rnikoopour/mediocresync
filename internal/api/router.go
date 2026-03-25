@@ -19,6 +19,7 @@ func NewRouter(
 	version string,
 	auth *db.AuthRepository,
 	sources *db.SourceRepository,
+	gitRepos *db.GitRepoRepository,
 	jobs *db.JobRepository,
 	runs *db.RunRepository,
 	transfers *db.TransferRepository,
@@ -42,7 +43,7 @@ func NewRouter(
 	r.Use(requireSetup(auth))
 
 	srcsH := &sourcesHandler{repo: sources, encKey: encKey}
-	jobsH := &jobsHandler{repo: jobs, runs: runs, syncState: syncState, engine: engine, broker: broker, appCtx: appCtx}
+	jobsH := &jobsHandler{repo: jobs, gitRepos: gitRepos, runs: runs, syncState: syncState, engine: engine, broker: broker, appCtx: appCtx}
 	runsH := &runsHandler{runs: runs, transfers: transfers, broker: broker, appCtx: appCtx}
 	authH := &authHandler{repo: auth}
 	settingsH := &settingsHandler{logLevel: logLevel}
