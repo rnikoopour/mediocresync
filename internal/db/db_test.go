@@ -88,6 +88,99 @@ func TestSourceGetNotFound(t *testing.T) {
 	}
 }
 
+// --- GitRepoRepository ---
+
+func openGitRepoRepos(t *testing.T) (*SourceRepository, *JobRepository, *GitRepoRepository) {
+	t.Helper()
+	database, err := Open(":memory:")
+	if err != nil {
+		t.Fatalf("open test DB: %v", err)
+	}
+	t.Cleanup(func() { database.Close() })
+	return NewSourceRepository(database), NewJobRepository(database), NewGitRepoRepository(database)
+}
+
+func TestGitRepoListByJobEmpty(t *testing.T) {
+	_, _, gitRepos := openGitRepoRepos(t)
+	repos, err := gitRepos.ListByJob("nonexistent-job")
+	if err != nil {
+		t.Fatalf("ListByJob: %v", err)
+	}
+	if len(repos) != 0 {
+		t.Errorf("expected 0 repos, got %d", len(repos))
+	}
+}
+
+func TestGitRepoReplaceForJob(t *testing.T) {
+	srcRepo, jobRepo, gitRepos := openGitRepoRepos(t)
+
+	src := &Source{Name: "s", Type: SourceTypeGit, AuthType: AuthTypeNone}
+	_ = srcRepo.Create(src)
+	job := &SyncJob{Name: "j", SourceID: src.ID, LocalDest: "/tmp", IntervalValue: 1, IntervalUnit: "hours", Concurrency: 1, Enabled: true}
+	_ = jobRepo.Create(job)
+
+	// Initial insert.
+	initial := []*GitRepo{
+		{URL: "https://github.com/org/repo-a", Branch: "main"},
+		{URL: "https://github.com/org/repo-b"},
+	}
+	if err := gitRepos.ReplaceForJob(job.ID, initial); err != nil {
+		t.Fatalf("ReplaceForJob (insert): %v", err)
+	}
+
+	list, err := gitRepos.ListByJob(job.ID)
+	if err != nil {
+		t.Fatalf("ListByJob: %v", err)
+	}
+	if len(list) != 2 {
+		t.Fatalf("expected 2 repos, got %d", len(list))
+	}
+	// Results are ordered by URL.
+	if list[0].URL != "https://github.com/org/repo-a" || list[0].Branch != "main" {
+		t.Errorf("unexpected repo[0]: %+v", list[0])
+	}
+	// Branch defaults to "main" when empty.
+	if list[1].URL != "https://github.com/org/repo-b" || list[1].Branch != "main" {
+		t.Errorf("unexpected repo[1]: %+v", list[1])
+	}
+	for _, r := range list {
+		if r.ID == "" {
+			t.Error("ID not set after insert")
+		}
+		if r.JobID != job.ID {
+			t.Errorf("JobID: got %q, want %q", r.JobID, job.ID)
+		}
+	}
+
+	// Replace with a different set.
+	replacement := []*GitRepo{
+		{URL: "https://github.com/org/repo-c", Branch: "dev"},
+	}
+	if err := gitRepos.ReplaceForJob(job.ID, replacement); err != nil {
+		t.Fatalf("ReplaceForJob (replace): %v", err)
+	}
+
+	list, err = gitRepos.ListByJob(job.ID)
+	if err != nil {
+		t.Fatalf("ListByJob after replace: %v", err)
+	}
+	if len(list) != 1 {
+		t.Fatalf("expected 1 repo after replace, got %d", len(list))
+	}
+	if list[0].URL != "https://github.com/org/repo-c" || list[0].Branch != "dev" {
+		t.Errorf("unexpected repo after replace: %+v", list[0])
+	}
+
+	// Replace with empty list clears all.
+	if err := gitRepos.ReplaceForJob(job.ID, nil); err != nil {
+		t.Fatalf("ReplaceForJob (clear): %v", err)
+	}
+	list, _ = gitRepos.ListByJob(job.ID)
+	if len(list) != 0 {
+		t.Errorf("expected 0 repos after clear, got %d", len(list))
+	}
+}
+
 // --- JobRepository ---
 
 func TestJobCRUD(t *testing.T) {

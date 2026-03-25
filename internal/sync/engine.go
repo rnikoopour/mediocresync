@@ -14,6 +14,7 @@ import (
 	"github.com/rnikoopour/mediocresync/internal/crypto"
 	"github.com/rnikoopour/mediocresync/internal/db"
 	"github.com/rnikoopour/mediocresync/internal/ftpes"
+	"github.com/rnikoopour/mediocresync/internal/gitsource"
 	"github.com/rnikoopour/mediocresync/internal/sse"
 )
 
@@ -59,6 +60,7 @@ type PlanEvent struct {
 
 type Engine struct {
 	sources   *db.SourceRepository
+	gitRepos  *db.GitRepoRepository
 	jobs      *db.JobRepository
 	runs      *db.RunRepository
 	transfers *db.TransferRepository
@@ -83,6 +85,7 @@ type Engine struct {
 
 func NewEngine(
 	sources *db.SourceRepository,
+	gitRepos *db.GitRepoRepository,
 	jobs *db.JobRepository,
 	runs *db.RunRepository,
 	transfers *db.TransferRepository,
@@ -93,6 +96,7 @@ func NewEngine(
 ) *Engine {
 	return &Engine{
 		sources:   sources,
+		gitRepos:  gitRepos,
 		jobs:      jobs,
 		runs:      runs,
 		transfers: transfers,
@@ -145,6 +149,27 @@ func (e *Engine) PlanJobStream(ctx context.Context, jobID string, progress func(
 		return nil, fmt.Errorf("load source %s: %w", job.SourceID, err)
 	}
 
+	var result *PlanResult
+	switch src.Type {
+	case db.SourceTypeFTPES:
+		result, err = e.planFTPES(ctx, job, src, progress)
+	case db.SourceTypeGit:
+		result, err = e.planGit(ctx, job, src)
+	default:
+		return nil, fmt.Errorf("unknown source type %q", src.Type)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	e.storedPlansMu.Lock()
+	e.storedPlans[jobID] = result
+	e.storedPlansMu.Unlock()
+
+	return result, nil
+}
+
+func (e *Engine) planFTPES(ctx context.Context, job *db.SyncJob, src *db.Source, progress func(files, dirs int)) (*PlanResult, error) {
 	password, err := crypto.Decrypt(e.encKey, src.Password)
 	if err != nil {
 		return nil, fmt.Errorf("decrypt password: %w", err)
@@ -179,7 +204,7 @@ func (e *Engine) PlanJobStream(ctx context.Context, jobID string, progress func(
 		if !applyFilters(f.Path, job.RemotePath, job.IncludePathFilters, job.IncludeNameFilters, job.ExcludePathFilters, job.ExcludeNameFilters) {
 			continue
 		}
-		state, _ := e.syncState.Get(jobID, f.Path)
+		state, _ := e.syncState.Get(job.ID, f.Path)
 		action := "copy"
 		if Matches(state, f) {
 			action = "skip"
@@ -195,12 +220,49 @@ func (e *Engine) PlanJobStream(ctx context.Context, jobID string, progress func(
 			Action:     action,
 		})
 	}
-
-	e.storedPlansMu.Lock()
-	e.storedPlans[jobID] = result
-	e.storedPlansMu.Unlock()
-
 	return result, nil
+}
+
+func (e *Engine) planGit(ctx context.Context, job *db.SyncJob, src *db.Source) (*PlanResult, error) {
+	repos, err := e.gitRepos.ListByJob(job.ID)
+	if err != nil {
+		return nil, fmt.Errorf("list git repos: %w", err)
+	}
+
+	var credPlaintext string
+	if len(src.AuthCredential) > 0 {
+		credPlaintext, err = crypto.Decrypt(e.encKey, src.AuthCredential)
+		if err != nil {
+			return nil, fmt.Errorf("decrypt credential: %w", err)
+		}
+	}
+
+	results, err := gitsource.Enumerate(ctx, src, job.LocalDest, repos, credPlaintext)
+	if err != nil {
+		return nil, err
+	}
+
+	plan := &PlanResult{Files: make([]PlanFile, 0, len(results))}
+	for _, res := range results {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		state, _ := e.syncState.Get(job.ID, res.Repo.URL)
+		action := "copy"
+		if state != nil && state.ContentHash != nil && *state.ContentHash == res.CommitHash {
+			action = "skip"
+			plan.ToSkip++
+		} else {
+			plan.ToCopy++
+		}
+		plan.Files = append(plan.Files, PlanFile{
+			RemotePath: res.Repo.URL,
+			LocalPath:  res.LocalPath,
+			SizeBytes:  0,
+			Action:     action,
+		})
+	}
+	return plan, nil
 }
 
 // IsRunning reports whether a run for the given job is currently active.
@@ -450,7 +512,15 @@ func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanResult
 	e.broker.Publish(jobID, sse.Event{RunID: run.ID, Status: "started"})
 	slog.Info("job started", "job_name", job.Name, "job_id", jobID, "run_id", run.ID)
 
-	runErr := e.executeRun(jobCtx, job, src, run, plan)
+	var runErr error
+	switch src.Type {
+	case db.SourceTypeFTPES:
+		runErr = e.executeRun(jobCtx, job, src, run, plan)
+	case db.SourceTypeGit:
+		runErr = e.executeGitRun(jobCtx, job, src, run, plan)
+	default:
+		runErr = fmt.Errorf("unknown source type %q", src.Type)
+	}
 
 	finalStatus := db.RunStatusCompleted
 	var finalErrMsg *string
@@ -908,5 +978,114 @@ func (e *Engine) downloadFile(
 		Percent:      100,
 		Status:       db.TransferStatusDone,
 	})
+	return nil
+}
+
+func (e *Engine) executeGitRun(ctx context.Context, job *db.SyncJob, src *db.Source, run *db.Run, plan *PlanResult) error {
+	var credPlaintext string
+	if len(src.AuthCredential) > 0 {
+		var err error
+		credPlaintext, err = crypto.Decrypt(e.encKey, src.AuthCredential)
+		if err != nil {
+			return fmt.Errorf("decrypt auth credential: %w", err)
+		}
+	}
+
+	auth, err := gitsource.AuthMethod(src, credPlaintext)
+	if err != nil {
+		return fmt.Errorf("build auth: %w", err)
+	}
+
+	// Load repos to get branch info (plan only stores URL + local path).
+	repos, err := e.gitRepos.ListByJob(job.ID)
+	if err != nil {
+		return fmt.Errorf("list git repos: %w", err)
+	}
+	repoByURL := make(map[string]*db.GitRepo, len(repos))
+	for _, r := range repos {
+		repoByURL[r.URL] = r
+	}
+
+	if err := e.runs.UpdateCounts(run.ID, len(plan.Files), 0, 0, 0); err != nil {
+		slog.Error("update run counts", "run_id", run.ID, "err", err)
+	}
+
+	concurrency := max(job.Concurrency, 1)
+	sem := make(chan struct{}, concurrency)
+	var (
+		mu      sync.Mutex
+		copied  int
+		skipped int
+		failed  int
+		wg      sync.WaitGroup
+	)
+
+	for _, pf := range plan.Files {
+		if ctx.Err() != nil {
+			break
+		}
+
+		planFile := pf
+		repo := repoByURL[planFile.RemotePath]
+		if repo == nil {
+			// Repo disappeared between plan and run; treat as failure.
+			repo = &db.GitRepo{URL: planFile.RemotePath}
+		}
+		sem <- struct{}{}
+
+		wg.Go(func() {
+			defer func() { <-sem }()
+
+			if planFile.Action == "skip" {
+				mu.Lock()
+				skipped++
+				if err := e.runs.UpdateCounts(run.ID, len(plan.Files), copied, skipped, failed); err != nil {
+					slog.Error("update run counts", "run_id", run.ID, "err", err)
+				}
+				mu.Unlock()
+				return
+			}
+
+			slog.Info("git sync started", "repo", planFile.RemotePath, "local", planFile.LocalPath)
+			commitHash, syncErr := gitsource.Sync(ctx, repo, planFile.LocalPath, auth)
+			if syncErr != nil {
+				slog.Error("git sync failed", "repo", planFile.RemotePath, "err", syncErr)
+				mu.Lock()
+				failed++
+				if err := e.runs.UpdateCounts(run.ID, len(plan.Files), copied, skipped, failed); err != nil {
+					slog.Error("update run counts", "run_id", run.ID, "err", err)
+				}
+				mu.Unlock()
+				return
+			}
+
+			slog.Info("git sync complete", "repo", planFile.RemotePath, "commit", commitHash)
+			if err := e.syncState.Upsert(&db.SyncState{
+				JobID:       job.ID,
+				RemotePath:  planFile.RemotePath,
+				SizeBytes:   0,
+				ContentHash: &commitHash,
+				CopiedAt:    time.Now().UTC(),
+			}); err != nil {
+				slog.Error("upsert sync state", "repo", planFile.RemotePath, "err", err)
+			}
+
+			mu.Lock()
+			copied++
+			if err := e.runs.UpdateCounts(run.ID, len(plan.Files), copied, skipped, failed); err != nil {
+				slog.Error("update run counts", "run_id", run.ID, "err", err)
+			}
+			mu.Unlock()
+		})
+	}
+
+	wg.Wait()
+
+	if failed > 0 {
+		if copied == 0 {
+			return failedTransferError{failed: failed}
+		}
+		return partialTransferError{completed: copied, failed: failed}
+	}
 	return nil
 }

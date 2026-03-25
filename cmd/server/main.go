@@ -61,6 +61,7 @@ func main() {
 
 	auth := db.NewAuthRepository(database)
 	sources := db.NewSourceRepository(database)
+	gitRepos := db.NewGitRepoRepository(database)
 	jobs := db.NewJobRepository(database)
 	runs := db.NewRunRepository(database)
 	transfers := db.NewTransferRepository(database)
@@ -78,6 +79,7 @@ func main() {
 
 	engine := internalsync.NewEngine(
 		sources,
+		gitRepos,
 		jobs,
 		runs,
 		transfers,
