@@ -453,28 +453,24 @@ function GitRepoRow({ file, onSkip, onUnskip }: {
 
   return (
     <div
-      className="flex items-center gap-3 px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700/50"
+      className="flex items-center gap-2 py-1 hover:bg-gray-50 dark:hover:bg-gray-700/50 relative"
+      style={{ paddingLeft: '12px', paddingRight: '16px' }}
       onContextMenu={(e) => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY }) }}
     >
-      <StatusBadge status={file.action === 'copy' ? 'pending' : 'skipped'} />
-      <span className="font-mono text-xs text-gray-700 dark:text-gray-300 flex-1 min-w-0 break-all">{file.remote_path}</span>
-      {file.action === 'copy' && (
-        <button
-          className="hidden md:block text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0"
-          onClick={() => onSkip(file.remote_path, file.commit_hash ?? '')}
-        >Skip</button>
-      )}
-      {file.action === 'skip' && (
-        <button
-          className="hidden md:block text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0"
-          onClick={() => onUnskip(file.remote_path)}
-        >Unskip</button>
-      )}
-      <button
-        className="md:hidden px-1 py-0.5 text-gray-400 dark:text-gray-500 text-base leading-none shrink-0"
-        onClick={(e) => { e.stopPropagation(); setMenu({ x: e.clientX, y: e.clientY }) }}
-        aria-label="Actions"
-      >⋮</button>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="hidden md:inline shrink-0"><StatusBadge status={file.action === 'copy' ? 'pending' : 'skipped'} /></span>
+          <span className="font-mono text-xs text-gray-600 dark:text-gray-300 flex-1 min-w-0 break-all">{file.remote_path}</span>
+          <button
+            className="md:hidden px-1 py-0.5 text-gray-400 dark:text-gray-500 text-base leading-none shrink-0"
+            onClick={(e) => { e.stopPropagation(); setMenu({ x: e.clientX, y: e.clientY }) }}
+            aria-label="Actions"
+          >⋮</button>
+        </div>
+        <div className="flex md:hidden items-center gap-2 mt-0.5">
+          <StatusBadge status={file.action === 'copy' ? 'pending' : 'skipped'} />
+        </div>
+      </div>
       {menu && (
         <div
           ref={menuRef}
