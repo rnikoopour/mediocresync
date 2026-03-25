@@ -134,6 +134,7 @@ export interface PlanFile {
   size_bytes: number
   mtime: string
   action: 'copy' | 'skip'
+  commit_hash?: string
 }
 
 export interface PlanResult {

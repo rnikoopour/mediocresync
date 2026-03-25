@@ -41,7 +41,7 @@ function sortNodes<T extends { type: string; name: string }>(nodes: T[]): T[] {
 
 // ── Run row ───────────────────────────────────────────────────────────────────
 
-function RunRow({ run: initialRun, remotePath, jobId }: { run: Run; remotePath: string; jobId: string }) {
+function RunRow({ run: initialRun, remotePath, jobId, isGit }: { run: Run; remotePath: string; jobId: string; isGit: boolean }) {
   const qc = useQueryClient()
   const [open, setOpen] = useState(initialRun.status === 'running')
 
@@ -147,8 +147,18 @@ function RunRow({ run: initialRun, remotePath, jobId }: { run: Run; remotePath: 
           <div className="border-t border-gray-100 dark:border-gray-700 px-4 py-4 text-xs text-center text-gray-400 dark:text-gray-500">
             {run.error_msg
               ? <p className="text-red-500 dark:text-red-400 font-mono break-all">{run.error_msg}</p>
-              : <p>No transfers recorded.</p>
+              : <p>{isGit ? 'No repos to sync.' : 'No transfers recorded.'}</p>
             }
+          </div>
+        ) : isGit ? (
+          <div className="border-t border-gray-100 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700">
+            {transfers.map((t) => (
+              <div key={t.id} className="flex items-center gap-3 px-4 py-2">
+                <StatusBadge status={t.status} />
+                <span className="font-mono text-xs text-gray-700 dark:text-gray-300 flex-1 min-w-0 break-all">{t.remote_path}</span>
+                {t.error_msg && <span className="text-xs text-red-500 dark:text-red-400 truncate">{t.error_msg}</span>}
+              </div>
+            ))}
           </div>
         ) : (
           <RunTreeView transfers={transfers} remotePath={remotePath} liveEvents={liveEvents} runEnded={!isRunning} />
@@ -416,11 +426,50 @@ function PlanTreeView({ files, remotePath, onSkip, onUnskip }: { files: PlanFile
   )
 }
 
+function GitPlanView({ files, onSkip, onUnskip }: {
+  files: PlanFile[]
+  onSkip: (path: string, commitHash: string) => Promise<void>
+  onUnskip: (path: string) => Promise<void>
+}) {
+  const [tab, setTab] = useState<TreeTab>('copy')
+  const filtered = tab === 'all' ? files : files.filter((f) => tab === 'copy' ? f.action === 'copy' : f.action === 'skip')
+  return (
+    <div className="card overflow-hidden">
+      <TreeTabBar tab={tab} onTab={setTab} />
+      <div className="divide-y divide-gray-100 dark:divide-gray-700 py-1">
+        {filtered.length === 0
+          ? <p className="px-4 py-4 text-xs text-center text-gray-400 dark:text-gray-500">No items</p>
+          : filtered.map((f) => (
+            <div key={f.remote_path} className="flex items-center gap-3 px-4 py-2">
+              <StatusBadge status={f.action === 'copy' ? 'pending' : 'skipped'} />
+              <span className="font-mono text-xs text-gray-700 dark:text-gray-300 flex-1 min-w-0 break-all">{f.remote_path}</span>
+              {f.action === 'copy' && (
+                <button
+                  className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0"
+                  onClick={() => onSkip(f.remote_path, f.commit_hash ?? '')}
+                >Skip</button>
+              )}
+              {f.action === 'skip' && (
+                <button
+                  className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0"
+                  onClick={() => onUnskip(f.remote_path)}
+                >Unskip</button>
+              )}
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  )
+}
+
 export function JobDetailPage() {
   const { id } = useParams<{ id: string }>()
   const qc = useQueryClient()
 
   const { data: job } = useQuery({ queryKey: ['jobs', id], queryFn: () => api.jobs.get(id!) })
+  const { data: sources = [] } = useQuery({ queryKey: ['sources'], queryFn: api.sources.list })
+  const isGitJob = !!sources.find((s) => s.id === job?.source_id && s.type === 'git')
   const { data: runs = [], isLoading } = useQuery({
     queryKey: ['runs', id],
     queryFn: () => api.jobs.listRuns(id!),
@@ -474,6 +523,11 @@ export function JobDetailPage() {
   const doSkip = (f: TreeFile): Promise<void> =>
     api.jobs.skipFile(id!, f.remote_path, f.size_bytes, f.mtime)
       .then(() => { if (id) skipFile(id, f.remote_path) })
+      .catch(() => {})
+
+  const doGitSkip = (path: string, commitHash: string): Promise<void> =>
+    api.jobs.skipFile(id!, path, 0, '', commitHash)
+      .then(() => { if (id) skipFile(id, path) })
       .catch(() => {})
 
   const doUnskip = (remotePath: string): Promise<void> =>
@@ -569,7 +623,10 @@ export function JobDetailPage() {
               </div>
             ) : planEntry.result && (
               <div className="border-t border-gray-100 dark:border-gray-700">
-                <PlanTreeView files={planEntry.result.files} remotePath={job?.remote_path ?? ''} onSkip={doSkip} onUnskip={doUnskip} />
+                {isGitJob
+                  ? <GitPlanView files={planEntry.result.files} onSkip={doGitSkip} onUnskip={doUnskip} />
+                  : <PlanTreeView files={planEntry.result.files} remotePath={job?.remote_path ?? ''} onSkip={doSkip} onUnskip={doUnskip} />
+                }
               </div>
             )
           )}
@@ -595,7 +652,7 @@ export function JobDetailPage() {
 
       <div className="space-y-2">
         {(showAllRuns ? runs : runs.slice(0, RUNS_LIMIT)).map((run) => (
-          <RunRow key={run.id} run={run} remotePath={job?.remote_path ?? ''} jobId={id!} />
+          <RunRow key={run.id} run={run} remotePath={job?.remote_path ?? ''} jobId={id!} isGit={isGitJob} />
         ))}
       </div>
 

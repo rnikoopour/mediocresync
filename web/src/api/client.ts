@@ -49,8 +49,8 @@ export const api = {
     plan: (id: string) => request<PlanResult>('POST', `/jobs/${id}/plan`),
     dismissPlan: (id: string) => request<void>('DELETE', `/jobs/${id}/plan`),
     deleteFileState: (id: string, path: string) => request<void>('DELETE', `/jobs/${id}/files?path=${encodeURIComponent(path)}`),
-    skipFile: (id: string, path: string, sizeBytes: number, mtime: string) =>
-      request<void>('PUT', `/jobs/${id}/files`, { path, size_bytes: sizeBytes, mtime }),
+    skipFile: (id: string, path: string, sizeBytes: number, mtime: string, commitHash?: string) =>
+      request<void>('PUT', `/jobs/${id}/files`, { path, size_bytes: sizeBytes, mtime, ...(commitHash ? { content_hash: commitHash } : {}) }),
     listRuns: (id: string) => request<Run[]>('GET', `/jobs/${id}/runs`),
   },
 

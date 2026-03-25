@@ -120,7 +120,8 @@ type PlanFile struct {
 	LocalPath  string    `json:"local_path"`
 	SizeBytes  int64     `json:"size_bytes"`
 	MTime      time.Time `json:"mtime"`
-	Action     string    `json:"action"` // "copy" | "skip"
+	Action     string    `json:"action"`      // "copy" | "skip"
+	CommitHash string    `json:"commit_hash,omitempty"` // git only
 }
 
 // PlanResult is the full output of a dry-run plan.
@@ -260,6 +261,7 @@ func (e *Engine) planGit(ctx context.Context, job *db.SyncJob, src *db.Source) (
 			LocalPath:  res.LocalPath,
 			SizeBytes:  0,
 			Action:     action,
+			CommitHash: res.CommitHash,
 		})
 	}
 	return plan, nil
@@ -1010,6 +1012,24 @@ func (e *Engine) executeGitRun(ctx context.Context, job *db.SyncJob, src *db.Sou
 		slog.Error("update run counts", "run_id", run.ID, "err", err)
 	}
 
+	// Create one transfer record per repo so run history shows repo names.
+	batch := make([]*db.Transfer, len(plan.Files))
+	for i, pf := range plan.Files {
+		batch[i] = &db.Transfer{
+			RunID:      run.ID,
+			RemotePath: pf.RemotePath,
+			LocalPath:  pf.LocalPath,
+			Status:     db.TransferStatusPending,
+		}
+	}
+	if err := e.transfers.CreateBatch(batch); err != nil {
+		return fmt.Errorf("create transfer records: %w", err)
+	}
+	transferByURL := make(map[string]*db.Transfer, len(batch))
+	for _, t := range batch {
+		transferByURL[t.RemotePath] = t
+	}
+
 	concurrency := max(job.Concurrency, 1)
 	sem := make(chan struct{}, concurrency)
 	var (
@@ -1031,12 +1051,18 @@ func (e *Engine) executeGitRun(ctx context.Context, job *db.SyncJob, src *db.Sou
 			// Repo disappeared between plan and run; treat as failure.
 			repo = &db.GitRepo{URL: planFile.RemotePath}
 		}
+		t := transferByURL[planFile.RemotePath]
 		sem <- struct{}{}
 
 		wg.Go(func() {
 			defer func() { <-sem }()
 
 			if planFile.Action == "skip" {
+				if t != nil {
+					if err := e.transfers.UpdateStatus(t.ID, db.TransferStatusSkipped, nil, nil); err != nil {
+						slog.Error("update transfer status", "transfer_id", t.ID, "err", err)
+					}
+				}
 				mu.Lock()
 				skipped++
 				if err := e.runs.UpdateCounts(run.ID, len(plan.Files), copied, skipped, failed); err != nil {
@@ -1046,10 +1072,25 @@ func (e *Engine) executeGitRun(ctx context.Context, job *db.SyncJob, src *db.Sou
 				return
 			}
 
+			if t != nil {
+				if err := e.transfers.UpdateStatus(t.ID, db.TransferStatusInProgress, nil, nil); err != nil {
+					slog.Error("update transfer status", "transfer_id", t.ID, "err", err)
+				}
+				e.broker.Publish(run.ID, sse.Event{RunID: run.ID, TransferID: t.ID, RemotePath: planFile.RemotePath, Status: db.TransferStatusInProgress})
+			}
+
 			slog.Info("git sync started", "repo", planFile.RemotePath, "local", planFile.LocalPath)
+			start := time.Now()
 			commitHash, syncErr := gitsource.Sync(ctx, repo, planFile.LocalPath, auth)
 			if syncErr != nil {
 				slog.Error("git sync failed", "repo", planFile.RemotePath, "err", syncErr)
+				if t != nil {
+					errMsg := syncErr.Error()
+					if err := e.transfers.UpdateStatus(t.ID, db.TransferStatusFailed, &errMsg, nil); err != nil {
+						slog.Error("update transfer status", "transfer_id", t.ID, "err", err)
+					}
+					e.broker.Publish(run.ID, sse.Event{RunID: run.ID, TransferID: t.ID, RemotePath: planFile.RemotePath, Status: db.TransferStatusFailed, Error: errMsg})
+				}
 				mu.Lock()
 				failed++
 				if err := e.runs.UpdateCounts(run.ID, len(plan.Files), copied, skipped, failed); err != nil {
@@ -1060,6 +1101,13 @@ func (e *Engine) executeGitRun(ctx context.Context, job *db.SyncJob, src *db.Sou
 			}
 
 			slog.Info("git sync complete", "repo", planFile.RemotePath, "commit", commitHash)
+			if t != nil {
+				durationMs := time.Since(start).Milliseconds()
+				if err := e.transfers.UpdateStatus(t.ID, db.TransferStatusDone, nil, &durationMs); err != nil {
+					slog.Error("update transfer status", "transfer_id", t.ID, "err", err)
+				}
+				e.broker.Publish(run.ID, sse.Event{RunID: run.ID, TransferID: t.ID, RemotePath: planFile.RemotePath, Status: db.TransferStatusDone})
+			}
 			if err := e.syncState.Upsert(&db.SyncState{
 				JobID:       job.ID,
 				RemotePath:  planFile.RemotePath,

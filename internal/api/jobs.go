@@ -241,25 +241,30 @@ func (h *jobsHandler) update(w http.ResponseWriter, r *http.Request) {
 func (h *jobsHandler) putFileState(w http.ResponseWriter, r *http.Request) {
 	jobID := chi.URLParam(r, "id")
 	var body struct {
-		Path      string `json:"path"`
-		SizeBytes int64  `json:"size_bytes"`
-		Mtime     string `json:"mtime"`
+		Path        string `json:"path"`
+		SizeBytes   int64  `json:"size_bytes"`
+		Mtime       string `json:"mtime"`
+		ContentHash string `json:"content_hash"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Path == "" {
 		writeError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	mtime, err := time.Parse(time.RFC3339Nano, body.Mtime)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid mtime format")
 		return
 	}
 	ss := &db.SyncState{
 		JobID:      jobID,
 		RemotePath: body.Path,
 		SizeBytes:  body.SizeBytes,
-		MTime:      &mtime,
 		CopiedAt:   time.Now(),
+	}
+	if body.ContentHash != "" {
+		ss.ContentHash = &body.ContentHash
+	} else {
+		mtime, err := time.Parse(time.RFC3339Nano, body.Mtime)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "invalid mtime format")
+			return
+		}
+		ss.MTime = &mtime
 	}
 	if err := h.syncState.Upsert(ss); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to set file state")
