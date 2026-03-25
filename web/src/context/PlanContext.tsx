@@ -1,4 +1,5 @@
 import { createContext, useContext, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { openEventSource } from '../hooks/eventSource'
 import { api } from '../api/client'
 import type { PlanResult } from '../api/types'
@@ -11,10 +12,16 @@ interface PlanEntry {
   error?: string
 }
 
+export type JobStatus = 'idle' | 'planning' | 'running'
+type JobEventHandler = (ev: Record<string, unknown>) => void
+
 interface PlanContextValue {
   plans: Record<string, PlanEntry>
+  jobStatuses: Record<string, JobStatus>
   runPlan: (jobId: string) => void
   subscribePlan: (jobId: string) => () => void
+  subscribeJobEvents: (jobId: string) => () => void
+  onJobEvent: (jobId: string, handler: JobEventHandler) => () => void
   dismissPlan: (jobId: string) => void
   unskipFile: (jobId: string, remotePath: string) => void
   skipFile: (jobId: string, remotePath: string) => void
@@ -23,17 +30,27 @@ interface PlanContextValue {
 const PlanContext = createContext<PlanContextValue | null>(null)
 
 export function PlanProvider({ children }: { children: React.ReactNode }) {
+  const qc = useQueryClient()
   const [plans, setPlans] = useState<Record<string, PlanEntry>>({})
-  // One active EventSource cleanup per job — re-subscribing replaces the old one.
-  const subs = useRef<Map<string, () => void>>(new Map())
+  const [jobStatuses, setJobStatuses] = useState<Record<string, JobStatus>>({})
+
+  // Plan SSE subscriptions — one EventSource cleanup per job.
+  const planSubs = useRef<Map<string, () => void>>(new Map())
+
+  // Job events SSE — ref-counted so multiple components can subscribe to the
+  // same job without opening duplicate connections.
+  const jobSubCounts = useRef<Map<string, number>>(new Map())
+  const jobSubCleanups = useRef<Map<string, () => void>>(new Map())
+
+  // Per-job event handlers for page-specific events (e.g. plan_file_updated).
+  const jobEventHandlers = useRef<Map<string, Set<JobEventHandler>>>(new Map())
+
+  // ── Plan events ─────────────────────────────────────────────────────────────
 
   function connectPlanEvents(jobId: string): () => void {
-    // Replace any existing subscription so we don't double-subscribe.
-    subs.current.get(jobId)?.()
+    planSubs.current.get(jobId)?.()
 
     const cleanup = openEventSource(`/api/jobs/${jobId}/plan/events`, (es) => {
-      // No markDone — the connection stays open indefinitely so future plan
-      // events and dismissed signals flow through the same EventSource.
       es.onmessage = (e) => {
         const msg = JSON.parse(e.data)
 
@@ -53,7 +70,6 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
           setPlans((p) => ({ ...p, [jobId]: { ...p[jobId], status: 'done', result: msg.result } }))
           return
         }
-        // progress event
         setPlans((p) => ({
           ...p,
           [jobId]: {
@@ -65,15 +81,13 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
         }))
       }
 
-      es.onerror = () => {
-        es.close()
-      }
+      es.onerror = () => { es.close() }
     })
 
-    subs.current.set(jobId, cleanup)
+    planSubs.current.set(jobId, cleanup)
     return () => {
       cleanup()
-      subs.current.delete(jobId)
+      planSubs.current.delete(jobId)
     }
   }
 
@@ -83,8 +97,6 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
     fetch(`/api/jobs/${jobId}/plan`, { method: 'POST' })
       .then((res) => {
         if (!res.ok && res.status !== 409) throw new Error('failed to start plan')
-        // Events arrive through the already-open plan EventSource — no extra
-        // subscription needed.
       })
       .catch((err: Error) => {
         setPlans((p) => ({ ...p, [jobId]: { status: 'error', scannedFiles: 0, scannedFolders: 0, error: err.message } }))
@@ -94,6 +106,70 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
   function subscribePlan(jobId: string): () => void {
     return connectPlanEvents(jobId)
   }
+
+  // ── Job events ───────────────────────────────────────────────────────────────
+
+  function openJobConnection(jobId: string) {
+    const cleanup = openEventSource(`/api/jobs/${jobId}/events`, (es) => {
+      // On (re)connect, refresh run list to catch any events missed while
+      // the connection was down.
+      es.onopen = () => {
+        qc.invalidateQueries({ queryKey: ['runs', jobId] })
+      }
+      es.onmessage = (e) => {
+        try {
+          const ev = JSON.parse(e.data) as Record<string, unknown>
+          const status = ev.status as string
+          if (status === 'planning') {
+            setJobStatuses((s) => ({ ...s, [jobId]: 'planning' }))
+          } else if (status === 'started') {
+            setJobStatuses((s) => ({ ...s, [jobId]: 'running' }))
+            qc.invalidateQueries({ queryKey: ['runs', jobId] })
+          } else if (status === 'run_finished' || status === 'runs_pruned') {
+            setJobStatuses((s) => ({ ...s, [jobId]: 'idle' }))
+            qc.invalidateQueries({ queryKey: ['runs', jobId] })
+          }
+          // Fan out to any page-specific handlers (e.g. plan_file_updated).
+          jobEventHandlers.current.get(jobId)?.forEach((h) => h(ev))
+        } catch {
+          // malformed event — ignore
+        }
+      }
+    })
+    jobSubCleanups.current.set(jobId, cleanup)
+  }
+
+  function subscribeJobEvents(jobId: string): () => void {
+    const count = (jobSubCounts.current.get(jobId) ?? 0) + 1
+    jobSubCounts.current.set(jobId, count)
+    if (count === 1) openJobConnection(jobId)
+
+    return () => {
+      const newCount = (jobSubCounts.current.get(jobId) ?? 1) - 1
+      jobSubCounts.current.set(jobId, newCount)
+      if (newCount <= 0) {
+        jobSubCleanups.current.get(jobId)?.()
+        jobSubCleanups.current.delete(jobId)
+        jobSubCounts.current.delete(jobId)
+        setJobStatuses((s) => {
+          const { [jobId]: _, ...rest } = s
+          return rest
+        })
+      }
+    }
+  }
+
+  function onJobEvent(jobId: string, handler: JobEventHandler): () => void {
+    if (!jobEventHandlers.current.has(jobId)) {
+      jobEventHandlers.current.set(jobId, new Set())
+    }
+    jobEventHandlers.current.get(jobId)!.add(handler)
+    return () => {
+      jobEventHandlers.current.get(jobId)?.delete(handler)
+    }
+  }
+
+  // ── Plan file state ──────────────────────────────────────────────────────────
 
   function unskipFile(jobId: string, remotePath: string) {
     setPlans((p) => {
@@ -116,15 +192,13 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
         f.remote_path === remotePath ? { ...f, action: 'skip' as const } : f
       )
       const toCopy = files.filter((f) => f.action === 'copy').length
-      const toSkip  = files.filter((f) => f.action === 'skip').length
+      const toSkip = files.filter((f) => f.action === 'skip').length
       return { ...p, [jobId]: { ...entry, result: { ...entry.result, files, to_copy: toCopy, to_skip: toSkip } } }
     })
   }
 
   function dismissPlan(jobId: string) {
     api.jobs.dismissPlan(jobId).catch(() => {})
-    // Local state cleared immediately; the dismissed event through plan SSE
-    // will clear all other connected clients.
     setPlans((p) => {
       const next = { ...p }
       delete next[jobId]
@@ -133,7 +207,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <PlanContext.Provider value={{ plans, runPlan, subscribePlan, dismissPlan, unskipFile, skipFile }}>
+    <PlanContext.Provider value={{ plans, jobStatuses, runPlan, subscribePlan, subscribeJobEvents, onJobEvent, dismissPlan, unskipFile, skipFile }}>
       {children}
     </PlanContext.Provider>
   )

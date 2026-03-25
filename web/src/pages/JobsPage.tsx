@@ -7,7 +7,6 @@ import { JobFormModal } from '../components/JobFormModal'
 import { StatusBadge } from '../components/StatusBadge'
 import { ProgressBar } from '../components/ProgressBar'
 import { useSSE } from '../hooks/useSSE'
-import { openEventSource } from '../hooks/eventSource'
 import { usePlan } from '../context/PlanContext'
 
 function formatBytes(b: number): string {
@@ -154,34 +153,9 @@ function JobRunPreview({ jobId, triggeredAt, onDismiss }: { jobId: string; trigg
 function JobRow({ job, onEdit, onDelete }: { job: SyncJob; onEdit: () => void; onDelete: () => void }) {
   const [showPreview, setShowPreview] = useState(false)
   const [triggeredAt, setTriggeredAt] = useState(0)
-  const [isPlanning, setIsPlanning] = useState(false)
-  const [isRunning, setIsRunning] = useState(false)
-  const qc = useQueryClient()
+  const { jobStatuses, subscribeJobEvents } = usePlan()
 
-  // Subscribe to job-level SSE events to track planning/running state.
-  useEffect(() => {
-    return openEventSource(`/api/jobs/${job.id}/events`, (es) => {
-      es.onmessage = (e) => {
-        try {
-          const ev = JSON.parse(e.data) as { status: string }
-          if (ev.status === 'planning') {
-            setIsPlanning(true)
-            setIsRunning(false)
-          } else if (ev.status === 'started') {
-            setIsPlanning(false)
-            setIsRunning(true)
-            qc.invalidateQueries({ queryKey: ['runs', job.id, 'preview'] })
-          } else if (ev.status === 'run_finished') {
-            setIsPlanning(false)
-            setIsRunning(false)
-            qc.invalidateQueries({ queryKey: ['runs', job.id, 'preview'] })
-          }
-        } catch {
-          // malformed event — ignore
-        }
-      }
-    })
-  }, [job.id, qc])
+  useEffect(() => subscribeJobEvents(job.id), [job.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const run = useMutation({
     mutationFn: () => api.jobs.planThenRun(job.id),
@@ -195,11 +169,12 @@ function JobRow({ job, onEdit, onDelete }: { job: SyncJob; onEdit: () => void; o
     },
   })
 
-  const isBusy = run.isPending || isPlanning || isRunning
+  const jobStatus = jobStatuses[job.id]
+  const isBusy = run.isPending || jobStatus === 'planning' || jobStatus === 'running'
 
   function runLabel() {
-    if (run.isPending || isPlanning) return 'Planning…'
-    if (isRunning) return 'Running…'
+    if (run.isPending || jobStatus === 'planning') return 'Planning…'
+    if (jobStatus === 'running') return 'Running…'
     return 'Run Now'
   }
 
@@ -217,7 +192,7 @@ function JobRow({ job, onEdit, onDelete }: { job: SyncJob; onEdit: () => void; o
           </p>
         </div>
         <div className="shrink-0 flex flex-wrap gap-2">
-          <button onClick={onEdit} className="btn-secondary text-xs">Edit</button>
+          <button onClick={onEdit} disabled={isBusy} className="btn-secondary text-xs">Edit</button>
           <button
             onClick={() => run.mutate()}
             disabled={isBusy}
@@ -225,7 +200,7 @@ function JobRow({ job, onEdit, onDelete }: { job: SyncJob; onEdit: () => void; o
           >
             {runLabel()}
           </button>
-          <button onClick={onDelete} className="btn-danger text-xs">Delete</button>
+          <button onClick={onDelete} disabled={isBusy} className="btn-danger text-xs">Delete</button>
         </div>
       </div>
       {run.isError && (
