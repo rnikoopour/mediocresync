@@ -5,13 +5,8 @@ import type { Source, SourceRequest } from '../api/types'
 import { StatusBadge } from '../components/StatusBadge'
 import { Modal } from '../components/Modal'
 
-const emptyFtpes: SourceRequest = {
+const emptyForm: SourceRequest = {
   name: '', type: 'ftpes', host: '', port: 21, username: '', password: '',
-  auth_type: 'none', auth_credential: '', skip_tls_verify: false, enable_epsv: false,
-}
-
-const emptyGit: SourceRequest = {
-  name: '', type: 'git', host: '', port: 0, username: '', password: '',
   auth_type: 'none', auth_credential: '', skip_tls_verify: false, enable_epsv: false,
 }
 
@@ -53,8 +48,8 @@ export function SourcesPage() {
     onSuccess: (res) => setModalTestResult(res),
   })
 
-  function openCreate(type: 'ftpes' | 'git') {
-    setForm(type === 'ftpes' ? emptyFtpes : emptyGit)
+  function openCreate() {
+    setForm(emptyForm)
     setActiveTab('general')
     setTestResult(null)
     setModalTestResult(null)
@@ -80,10 +75,7 @@ export function SourcesPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Sources</h1>
-        <div className="flex gap-2">
-          <button onClick={() => openCreate('ftpes')} className="btn-primary">Add FTPES</button>
-          <button onClick={() => openCreate('git')} className="btn-secondary">Add Git</button>
-        </div>
+        <button onClick={openCreate} className="btn-primary">Add Source</button>
       </div>
 
       {isLoading && <p className="text-gray-500 dark:text-gray-400 text-sm">Loading…</p>}
@@ -135,7 +127,7 @@ export function SourcesPage() {
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
               <h2 className="font-semibold text-gray-900 dark:text-gray-100">
-                {modal.editing ? `Edit Source` : `Add ${form.type.toUpperCase()} Source`}
+                {modal.editing ? 'Edit Source' : 'Add Source'}
               </h2>
               <button onClick={closeModal} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">&times;</button>
             </div>
@@ -181,6 +173,17 @@ export function SourcesPage() {
                 <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
                   {activeTab === 'general' && (
                     <>
+                      <Field label="Type">
+                        <select
+                          className="input"
+                          value={form.type}
+                          onChange={(e) => setForm({ ...form, type: e.target.value as SourceRequest['type'], host: '', port: e.target.value === 'ftpes' ? 21 : 0, username: '', password: '', auth_type: 'none', auth_credential: '' })}
+                          disabled={!!modal.editing}
+                        >
+                          <option value="ftpes">FTPES</option>
+                          <option value="git">Git</option>
+                        </select>
+                      </Field>
                       <Field label="Name">
                         <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
                       </Field>
