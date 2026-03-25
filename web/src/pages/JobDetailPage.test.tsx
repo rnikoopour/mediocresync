@@ -93,6 +93,7 @@ const defaultHandlers = [
   http.get('/api/jobs/:id',             () => HttpResponse.json(buildJob())),
   http.get('/api/jobs/:id/runs',        () => HttpResponse.json([])),
   http.get('/api/runs/:id',             () => HttpResponse.json(buildRun())),
+  http.get('/api/sources',              () => HttpResponse.json([])),
   http.get('/api/jobs/:id/plan/events', () => new HttpResponse(null, { status: 200, headers: { 'Content-Type': 'text/event-stream' } })),
   http.get('/api/jobs/:id/events',      () => new HttpResponse(null, { status: 200, headers: { 'Content-Type': 'text/event-stream' } })),
 ]

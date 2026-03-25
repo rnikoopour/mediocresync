@@ -9,7 +9,6 @@ import { RunTreeView, formatBytes, formatSpeed } from '../components/RunTree'
 
 import { usePlan } from '../context/PlanContext'
 import { useSSE } from '../hooks/useSSE'
-import { openEventSource } from '../hooks/eventSource'
 
 function formatDuration(ms: number): string {
   const s = Math.floor(ms / 1000)
@@ -528,41 +527,28 @@ export function JobDetailPage() {
     queryKey: ['runs', id],
     queryFn: () => api.jobs.listRuns(id!),
   })
-  const { plans, runPlan, subscribePlan, dismissPlan, unskipFile, skipFile } = usePlan()
+  const { plans, runPlan, subscribePlan, dismissPlan, unskipFile, skipFile, subscribeJobEvents, onJobEvent } = usePlan()
   const planEntry = id ? plans[id] : undefined
   const [planOpen, setPlanOpen] = useState(true)
   const [showAllRuns, setShowAllRuns] = useState(false)
   const RUNS_LIMIT = 25
 
-  // Auto-subscribe to plan events so plans started by other clients are visible.
-  // The cleanup closes the EventSource when the page unmounts or id changes.
-  useEffect(() => {
-    if (!id) return
-    return subscribePlan(id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id])
+  // Auto-subscribe to plan events and job-level events via global context.
+  useEffect(() => { if (!id) return; return subscribePlan(id) }, [id])  // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!id) return; return subscribeJobEvents(id) }, [id])  // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Subscribe to job-level events so runs runed by other clients (including
-  // the scheduler) are discovered immediately. On reconnect after a visibility
-  // change or error, refetch runs to catch any events missed while disconnected.
+  // Handle page-specific job events (plan file updates).
   useEffect(() => {
     if (!id) return
-    return openEventSource(`/api/jobs/${id}/events`, (es) => {
-      es.onopen = () => {
-        qc.invalidateQueries({ queryKey: ['runs', id] })
-      }
-      es.onmessage = (e) => {
-        const ev = JSON.parse(e.data)
-        if (ev.status === 'started' || ev.status === 'run_finished' || ev.status === 'runs_pruned') {
-          qc.invalidateQueries({ queryKey: ['runs', id] })
-        } else if (ev.status === 'plan_file_updated') {
-          if (ev.plan_action === 'skip') skipFile(id, ev.plan_path)
-          else unskipFile(id, ev.plan_path)
-        }
+    return onJobEvent(id, (ev) => {
+      const status = ev.status as string
+      if (status === 'plan_file_updated') {
+        if (ev.plan_action === 'skip') skipFile(id, ev.plan_path as string)
+        else unskipFile(id, ev.plan_path as string)
       }
     })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id])
+  }, [id])  // eslint-disable-line react-hooks/exhaustive-deps
+
   const [editOpen, setEditOpen] = useState(false)
   const jobIsRunning = runs[0]?.status === 'running'
 
