@@ -274,6 +274,13 @@ func (e *Engine) IsRunning(jobID string) bool {
 	return e.active[jobID]
 }
 
+// IsPlanning reports whether a plan scan for the given job is currently active.
+func (e *Engine) IsPlanning(jobID string) bool {
+	e.planMu.Lock()
+	defer e.planMu.Unlock()
+	return e.planActive[jobID]
+}
+
 // RunJob executes a full sync for the given job using a previously stored plan.
 // Returns an error if no plan has been computed via PlanJob/PlanJobStream first.
 // Returns ErrJobAlreadyRunning if a run for this job is already in progress.

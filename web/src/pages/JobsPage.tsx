@@ -217,7 +217,7 @@ function JobRow({ job, onEdit, onDelete }: { job: SyncJob; onEdit: () => void; o
           </p>
         </div>
         <div className="shrink-0 flex flex-wrap gap-2">
-          <button onClick={onEdit} className="btn-secondary text-xs">Edit</button>
+          <button onClick={onEdit} disabled={isBusy} className="btn-secondary text-xs">Edit</button>
           <button
             onClick={() => run.mutate()}
             disabled={isBusy}
@@ -225,7 +225,7 @@ function JobRow({ job, onEdit, onDelete }: { job: SyncJob; onEdit: () => void; o
           >
             {runLabel()}
           </button>
-          <button onClick={onDelete} className="btn-danger text-xs">Delete</button>
+          <button onClick={onDelete} disabled={isBusy} className="btn-danger text-xs">Delete</button>
         </div>
       </div>
       {run.isError && (

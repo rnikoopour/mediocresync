@@ -439,6 +439,18 @@ func (h *jobsHandler) jobEvents(w http.ResponseWriter, r *http.Request) {
 	ch, unsub := h.broker.Subscribe(jobID)
 	defer unsub()
 
+	// Emit the current state immediately so clients that connect while a job
+	// is already running or planning see the correct initial state.
+	if h.engine.IsRunning(jobID) {
+		data, _ := json.Marshal(sse.Event{Status: "started"})
+		fmt.Fprintf(w, "data: %s\n\n", data)
+		flusher.Flush()
+	} else if h.engine.IsPlanning(jobID) {
+		data, _ := json.Marshal(sse.Event{Status: "planning"})
+		fmt.Fprintf(w, "data: %s\n\n", data)
+		flusher.Flush()
+	}
+
 	for {
 		select {
 		case ev, ok := <-ch:
