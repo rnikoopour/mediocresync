@@ -281,6 +281,90 @@ func TestCreateAndListJobs(t *testing.T) {
 	}
 }
 
+func TestCreateGitJobWithRepos(t *testing.T) {
+	router, srcRepo, _, _, session := setupRouter(t)
+
+	src := &db.Source{Name: "gs", Type: db.SourceTypeGit, AuthType: db.AuthTypeNone}
+	_ = srcRepo.Create(src)
+
+	w := do(t, router, "POST", "/api/jobs", map[string]any{
+		"name": "gitjob", "source_id": src.ID, "local_dest": "/tmp",
+		"interval_value": 1, "interval_unit": "hours", "concurrency": 2, "enabled": true,
+		"git_repos": []map[string]any{
+			{"url": "https://github.com/org/repo-a", "branch": "main"},
+			{"url": "https://github.com/org/repo-b", "branch": "dev"},
+		},
+	}, session)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("create git job: got %d (body: %s)", w.Code, w.Body.String())
+	}
+
+	var resp jobResponse
+	decodeJSON(t, w, &resp)
+	if len(resp.GitRepos) != 2 {
+		t.Fatalf("git_repos: got %d, want 2", len(resp.GitRepos))
+	}
+	if resp.GitRepos[0].URL != "https://github.com/org/repo-a" || resp.GitRepos[0].Branch != "main" {
+		t.Errorf("unexpected repo[0]: %+v", resp.GitRepos[0])
+	}
+	if resp.GitRepos[1].URL != "https://github.com/org/repo-b" || resp.GitRepos[1].Branch != "dev" {
+		t.Errorf("unexpected repo[1]: %+v", resp.GitRepos[1])
+	}
+	for _, r := range resp.GitRepos {
+		if r.ID == "" {
+			t.Error("repo ID not populated in response")
+		}
+	}
+
+	// GET should also return repos.
+	wGet := do(t, router, "GET", "/api/jobs/"+resp.ID, nil, session)
+	var getResp jobResponse
+	decodeJSON(t, wGet, &getResp)
+	if len(getResp.GitRepos) != 2 {
+		t.Errorf("GET git_repos: got %d, want 2", len(getResp.GitRepos))
+	}
+}
+
+func TestUpdateGitJobReplacesRepos(t *testing.T) {
+	router, srcRepo, _, _, session := setupRouter(t)
+
+	src := &db.Source{Name: "gs", Type: db.SourceTypeGit, AuthType: db.AuthTypeNone}
+	_ = srcRepo.Create(src)
+
+	// Create with two repos.
+	wCreate := do(t, router, "POST", "/api/jobs", map[string]any{
+		"name": "gitjob", "source_id": src.ID, "local_dest": "/tmp",
+		"interval_value": 1, "interval_unit": "hours", "concurrency": 1, "enabled": true,
+		"git_repos": []map[string]any{
+			{"url": "https://github.com/org/repo-a"},
+			{"url": "https://github.com/org/repo-b"},
+		},
+	}, session)
+	var created jobResponse
+	decodeJSON(t, wCreate, &created)
+
+	// Update with a single different repo.
+	wUpdate := do(t, router, "PUT", "/api/jobs/"+created.ID, map[string]any{
+		"name": "gitjob", "source_id": src.ID, "local_dest": "/tmp",
+		"interval_value": 1, "interval_unit": "hours", "concurrency": 1, "enabled": true,
+		"git_repos": []map[string]any{
+			{"url": "https://github.com/org/repo-c", "branch": "release"},
+		},
+	}, session)
+	if wUpdate.Code != http.StatusOK {
+		t.Fatalf("update job: got %d (body: %s)", wUpdate.Code, wUpdate.Body.String())
+	}
+
+	var updated jobResponse
+	decodeJSON(t, wUpdate, &updated)
+	if len(updated.GitRepos) != 1 {
+		t.Fatalf("git_repos after update: got %d, want 1", len(updated.GitRepos))
+	}
+	if updated.GitRepos[0].URL != "https://github.com/org/repo-c" || updated.GitRepos[0].Branch != "release" {
+		t.Errorf("unexpected repo after update: %+v", updated.GitRepos[0])
+	}
+}
+
 func TestTriggerRunAlreadyRunning(t *testing.T) {
 	router, srcRepo, jobRepo, _, session := setupRouter(t)
 
