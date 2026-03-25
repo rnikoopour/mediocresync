@@ -23,7 +23,8 @@ function buildJob(overrides: Partial<SyncJob> = {}): SyncJob {
   return {
     id: 'job-1',
     name: 'My Job',
-    connection_id: 'conn-1',
+    source_id: 'src-1',
+    git_repos: [],
     remote_path: '/remote/base',
     local_dest: '/local/dest',
     interval_value: 1,
