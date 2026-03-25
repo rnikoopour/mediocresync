@@ -13,7 +13,7 @@ const emptyForm: SourceRequest = {
 export function SourcesPage() {
   const qc = useQueryClient()
   const [modal, setModal] = useState<{ open: boolean; editing: Source | null }>({ open: false, editing: null })
-  const [form, setForm] = useState<SourceRequest>(emptyFtpes)
+  const [form, setForm] = useState<SourceRequest>(emptyForm)
   const [activeTab, setActiveTab] = useState<'general' | 'advanced'>('general')
   const [testResult, setTestResult] = useState<{ id: string; ok: boolean; error?: string } | null>(null)
   const [modalTestResult, setModalTestResult] = useState<{ ok: boolean; error?: string } | null>(null)
