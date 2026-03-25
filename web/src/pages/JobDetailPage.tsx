@@ -426,6 +426,79 @@ function PlanTreeView({ files, remotePath, onSkip, onUnskip }: { files: PlanFile
   )
 }
 
+function GitRepoRow({ file, onSkip, onUnskip }: {
+  file: PlanFile
+  onSkip: (path: string, commitHash: string) => Promise<void>
+  onUnskip: (path: string) => Promise<void>
+}) {
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!menu) return
+    function close(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenu(null)
+    }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [menu])
+
+  useLayoutEffect(() => {
+    if (!menu || !menuRef.current) return
+    const el = menuRef.current
+    const r = el.getBoundingClientRect()
+    if (r.right  > window.innerWidth)  el.style.left = `${menu.x - r.width}px`
+    if (r.bottom > window.innerHeight) el.style.top  = `${menu.y - r.height}px`
+  }, [menu])
+
+  return (
+    <div
+      className="flex items-center gap-3 px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700/50"
+      onContextMenu={(e) => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY }) }}
+    >
+      <StatusBadge status={file.action === 'copy' ? 'pending' : 'skipped'} />
+      <span className="font-mono text-xs text-gray-700 dark:text-gray-300 flex-1 min-w-0 break-all">{file.remote_path}</span>
+      {file.action === 'copy' && (
+        <button
+          className="hidden md:block text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0"
+          onClick={() => onSkip(file.remote_path, file.commit_hash ?? '')}
+        >Skip</button>
+      )}
+      {file.action === 'skip' && (
+        <button
+          className="hidden md:block text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0"
+          onClick={() => onUnskip(file.remote_path)}
+        >Unskip</button>
+      )}
+      <button
+        className="md:hidden px-1 py-0.5 text-gray-400 dark:text-gray-500 text-base leading-none shrink-0"
+        onClick={(e) => { e.stopPropagation(); setMenu({ x: e.clientX, y: e.clientY }) }}
+        aria-label="Actions"
+      >⋮</button>
+      {menu && (
+        <div
+          ref={menuRef}
+          className="fixed z-50 card shadow-lg py-1 min-w-[140px]"
+          style={{ top: menu.y, left: menu.x }}
+        >
+          {file.action === 'copy' && (
+            <button
+              className="w-full text-left px-3 py-1.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+              onClick={() => { onSkip(file.remote_path, file.commit_hash ?? ''); setMenu(null) }}
+            >Skip</button>
+          )}
+          {file.action === 'skip' && (
+            <button
+              className="w-full text-left px-3 py-1.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+              onClick={() => { onUnskip(file.remote_path); setMenu(null) }}
+            >Unskip</button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function GitPlanView({ files, onSkip, onUnskip }: {
   files: PlanFile[]
   onSkip: (path: string, commitHash: string) => Promise<void>
@@ -440,22 +513,7 @@ function GitPlanView({ files, onSkip, onUnskip }: {
         {filtered.length === 0
           ? <p className="px-4 py-4 text-xs text-center text-gray-400 dark:text-gray-500">No items</p>
           : filtered.map((f) => (
-            <div key={f.remote_path} className="flex items-center gap-3 px-4 py-2">
-              <StatusBadge status={f.action === 'copy' ? 'pending' : 'skipped'} />
-              <span className="font-mono text-xs text-gray-700 dark:text-gray-300 flex-1 min-w-0 break-all">{f.remote_path}</span>
-              {f.action === 'copy' && (
-                <button
-                  className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0"
-                  onClick={() => onSkip(f.remote_path, f.commit_hash ?? '')}
-                >Skip</button>
-              )}
-              {f.action === 'skip' && (
-                <button
-                  className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0"
-                  onClick={() => onUnskip(f.remote_path)}
-                >Unskip</button>
-              )}
-            </div>
+            <GitRepoRow key={f.remote_path} file={f} onSkip={onSkip} onUnskip={onUnskip} />
           ))
         }
       </div>
