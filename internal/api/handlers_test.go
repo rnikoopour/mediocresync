@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"testing/fstest"
 	"time"
@@ -514,5 +515,151 @@ func TestUpdateJobPrunesOldRuns(t *testing.T) {
 	}
 	if got, _ := runRepo.Get(recentRun.ID); got == nil {
 		t.Error("recent run should not have been pruned")
+	}
+}
+
+// --- File state (skip/unskip) ---
+
+func TestPutFileStateWithContentHash(t *testing.T) {
+	database, router, srcRepo, jobRepo, _, session := setupRouterFull(t)
+	syncState := db.NewSyncStateRepository(database)
+
+	src := &db.Source{Name: "gs", Type: db.SourceTypeGit, AuthType: db.AuthTypeNone}
+	_ = srcRepo.Create(src)
+	job := &db.SyncJob{
+		Name: "gitjob", SourceID: src.ID, LocalDest: "/tmp",
+		IntervalValue: 1, IntervalUnit: "hours", Concurrency: 1, Enabled: true,
+	}
+	_ = jobRepo.Create(job)
+
+	w := do(t, router, "PUT", "/api/jobs/"+job.ID+"/files", map[string]any{
+		"path": "https://github.com/org/repo", "size_bytes": 0, "content_hash": "deadbeef",
+	}, session)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("put file state: got %d (body: %s)", w.Code, w.Body.String())
+	}
+
+	state, err := syncState.Get(job.ID, "https://github.com/org/repo")
+	if err != nil {
+		t.Fatalf("get sync state: %v", err)
+	}
+	if state == nil {
+		t.Fatal("expected sync state to be set")
+	}
+	if state.ContentHash == nil || *state.ContentHash != "deadbeef" {
+		t.Errorf("content_hash: got %v, want deadbeef", state.ContentHash)
+	}
+	if state.MTime != nil {
+		t.Errorf("mtime should be nil when content_hash is set, got %v", state.MTime)
+	}
+}
+
+func TestPutFileStateWithMtime(t *testing.T) {
+	database, router, srcRepo, jobRepo, _, session := setupRouterFull(t)
+	syncState := db.NewSyncStateRepository(database)
+
+	encrypted, _ := crypto.Encrypt(testEncKey, "pass")
+	src := &db.Source{Name: "s", Type: db.SourceTypeFTPES, Host: "h", Port: 21, Username: "u", Password: encrypted}
+	_ = srcRepo.Create(src)
+	job := &db.SyncJob{
+		Name: "j", SourceID: src.ID, RemotePath: "/", LocalDest: "/tmp",
+		IntervalValue: 1, IntervalUnit: "hours", Concurrency: 1, Enabled: true,
+	}
+	_ = jobRepo.Create(job)
+
+	w := do(t, router, "PUT", "/api/jobs/"+job.ID+"/files", map[string]any{
+		"path": "/remote/file.txt", "size_bytes": 1234, "mtime": "2024-01-15T10:30:00.000000000Z",
+	}, session)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("put file state: got %d (body: %s)", w.Code, w.Body.String())
+	}
+
+	state, err := syncState.Get(job.ID, "/remote/file.txt")
+	if err != nil {
+		t.Fatalf("get sync state: %v", err)
+	}
+	if state == nil {
+		t.Fatal("expected sync state to be set")
+	}
+	if state.MTime == nil {
+		t.Fatal("expected mtime to be set")
+	}
+	if state.ContentHash != nil {
+		t.Errorf("content_hash should be nil when mtime is set, got %v", state.ContentHash)
+	}
+	if state.SizeBytes != 1234 {
+		t.Errorf("size_bytes: got %d, want 1234", state.SizeBytes)
+	}
+}
+
+func TestPutFileStateInvalidMtime(t *testing.T) {
+	router, srcRepo, jobRepo, _, session := setupRouter(t)
+
+	encrypted, _ := crypto.Encrypt(testEncKey, "pass")
+	src := &db.Source{Name: "s", Type: db.SourceTypeFTPES, Host: "h", Port: 21, Username: "u", Password: encrypted}
+	_ = srcRepo.Create(src)
+	job := &db.SyncJob{
+		Name: "j", SourceID: src.ID, RemotePath: "/", LocalDest: "/tmp",
+		IntervalValue: 1, IntervalUnit: "hours", Concurrency: 1, Enabled: true,
+	}
+	_ = jobRepo.Create(job)
+
+	w := do(t, router, "PUT", "/api/jobs/"+job.ID+"/files", map[string]any{
+		"path": "/file.txt", "size_bytes": 100, "mtime": "not-a-valid-time",
+	}, session)
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("invalid mtime: got %d, want 400", w.Code)
+	}
+}
+
+func TestPutFileStateMissingPath(t *testing.T) {
+	router, srcRepo, jobRepo, _, session := setupRouter(t)
+
+	src := &db.Source{Name: "gs", Type: db.SourceTypeGit, AuthType: db.AuthTypeNone}
+	_ = srcRepo.Create(src)
+	job := &db.SyncJob{
+		Name: "j", SourceID: src.ID, LocalDest: "/tmp",
+		IntervalValue: 1, IntervalUnit: "hours", Concurrency: 1, Enabled: true,
+	}
+	_ = jobRepo.Create(job)
+
+	w := do(t, router, "PUT", "/api/jobs/"+job.ID+"/files", map[string]any{
+		"size_bytes": 0, "content_hash": "abc",
+	}, session)
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("missing path: got %d, want 400", w.Code)
+	}
+}
+
+func TestDeleteFileState(t *testing.T) {
+	database, router, srcRepo, jobRepo, _, session := setupRouterFull(t)
+	syncState := db.NewSyncStateRepository(database)
+
+	src := &db.Source{Name: "gs", Type: db.SourceTypeGit, AuthType: db.AuthTypeNone}
+	_ = srcRepo.Create(src)
+	job := &db.SyncJob{
+		Name: "j", SourceID: src.ID, LocalDest: "/tmp",
+		IntervalValue: 1, IntervalUnit: "hours", Concurrency: 1, Enabled: true,
+	}
+	_ = jobRepo.Create(job)
+
+	repoURL := "https://github.com/org/repo"
+	hash := "abc123"
+	_ = syncState.Upsert(&db.SyncState{
+		JobID: job.ID, RemotePath: repoURL,
+		ContentHash: &hash, CopiedAt: time.Now(),
+	})
+
+	w := do(t, router, "DELETE", "/api/jobs/"+job.ID+"/files?path="+url.QueryEscape(repoURL), nil, session)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("delete file state: got %d (body: %s)", w.Code, w.Body.String())
+	}
+
+	state, err := syncState.Get(job.ID, repoURL)
+	if err != nil {
+		t.Fatalf("get sync state after delete: %v", err)
+	}
+	if state != nil {
+		t.Error("expected sync state to be deleted, got non-nil")
 	}
 }
