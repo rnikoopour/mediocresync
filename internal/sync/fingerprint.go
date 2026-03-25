@@ -11,11 +11,14 @@ const mtimeTolerance = time.Second
 
 // Matches returns true if the remote file's size and mtime match the stored
 // state, meaning the file has not changed since it was last copied.
-func Matches(state *db.FileState, remote ftpes.RemoteFile) bool {
+func Matches(state *db.SyncState, remote ftpes.RemoteFile) bool {
 	if state == nil {
 		return false
 	}
 	if state.SizeBytes != remote.Size {
+		return false
+	}
+	if state.MTime == nil {
 		return false
 	}
 	diff := state.MTime.Sub(remote.MTime)

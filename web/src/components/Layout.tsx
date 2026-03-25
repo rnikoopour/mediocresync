@@ -65,7 +65,7 @@ export function Layout() {
         <ul className="flex-1 py-3 space-y-0.5 overflow-y-auto">
           <li>
             <NavLink
-              to="/connections"
+              to="/sources"
               className={({ isActive }) =>
                 `block px-4 py-2 text-sm rounded-md mx-2 ${
                   isActive
@@ -74,7 +74,7 @@ export function Layout() {
                 }`
               }
             >
-              Connections
+              Sources
             </NavLink>
           </li>
           <li>

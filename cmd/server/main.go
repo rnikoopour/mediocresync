@@ -60,11 +60,12 @@ func main() {
 	}
 
 	auth := db.NewAuthRepository(database)
-	connections := db.NewConnectionRepository(database)
+	sources := db.NewSourceRepository(database)
+	gitRepos := db.NewGitRepoRepository(database)
 	jobs := db.NewJobRepository(database)
 	runs := db.NewRunRepository(database)
 	transfers := db.NewTransferRepository(database)
-	fileState := db.NewFileStateRepository(database)
+	syncState := db.NewSyncStateRepository(database)
 
 	// Mark any runs left in "running" state from a previous unclean shutdown.
 	if err := runs.CancelStaleRuns(); err != nil {
@@ -77,11 +78,12 @@ func main() {
 	broker := sse.NewBroker()
 
 	engine := internalsync.NewEngine(
-		connections,
+		sources,
+		gitRepos,
 		jobs,
 		runs,
 		transfers,
-		fileState,
+		syncState,
 		encKey,
 		broker,
 		ctx,
@@ -93,11 +95,12 @@ func main() {
 		ctx,
 		version,
 		auth,
-		connections,
+		sources,
+		gitRepos,
 		jobs,
 		runs,
 		transfers,
-		fileState,
+		syncState,
 		engine,
 		broker,
 		encKey,

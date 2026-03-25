@@ -14,50 +14,67 @@ import (
 	"github.com/rnikoopour/mediocresync/internal/sse"
 )
 
+type gitRepoRequest struct {
+	URL    string `json:"url"`
+	Branch string `json:"branch"`
+}
+
+type gitRepoResponse struct {
+	ID     string `json:"id"`
+	URL    string `json:"url"`
+	Branch string `json:"branch"`
+}
+
 type jobRequest struct {
-	Name               string   `json:"name"`
-	ConnectionID       string   `json:"connection_id"`
-	RemotePath         string   `json:"remote_path"`
-	LocalDest          string   `json:"local_dest"`
-	IntervalValue      int      `json:"interval_value"`
-	IntervalUnit       string   `json:"interval_unit"`
-	Concurrency        int      `json:"concurrency"`
-	RetryAttempts      int      `json:"retry_attempts"`
-	RetryDelaySeconds  int      `json:"retry_delay_seconds"`
-	Enabled            bool     `json:"enabled"`
-	IncludePathFilters []string `json:"include_path_filters"`
-	IncludeNameFilters []string `json:"include_name_filters"`
-	ExcludePathFilters []string `json:"exclude_path_filters"`
-	ExcludeNameFilters []string `json:"exclude_name_filters"`
-	RunRetentionDays   int      `json:"run_retention_days"`
+	Name               string           `json:"name"`
+	SourceID           string           `json:"source_id"`
+	RemotePath         string           `json:"remote_path"`
+	LocalDest          string           `json:"local_dest"`
+	IntervalValue      int              `json:"interval_value"`
+	IntervalUnit       string           `json:"interval_unit"`
+	Concurrency        int              `json:"concurrency"`
+	RetryAttempts      int              `json:"retry_attempts"`
+	RetryDelaySeconds  int              `json:"retry_delay_seconds"`
+	Enabled            bool             `json:"enabled"`
+	IncludePathFilters []string         `json:"include_path_filters"`
+	IncludeNameFilters []string         `json:"include_name_filters"`
+	ExcludePathFilters []string         `json:"exclude_path_filters"`
+	ExcludeNameFilters []string         `json:"exclude_name_filters"`
+	RunRetentionDays   int              `json:"run_retention_days"`
+	GitRepos           []gitRepoRequest `json:"git_repos"`
 }
 
 type jobResponse struct {
-	ID                 string   `json:"id"`
-	Name               string   `json:"name"`
-	ConnectionID       string   `json:"connection_id"`
-	RemotePath         string   `json:"remote_path"`
-	LocalDest          string   `json:"local_dest"`
-	IntervalValue      int      `json:"interval_value"`
-	IntervalUnit       string   `json:"interval_unit"`
-	Concurrency        int      `json:"concurrency"`
-	RetryAttempts      int      `json:"retry_attempts"`
-	RetryDelaySeconds  int      `json:"retry_delay_seconds"`
-	Enabled            bool     `json:"enabled"`
-	IncludePathFilters []string `json:"include_path_filters"`
-	IncludeNameFilters []string `json:"include_name_filters"`
-	ExcludePathFilters []string `json:"exclude_path_filters"`
-	ExcludeNameFilters []string `json:"exclude_name_filters"`
-	RunRetentionDays   int      `json:"run_retention_days"`
-	CreatedAt          string   `json:"created_at"`
-	UpdatedAt          string   `json:"updated_at"`
+	ID                 string            `json:"id"`
+	Name               string            `json:"name"`
+	SourceID           string            `json:"source_id"`
+	RemotePath         string            `json:"remote_path"`
+	LocalDest          string            `json:"local_dest"`
+	IntervalValue      int               `json:"interval_value"`
+	IntervalUnit       string            `json:"interval_unit"`
+	Concurrency        int               `json:"concurrency"`
+	RetryAttempts      int               `json:"retry_attempts"`
+	RetryDelaySeconds  int               `json:"retry_delay_seconds"`
+	Enabled            bool              `json:"enabled"`
+	IncludePathFilters []string          `json:"include_path_filters"`
+	IncludeNameFilters []string          `json:"include_name_filters"`
+	ExcludePathFilters []string          `json:"exclude_path_filters"`
+	ExcludeNameFilters []string          `json:"exclude_name_filters"`
+	RunRetentionDays   int               `json:"run_retention_days"`
+	GitRepos           []gitRepoResponse `json:"git_repos"`
+	CreatedAt          string            `json:"created_at"`
+	UpdatedAt          string            `json:"updated_at"`
 }
 
-func toJobResponse(j *db.SyncJob) jobResponse {
+func toJobResponse(j *db.SyncJob, repos []*db.GitRepo) jobResponse {
+	gitRepos := make([]gitRepoResponse, len(repos))
+	for i, r := range repos {
+		gitRepos[i] = gitRepoResponse{ID: r.ID, URL: r.URL, Branch: r.Branch}
+	}
 	return jobResponse{
 		ID:                 j.ID,
 		Name:               j.Name,
-		ConnectionID:       j.ConnectionID,
+		SourceID:           j.SourceID,
 		RemotePath:         j.RemotePath,
 		LocalDest:          j.LocalDest,
 		IntervalValue:      j.IntervalValue,
@@ -71,6 +88,7 @@ func toJobResponse(j *db.SyncJob) jobResponse {
 		ExcludePathFilters: j.ExcludePathFilters,
 		ExcludeNameFilters: j.ExcludeNameFilters,
 		RunRetentionDays:   j.RunRetentionDays,
+		GitRepos:           gitRepos,
 		CreatedAt:          j.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		UpdatedAt:          j.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 	}
@@ -78,8 +96,9 @@ func toJobResponse(j *db.SyncJob) jobResponse {
 
 type jobsHandler struct {
 	repo      *db.JobRepository
+	gitRepos  *db.GitRepoRepository
 	runs      *db.RunRepository
-	fileState *db.FileStateRepository
+	syncState *db.SyncStateRepository
 	engine    *internalsync.Engine
 	broker    *sse.Broker
 	appCtx    context.Context
@@ -93,7 +112,8 @@ func (h *jobsHandler) list(w http.ResponseWriter, r *http.Request) {
 	}
 	resp := make([]jobResponse, len(jobs))
 	for i, j := range jobs {
-		resp[i] = toJobResponse(j)
+		repos, _ := h.gitRepos.ListByJob(j.ID)
+		resp[i] = toJobResponse(j, repos)
 	}
 	writeJSON(w, http.StatusOK, resp)
 }
@@ -104,8 +124,8 @@ func (h *jobsHandler) create(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if req.Name == "" || req.ConnectionID == "" || req.LocalDest == "" {
-		writeError(w, http.StatusBadRequest, "name, connection_id, and local_dest are required")
+	if req.Name == "" || req.SourceID == "" || req.LocalDest == "" {
+		writeError(w, http.StatusBadRequest, "name, source_id, and local_dest are required")
 		return
 	}
 	if req.RemotePath == "" {
@@ -123,7 +143,7 @@ func (h *jobsHandler) create(w http.ResponseWriter, r *http.Request) {
 
 	job := &db.SyncJob{
 		Name:               req.Name,
-		ConnectionID:       req.ConnectionID,
+		SourceID:           req.SourceID,
 		RemotePath:         req.RemotePath,
 		LocalDest:          req.LocalDest,
 		IntervalValue:      req.IntervalValue,
@@ -142,7 +162,15 @@ func (h *jobsHandler) create(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to create job")
 		return
 	}
-	writeJSON(w, http.StatusCreated, toJobResponse(job))
+	dbRepos := make([]*db.GitRepo, len(req.GitRepos))
+	for i, gr := range req.GitRepos {
+		dbRepos[i] = &db.GitRepo{URL: gr.URL, Branch: gr.Branch}
+	}
+	if err := h.gitRepos.ReplaceForJob(job.ID, dbRepos); err != nil {
+		slog.Error("save git repos on create", "job_id", job.ID, "err", err)
+	}
+	storedRepos, _ := h.gitRepos.ListByJob(job.ID)
+	writeJSON(w, http.StatusCreated, toJobResponse(job, storedRepos))
 }
 
 func (h *jobsHandler) get(w http.ResponseWriter, r *http.Request) {
@@ -155,7 +183,8 @@ func (h *jobsHandler) get(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "job not found")
 		return
 	}
-	writeJSON(w, http.StatusOK, toJobResponse(job))
+	repos, _ := h.gitRepos.ListByJob(job.ID)
+	writeJSON(w, http.StatusOK, toJobResponse(job, repos))
 }
 
 func (h *jobsHandler) update(w http.ResponseWriter, r *http.Request) {
@@ -172,7 +201,7 @@ func (h *jobsHandler) update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	job.Name = req.Name
-	job.ConnectionID = req.ConnectionID
+	job.SourceID = req.SourceID
 	job.RemotePath = req.RemotePath
 	job.LocalDest = req.LocalDest
 	job.IntervalValue = req.IntervalValue
@@ -191,6 +220,13 @@ func (h *jobsHandler) update(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to update job")
 		return
 	}
+	dbRepos := make([]*db.GitRepo, len(req.GitRepos))
+	for i, gr := range req.GitRepos {
+		dbRepos[i] = &db.GitRepo{URL: gr.URL, Branch: gr.Branch}
+	}
+	if err := h.gitRepos.ReplaceForJob(job.ID, dbRepos); err != nil {
+		slog.Error("save git repos on update", "job_id", job.ID, "err", err)
+	}
 	if job.RunRetentionDays > 0 {
 		if err := h.runs.PruneForJob(job.ID, job.RunRetentionDays); err != nil {
 			slog.Error("prune runs on save", "job_id", job.ID, "err", err)
@@ -198,33 +234,39 @@ func (h *jobsHandler) update(w http.ResponseWriter, r *http.Request) {
 			h.broker.Publish(job.ID, sse.Event{Status: "runs_pruned"})
 		}
 	}
-	writeJSON(w, http.StatusOK, toJobResponse(job))
+	storedRepos, _ := h.gitRepos.ListByJob(job.ID)
+	writeJSON(w, http.StatusOK, toJobResponse(job, storedRepos))
 }
 
 func (h *jobsHandler) putFileState(w http.ResponseWriter, r *http.Request) {
 	jobID := chi.URLParam(r, "id")
 	var body struct {
-		Path      string `json:"path"`
-		SizeBytes int64  `json:"size_bytes"`
-		Mtime     string `json:"mtime"`
+		Path        string `json:"path"`
+		SizeBytes   int64  `json:"size_bytes"`
+		Mtime       string `json:"mtime"`
+		ContentHash string `json:"content_hash"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Path == "" {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	mtime, err := time.Parse(time.RFC3339Nano, body.Mtime)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid mtime format")
-		return
-	}
-	fs := &db.FileState{
+	ss := &db.SyncState{
 		JobID:      jobID,
 		RemotePath: body.Path,
 		SizeBytes:  body.SizeBytes,
-		MTime:      mtime,
 		CopiedAt:   time.Now(),
 	}
-	if err := h.fileState.Upsert(fs); err != nil {
+	if body.ContentHash != "" {
+		ss.ContentHash = &body.ContentHash
+	} else {
+		mtime, err := time.Parse(time.RFC3339Nano, body.Mtime)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "invalid mtime format")
+			return
+		}
+		ss.MTime = &mtime
+	}
+	if err := h.syncState.Upsert(ss); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to set file state")
 		return
 	}
@@ -240,7 +282,7 @@ func (h *jobsHandler) deleteFileState(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "path query parameter is required")
 		return
 	}
-	if err := h.fileState.Delete(jobID, remotePath); err != nil {
+	if err := h.syncState.Delete(jobID, remotePath); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to clear file state")
 		return
 	}

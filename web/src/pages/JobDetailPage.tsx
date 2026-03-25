@@ -41,7 +41,7 @@ function sortNodes<T extends { type: string; name: string }>(nodes: T[]): T[] {
 
 // ── Run row ───────────────────────────────────────────────────────────────────
 
-function RunRow({ run: initialRun, remotePath, jobId }: { run: Run; remotePath: string; jobId: string }) {
+function RunRow({ run: initialRun, remotePath, jobId, isGit }: { run: Run; remotePath: string; jobId: string; isGit: boolean }) {
   const qc = useQueryClient()
   const [open, setOpen] = useState(initialRun.status === 'running')
 
@@ -147,8 +147,18 @@ function RunRow({ run: initialRun, remotePath, jobId }: { run: Run; remotePath: 
           <div className="border-t border-gray-100 dark:border-gray-700 px-4 py-4 text-xs text-center text-gray-400 dark:text-gray-500">
             {run.error_msg
               ? <p className="text-red-500 dark:text-red-400 font-mono break-all">{run.error_msg}</p>
-              : <p>No transfers recorded.</p>
+              : <p>{isGit ? 'No repos to sync.' : 'No transfers recorded.'}</p>
             }
+          </div>
+        ) : isGit ? (
+          <div className="border-t border-gray-100 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700">
+            {transfers.map((t) => (
+              <div key={t.id} className="flex items-center gap-3 px-4 py-2">
+                <StatusBadge status={t.status} />
+                <span className="font-mono text-xs text-gray-700 dark:text-gray-300 flex-1 min-w-0 break-all">{t.remote_path}</span>
+                {t.error_msg && <span className="text-xs text-red-500 dark:text-red-400 truncate">{t.error_msg}</span>}
+              </div>
+            ))}
           </div>
         ) : (
           <RunTreeView transfers={transfers} remotePath={remotePath} liveEvents={liveEvents} runEnded={!isRunning} />
@@ -416,11 +426,104 @@ function PlanTreeView({ files, remotePath, onSkip, onUnskip }: { files: PlanFile
   )
 }
 
+function GitRepoRow({ file, onSkip, onUnskip }: {
+  file: PlanFile
+  onSkip: (path: string, commitHash: string) => Promise<void>
+  onUnskip: (path: string) => Promise<void>
+}) {
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!menu) return
+    function close(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenu(null)
+    }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [menu])
+
+  useLayoutEffect(() => {
+    if (!menu || !menuRef.current) return
+    const el = menuRef.current
+    const r = el.getBoundingClientRect()
+    if (r.right  > window.innerWidth)  el.style.left = `${menu.x - r.width}px`
+    if (r.bottom > window.innerHeight) el.style.top  = `${menu.y - r.height}px`
+  }, [menu])
+
+  return (
+    <div
+      className="flex items-center gap-2 py-1 hover:bg-gray-50 dark:hover:bg-gray-700/50 relative"
+      style={{ paddingLeft: '12px', paddingRight: '16px' }}
+      onContextMenu={(e) => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY }) }}
+    >
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="hidden md:inline shrink-0"><StatusBadge status={file.action === 'copy' ? 'pending' : 'skipped'} /></span>
+          <span className="font-mono text-xs text-gray-600 dark:text-gray-300 flex-1 min-w-0 break-all">{file.remote_path}</span>
+          <button
+            className="md:hidden px-1 py-0.5 text-gray-400 dark:text-gray-500 text-base leading-none shrink-0"
+            onClick={(e) => { e.stopPropagation(); setMenu({ x: e.clientX, y: e.clientY }) }}
+            aria-label="Actions"
+          >⋮</button>
+        </div>
+        <div className="flex md:hidden items-center gap-2 mt-0.5">
+          <StatusBadge status={file.action === 'copy' ? 'pending' : 'skipped'} />
+        </div>
+      </div>
+      {menu && (
+        <div
+          ref={menuRef}
+          className="fixed z-50 card shadow-lg py-1 min-w-[140px]"
+          style={{ top: menu.y, left: menu.x }}
+        >
+          {file.action === 'copy' && (
+            <button
+              className="w-full text-left px-3 py-1.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+              onClick={() => { onSkip(file.remote_path, file.commit_hash ?? ''); setMenu(null) }}
+            >Skip</button>
+          )}
+          {file.action === 'skip' && (
+            <button
+              className="w-full text-left px-3 py-1.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+              onClick={() => { onUnskip(file.remote_path); setMenu(null) }}
+            >Unskip</button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function GitPlanView({ files, onSkip, onUnskip }: {
+  files: PlanFile[]
+  onSkip: (path: string, commitHash: string) => Promise<void>
+  onUnskip: (path: string) => Promise<void>
+}) {
+  const [tab, setTab] = useState<TreeTab>('copy')
+  const filtered = tab === 'all' ? files : files.filter((f) => tab === 'copy' ? f.action === 'copy' : f.action === 'skip')
+  return (
+    <div className="card overflow-hidden">
+      <TreeTabBar tab={tab} onTab={setTab} />
+      <div className="divide-y divide-gray-100 dark:divide-gray-700 py-1">
+        {filtered.length === 0
+          ? <p className="px-4 py-4 text-xs text-center text-gray-400 dark:text-gray-500">No items</p>
+          : filtered.map((f) => (
+            <GitRepoRow key={f.remote_path} file={f} onSkip={onSkip} onUnskip={onUnskip} />
+          ))
+        }
+      </div>
+    </div>
+  )
+}
+
 export function JobDetailPage() {
   const { id } = useParams<{ id: string }>()
   const qc = useQueryClient()
 
   const { data: job } = useQuery({ queryKey: ['jobs', id], queryFn: () => api.jobs.get(id!) })
+  const { data: sources = [] } = useQuery({ queryKey: ['sources'], queryFn: api.sources.list })
+  const isGitJob = !!sources.find((s) => s.id === job?.source_id && s.type === 'git')
   const { data: runs = [], isLoading } = useQuery({
     queryKey: ['runs', id],
     queryFn: () => api.jobs.listRuns(id!),
@@ -474,6 +577,11 @@ export function JobDetailPage() {
   const doSkip = (f: TreeFile): Promise<void> =>
     api.jobs.skipFile(id!, f.remote_path, f.size_bytes, f.mtime)
       .then(() => { if (id) skipFile(id, f.remote_path) })
+      .catch(() => {})
+
+  const doGitSkip = (path: string, commitHash: string): Promise<void> =>
+    api.jobs.skipFile(id!, path, 0, '', commitHash)
+      .then(() => { if (id) skipFile(id, path) })
       .catch(() => {})
 
   const doUnskip = (remotePath: string): Promise<void> =>
@@ -569,7 +677,10 @@ export function JobDetailPage() {
               </div>
             ) : planEntry.result && (
               <div className="border-t border-gray-100 dark:border-gray-700">
-                <PlanTreeView files={planEntry.result.files} remotePath={job?.remote_path ?? ''} onSkip={doSkip} onUnskip={doUnskip} />
+                {isGitJob
+                  ? <GitPlanView files={planEntry.result.files} onSkip={doGitSkip} onUnskip={doUnskip} />
+                  : <PlanTreeView files={planEntry.result.files} remotePath={job?.remote_path ?? ''} onSkip={doSkip} onUnskip={doUnskip} />
+                }
               </div>
             )
           )}
@@ -595,7 +706,7 @@ export function JobDetailPage() {
 
       <div className="space-y-2">
         {(showAllRuns ? runs : runs.slice(0, RUNS_LIMIT)).map((run) => (
-          <RunRow key={run.id} run={run} remotePath={job?.remote_path ?? ''} jobId={id!} />
+          <RunRow key={run.id} run={run} remotePath={job?.remote_path ?? ''} jobId={id!} isGit={isGitJob} />
         ))}
       </div>
 

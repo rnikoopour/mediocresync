@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"testing/fstest"
 	"time"
@@ -20,7 +21,7 @@ import (
 
 var testEncKey = bytes.Repeat([]byte{0x01}, 32)
 
-func setupRouterFull(t *testing.T) (*sql.DB, http.Handler, *db.ConnectionRepository, *db.JobRepository, *db.RunRepository, string) {
+func setupRouterFull(t *testing.T) (*sql.DB, http.Handler, *db.SourceRepository, *db.JobRepository, *db.RunRepository, string) {
 	t.Helper()
 	database, err := db.Open(":memory:")
 	if err != nil {
@@ -29,16 +30,17 @@ func setupRouterFull(t *testing.T) (*sql.DB, http.Handler, *db.ConnectionReposit
 	t.Cleanup(func() { database.Close() })
 
 	auth := db.NewAuthRepository(database)
-	connections := db.NewConnectionRepository(database)
+	sources := db.NewSourceRepository(database)
 	jobs := db.NewJobRepository(database)
 	runs := db.NewRunRepository(database)
 	transfers := db.NewTransferRepository(database)
-	fileState := db.NewFileStateRepository(database)
+	syncState := db.NewSyncStateRepository(database)
 	broker := sse.NewBroker()
-	engine := internalsync.NewEngine(connections, jobs, runs, transfers, fileState, testEncKey, broker, context.Background())
+	gitRepos := db.NewGitRepoRepository(database)
+	engine := internalsync.NewEngine(sources, gitRepos, jobs, runs, transfers, syncState, testEncKey, broker, context.Background())
 
 	staticFS := fstest.MapFS{"index.html": {Data: []byte("<html></html>")}}
-	router := NewRouter(context.Background(), "dev", auth, connections, jobs, runs, transfers, fileState, engine, broker, testEncKey, true, new(slog.LevelVar), nil, staticFS)
+	router := NewRouter(context.Background(), "dev", auth, sources, gitRepos, jobs, runs, transfers, syncState, engine, broker, testEncKey, true, new(slog.LevelVar), nil, staticFS)
 
 	w := do(t, router, "POST", "/api/auth/setup", map[string]any{
 		"username": "testuser", "password": "testpass", "password_confirm": "testpass",
@@ -63,10 +65,10 @@ func setupRouterFull(t *testing.T) (*sql.DB, http.Handler, *db.ConnectionReposit
 		t.Fatal("no session cookie after login")
 	}
 
-	return database, router, connections, jobs, runs, sessionToken
+	return database, router, sources, jobs, runs, sessionToken
 }
 
-func setupRouter(t *testing.T) (http.Handler, *db.ConnectionRepository, *db.JobRepository, *db.RunRepository, string) {
+func setupRouter(t *testing.T) (http.Handler, *db.SourceRepository, *db.JobRepository, *db.RunRepository, string) {
 	t.Helper()
 	database, err := db.Open(":memory:")
 	if err != nil {
@@ -75,16 +77,17 @@ func setupRouter(t *testing.T) (http.Handler, *db.ConnectionRepository, *db.JobR
 	t.Cleanup(func() { database.Close() })
 
 	auth := db.NewAuthRepository(database)
-	connections := db.NewConnectionRepository(database)
+	sources := db.NewSourceRepository(database)
 	jobs := db.NewJobRepository(database)
 	runs := db.NewRunRepository(database)
 	transfers := db.NewTransferRepository(database)
-	fileState := db.NewFileStateRepository(database)
+	syncState := db.NewSyncStateRepository(database)
 	broker := sse.NewBroker()
-	engine := internalsync.NewEngine(connections, jobs, runs, transfers, fileState, testEncKey, broker, context.Background())
+	gitRepos := db.NewGitRepoRepository(database)
+	engine := internalsync.NewEngine(sources, gitRepos, jobs, runs, transfers, syncState, testEncKey, broker, context.Background())
 
 	staticFS := fstest.MapFS{"index.html": {Data: []byte("<html></html>")}}
-	router := NewRouter(context.Background(), "dev", auth, connections, jobs, runs, transfers, fileState, engine, broker, testEncKey, true, new(slog.LevelVar), nil, staticFS)
+	router := NewRouter(context.Background(), "dev", auth, sources, gitRepos, jobs, runs, transfers, syncState, engine, broker, testEncKey, true, new(slog.LevelVar), nil, staticFS)
 
 	// Configure credentials and log in so tests can hit protected endpoints.
 	w := do(t, router, "POST", "/api/auth/setup", map[string]any{
@@ -110,7 +113,7 @@ func setupRouter(t *testing.T) (http.Handler, *db.ConnectionRepository, *db.JobR
 		t.Fatal("no session cookie after login")
 	}
 
-	return router, connections, jobs, runs, sessionToken
+	return router, sources, jobs, runs, sessionToken
 }
 
 // do performs an HTTP request against the router. Pass a session token as the
@@ -140,36 +143,36 @@ func decodeJSON(t *testing.T, w *httptest.ResponseRecorder, v any) {
 	}
 }
 
-// --- Connections ---
+// --- Sources ---
 
-func TestListConnectionsEmpty(t *testing.T) {
+func TestListSourcesEmpty(t *testing.T) {
 	router, _, _, _, session := setupRouter(t)
-	w := do(t, router, "GET", "/api/connections", nil, session)
+	w := do(t, router, "GET", "/api/sources", nil, session)
 	if w.Code != http.StatusOK {
 		t.Fatalf("got %d, want 200", w.Code)
 	}
-	var list []connectionResponse
+	var list []sourceResponse
 	decodeJSON(t, w, &list)
 	if len(list) != 0 {
 		t.Errorf("expected empty list, got %d items", len(list))
 	}
 }
 
-func TestCreateAndGetConnection(t *testing.T) {
+func TestCreateAndGetSource(t *testing.T) {
 	router, _, _, _, session := setupRouter(t)
 
-	w := do(t, router, "POST", "/api/connections", map[string]any{
-		"name": "test", "host": "ftp.example.com", "port": 21,
+	w := do(t, router, "POST", "/api/sources", map[string]any{
+		"name": "test", "type": "ftpes", "host": "ftp.example.com", "port": 21,
 		"username": "user", "password": "secret", "skip_tls_verify": false,
 	}, session)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("create: got %d, want 201 (body: %s)", w.Code, w.Body.String())
 	}
 
-	var created connectionResponse
+	var created sourceResponse
 	decodeJSON(t, w, &created)
 	if created.ID == "" {
-		t.Fatal("no ID in created connection")
+		t.Fatal("no ID in created source")
 	}
 	// Password must never be in the response
 	if w.Body.String() != "" {
@@ -181,66 +184,66 @@ func TestCreateAndGetConnection(t *testing.T) {
 	}
 
 	// GET by ID
-	w2 := do(t, router, "GET", "/api/connections/"+created.ID, nil, session)
+	w2 := do(t, router, "GET", "/api/sources/"+created.ID, nil, session)
 	if w2.Code != http.StatusOK {
 		t.Fatalf("get: got %d, want 200", w2.Code)
 	}
 }
 
-func TestCreateConnectionMissingFields(t *testing.T) {
+func TestCreateSourceMissingFields(t *testing.T) {
 	router, _, _, _, session := setupRouter(t)
-	w := do(t, router, "POST", "/api/connections", map[string]any{"name": "incomplete"}, session)
+	w := do(t, router, "POST", "/api/sources", map[string]any{"name": "incomplete", "type": "ftpes"}, session)
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("got %d, want 400", w.Code)
 	}
 }
 
-func TestDeleteConnection(t *testing.T) {
+func TestDeleteSource(t *testing.T) {
 	router, _, _, _, session := setupRouter(t)
 
-	w := do(t, router, "POST", "/api/connections", map[string]any{
-		"name": "del", "host": "h", "port": 21, "username": "u", "password": "p",
+	w := do(t, router, "POST", "/api/sources", map[string]any{
+		"name": "del", "type": "ftpes", "host": "h", "port": 21, "username": "u", "password": "p",
 	}, session)
-	var created connectionResponse
+	var created sourceResponse
 	decodeJSON(t, w, &created)
 
-	w2 := do(t, router, "DELETE", "/api/connections/"+created.ID, nil, session)
+	w2 := do(t, router, "DELETE", "/api/sources/"+created.ID, nil, session)
 	if w2.Code != http.StatusNoContent {
 		t.Errorf("delete: got %d, want 204", w2.Code)
 	}
 
-	w3 := do(t, router, "GET", "/api/connections/"+created.ID, nil, session)
+	w3 := do(t, router, "GET", "/api/sources/"+created.ID, nil, session)
 	if w3.Code != http.StatusNotFound {
 		t.Errorf("after delete, get should return 404, got %d", w3.Code)
 	}
 }
 
-func TestGetConnectionNotFound(t *testing.T) {
+func TestGetSourceNotFound(t *testing.T) {
 	router, _, _, _, session := setupRouter(t)
-	w := do(t, router, "GET", "/api/connections/nonexistent", nil, session)
+	w := do(t, router, "GET", "/api/sources/nonexistent", nil, session)
 	if w.Code != http.StatusNotFound {
 		t.Errorf("got %d, want 404", w.Code)
 	}
 }
 
-func TestUpdateConnectionPasswordOptional(t *testing.T) {
-	router, connRepo, _, _, session := setupRouter(t)
+func TestUpdateSourcePasswordOptional(t *testing.T) {
+	router, srcRepo, _, _, session := setupRouter(t)
 
 	// Create with known password
 	encrypted, _ := crypto.Encrypt(testEncKey, "original")
-	conn := &db.Connection{Name: "c", Host: "h", Port: 21, Username: "u", Password: encrypted}
-	_ = connRepo.Create(conn)
+	src := &db.Source{Name: "c", Type: db.SourceTypeFTPES, Host: "h", Port: 21, Username: "u", Password: encrypted}
+	_ = srcRepo.Create(src)
 
 	// Update without providing a new password
-	w := do(t, router, "PUT", "/api/connections/"+conn.ID, map[string]any{
-		"name": "updated", "host": "h", "port": 21, "username": "u", "password": "",
+	w := do(t, router, "PUT", "/api/sources/"+src.ID, map[string]any{
+		"name": "updated", "type": "ftpes", "host": "h", "port": 21, "username": "u", "password": "",
 	}, session)
 	if w.Code != http.StatusOK {
 		t.Fatalf("update: got %d (body: %s)", w.Code, w.Body.String())
 	}
 
 	// Password in DB should be unchanged
-	got, _ := connRepo.Get(conn.ID)
+	got, _ := srcRepo.Get(src.ID)
 	decrypted, err := crypto.Decrypt(testEncKey, got.Password)
 	if err != nil || decrypted != "original" {
 		t.Errorf("password should be unchanged, got %q (err: %v)", decrypted, err)
@@ -250,14 +253,14 @@ func TestUpdateConnectionPasswordOptional(t *testing.T) {
 // --- Jobs ---
 
 func TestCreateAndListJobs(t *testing.T) {
-	router, connRepo, _, _, session := setupRouter(t)
+	router, srcRepo, _, _, session := setupRouter(t)
 
 	encrypted, _ := crypto.Encrypt(testEncKey, "pass")
-	conn := &db.Connection{Name: "c", Host: "h", Port: 21, Username: "u", Password: encrypted}
-	_ = connRepo.Create(conn)
+	src := &db.Source{Name: "c", Type: db.SourceTypeFTPES, Host: "h", Port: 21, Username: "u", Password: encrypted}
+	_ = srcRepo.Create(src)
 
 	w := do(t, router, "POST", "/api/jobs", map[string]any{
-		"name": "myjob", "connection_id": conn.ID, "remote_path": "/",
+		"name": "myjob", "source_id": src.ID, "remote_path": "/",
 		"local_dest": "/tmp", "interval_value": 30, "interval_unit": "minutes",
 		"concurrency": 3, "enabled": true,
 	}, session)
@@ -279,14 +282,98 @@ func TestCreateAndListJobs(t *testing.T) {
 	}
 }
 
+func TestCreateGitJobWithRepos(t *testing.T) {
+	router, srcRepo, _, _, session := setupRouter(t)
+
+	src := &db.Source{Name: "gs", Type: db.SourceTypeGit, AuthType: db.AuthTypeNone}
+	_ = srcRepo.Create(src)
+
+	w := do(t, router, "POST", "/api/jobs", map[string]any{
+		"name": "gitjob", "source_id": src.ID, "local_dest": "/tmp",
+		"interval_value": 1, "interval_unit": "hours", "concurrency": 2, "enabled": true,
+		"git_repos": []map[string]any{
+			{"url": "https://github.com/org/repo-a", "branch": "main"},
+			{"url": "https://github.com/org/repo-b", "branch": "dev"},
+		},
+	}, session)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("create git job: got %d (body: %s)", w.Code, w.Body.String())
+	}
+
+	var resp jobResponse
+	decodeJSON(t, w, &resp)
+	if len(resp.GitRepos) != 2 {
+		t.Fatalf("git_repos: got %d, want 2", len(resp.GitRepos))
+	}
+	if resp.GitRepos[0].URL != "https://github.com/org/repo-a" || resp.GitRepos[0].Branch != "main" {
+		t.Errorf("unexpected repo[0]: %+v", resp.GitRepos[0])
+	}
+	if resp.GitRepos[1].URL != "https://github.com/org/repo-b" || resp.GitRepos[1].Branch != "dev" {
+		t.Errorf("unexpected repo[1]: %+v", resp.GitRepos[1])
+	}
+	for _, r := range resp.GitRepos {
+		if r.ID == "" {
+			t.Error("repo ID not populated in response")
+		}
+	}
+
+	// GET should also return repos.
+	wGet := do(t, router, "GET", "/api/jobs/"+resp.ID, nil, session)
+	var getResp jobResponse
+	decodeJSON(t, wGet, &getResp)
+	if len(getResp.GitRepos) != 2 {
+		t.Errorf("GET git_repos: got %d, want 2", len(getResp.GitRepos))
+	}
+}
+
+func TestUpdateGitJobReplacesRepos(t *testing.T) {
+	router, srcRepo, _, _, session := setupRouter(t)
+
+	src := &db.Source{Name: "gs", Type: db.SourceTypeGit, AuthType: db.AuthTypeNone}
+	_ = srcRepo.Create(src)
+
+	// Create with two repos.
+	wCreate := do(t, router, "POST", "/api/jobs", map[string]any{
+		"name": "gitjob", "source_id": src.ID, "local_dest": "/tmp",
+		"interval_value": 1, "interval_unit": "hours", "concurrency": 1, "enabled": true,
+		"git_repos": []map[string]any{
+			{"url": "https://github.com/org/repo-a"},
+			{"url": "https://github.com/org/repo-b"},
+		},
+	}, session)
+	var created jobResponse
+	decodeJSON(t, wCreate, &created)
+
+	// Update with a single different repo.
+	wUpdate := do(t, router, "PUT", "/api/jobs/"+created.ID, map[string]any{
+		"name": "gitjob", "source_id": src.ID, "local_dest": "/tmp",
+		"interval_value": 1, "interval_unit": "hours", "concurrency": 1, "enabled": true,
+		"git_repos": []map[string]any{
+			{"url": "https://github.com/org/repo-c", "branch": "release"},
+		},
+	}, session)
+	if wUpdate.Code != http.StatusOK {
+		t.Fatalf("update job: got %d (body: %s)", wUpdate.Code, wUpdate.Body.String())
+	}
+
+	var updated jobResponse
+	decodeJSON(t, wUpdate, &updated)
+	if len(updated.GitRepos) != 1 {
+		t.Fatalf("git_repos after update: got %d, want 1", len(updated.GitRepos))
+	}
+	if updated.GitRepos[0].URL != "https://github.com/org/repo-c" || updated.GitRepos[0].Branch != "release" {
+		t.Errorf("unexpected repo after update: %+v", updated.GitRepos[0])
+	}
+}
+
 func TestTriggerRunAlreadyRunning(t *testing.T) {
-	router, connRepo, jobRepo, _, session := setupRouter(t)
+	router, srcRepo, jobRepo, _, session := setupRouter(t)
 
 	encrypted, _ := crypto.Encrypt(testEncKey, "pass")
-	conn := &db.Connection{Name: "c", Host: "h", Port: 21, Username: "u", Password: encrypted}
-	_ = connRepo.Create(conn)
+	src := &db.Source{Name: "c", Type: db.SourceTypeFTPES, Host: "h", Port: 21, Username: "u", Password: encrypted}
+	_ = srcRepo.Create(src)
 	job := &db.SyncJob{
-		Name: "j", ConnectionID: conn.ID, RemotePath: "/", LocalDest: "/tmp",
+		Name: "j", SourceID: src.ID, RemotePath: "/", LocalDest: "/tmp",
 		IntervalValue: 1, IntervalUnit: "hours", Concurrency: 1, Enabled: true,
 	}
 	_ = jobRepo.Create(job)
@@ -301,13 +388,13 @@ func TestTriggerRunAlreadyRunning(t *testing.T) {
 // --- Runs ---
 
 func TestListRunsEmpty(t *testing.T) {
-	router, connRepo, jobRepo, _, session := setupRouter(t)
+	router, srcRepo, jobRepo, _, session := setupRouter(t)
 
 	encrypted, _ := crypto.Encrypt(testEncKey, "pass")
-	conn := &db.Connection{Name: "c", Host: "h", Port: 21, Username: "u", Password: encrypted}
-	_ = connRepo.Create(conn)
+	src := &db.Source{Name: "c", Type: db.SourceTypeFTPES, Host: "h", Port: 21, Username: "u", Password: encrypted}
+	_ = srcRepo.Create(src)
 	job := &db.SyncJob{
-		Name: "j", ConnectionID: conn.ID, RemotePath: "/", LocalDest: "/tmp",
+		Name: "j", SourceID: src.ID, RemotePath: "/", LocalDest: "/tmp",
 		IntervalValue: 1, IntervalUnit: "hours", Concurrency: 1, Enabled: true,
 	}
 	_ = jobRepo.Create(job)
@@ -332,13 +419,13 @@ func TestGetRunNotFound(t *testing.T) {
 }
 
 func TestPlanThenRunReturns202(t *testing.T) {
-	router, connRepo, jobRepo, _, session := setupRouter(t)
+	router, srcRepo, jobRepo, _, session := setupRouter(t)
 
 	encrypted, _ := crypto.Encrypt(testEncKey, "pass")
-	conn := &db.Connection{Name: "c", Host: "h", Port: 21, Username: "u", Password: encrypted}
-	_ = connRepo.Create(conn)
+	src := &db.Source{Name: "c", Type: db.SourceTypeFTPES, Host: "h", Port: 21, Username: "u", Password: encrypted}
+	_ = srcRepo.Create(src)
 	job := &db.SyncJob{
-		Name: "j", ConnectionID: conn.ID, RemotePath: "/", LocalDest: "/tmp",
+		Name: "j", SourceID: src.ID, RemotePath: "/", LocalDest: "/tmp",
 		IntervalValue: 1, IntervalUnit: "hours", Concurrency: 1, Enabled: true,
 	}
 	_ = jobRepo.Create(job)
@@ -359,13 +446,13 @@ func TestPlanThenRunJobNotFound(t *testing.T) {
 }
 
 func TestRunErrorMsgPersistedOnFailure(t *testing.T) {
-	_, _, connRepo, jobRepo, runRepo, _ := setupRouterFull(t)
+	_, _, srcRepo, jobRepo, runRepo, _ := setupRouterFull(t)
 
 	encrypted, _ := crypto.Encrypt(testEncKey, "pass")
-	conn := &db.Connection{Name: "c", Host: "h", Port: 21, Username: "u", Password: encrypted}
-	_ = connRepo.Create(conn)
+	src := &db.Source{Name: "c", Type: db.SourceTypeFTPES, Host: "h", Port: 21, Username: "u", Password: encrypted}
+	_ = srcRepo.Create(src)
 	job := &db.SyncJob{
-		Name: "j", ConnectionID: conn.ID, RemotePath: "/", LocalDest: "/tmp",
+		Name: "j", SourceID: src.ID, RemotePath: "/", LocalDest: "/tmp",
 		IntervalValue: 1, IntervalUnit: "hours", Concurrency: 1, Enabled: true,
 	}
 	_ = jobRepo.Create(job)
@@ -393,13 +480,13 @@ func TestRunErrorMsgPersistedOnFailure(t *testing.T) {
 }
 
 func TestUpdateJobPrunesOldRuns(t *testing.T) {
-	database, router, connRepo, jobRepo, runRepo, session := setupRouterFull(t)
+	database, router, srcRepo, jobRepo, runRepo, session := setupRouterFull(t)
 
 	encrypted, _ := crypto.Encrypt(testEncKey, "pass")
-	conn := &db.Connection{Name: "c", Host: "h", Port: 21, Username: "u", Password: encrypted}
-	_ = connRepo.Create(conn)
+	src := &db.Source{Name: "c", Type: db.SourceTypeFTPES, Host: "h", Port: 21, Username: "u", Password: encrypted}
+	_ = srcRepo.Create(src)
 	job := &db.SyncJob{
-		Name: "j", ConnectionID: conn.ID, RemotePath: "/", LocalDest: "/tmp",
+		Name: "j", SourceID: src.ID, RemotePath: "/", LocalDest: "/tmp",
 		IntervalValue: 1, IntervalUnit: "hours", Concurrency: 1, Enabled: true,
 	}
 	_ = jobRepo.Create(job)
@@ -415,7 +502,7 @@ func TestUpdateJobPrunesOldRuns(t *testing.T) {
 
 	// Update job with 1-day retention — should prune the old run
 	w := do(t, router, "PUT", "/api/jobs/"+job.ID, map[string]any{
-		"name": job.Name, "connection_id": job.ConnectionID, "remote_path": job.RemotePath,
+		"name": job.Name, "source_id": job.SourceID, "remote_path": job.RemotePath,
 		"local_dest": job.LocalDest, "interval_value": job.IntervalValue, "interval_unit": job.IntervalUnit,
 		"concurrency": job.Concurrency, "enabled": job.Enabled, "run_retention_days": 1,
 	}, session)
@@ -428,5 +515,151 @@ func TestUpdateJobPrunesOldRuns(t *testing.T) {
 	}
 	if got, _ := runRepo.Get(recentRun.ID); got == nil {
 		t.Error("recent run should not have been pruned")
+	}
+}
+
+// --- File state (skip/unskip) ---
+
+func TestPutFileStateWithContentHash(t *testing.T) {
+	database, router, srcRepo, jobRepo, _, session := setupRouterFull(t)
+	syncState := db.NewSyncStateRepository(database)
+
+	src := &db.Source{Name: "gs", Type: db.SourceTypeGit, AuthType: db.AuthTypeNone}
+	_ = srcRepo.Create(src)
+	job := &db.SyncJob{
+		Name: "gitjob", SourceID: src.ID, LocalDest: "/tmp",
+		IntervalValue: 1, IntervalUnit: "hours", Concurrency: 1, Enabled: true,
+	}
+	_ = jobRepo.Create(job)
+
+	w := do(t, router, "PUT", "/api/jobs/"+job.ID+"/files", map[string]any{
+		"path": "https://github.com/org/repo", "size_bytes": 0, "content_hash": "deadbeef",
+	}, session)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("put file state: got %d (body: %s)", w.Code, w.Body.String())
+	}
+
+	state, err := syncState.Get(job.ID, "https://github.com/org/repo")
+	if err != nil {
+		t.Fatalf("get sync state: %v", err)
+	}
+	if state == nil {
+		t.Fatal("expected sync state to be set")
+	}
+	if state.ContentHash == nil || *state.ContentHash != "deadbeef" {
+		t.Errorf("content_hash: got %v, want deadbeef", state.ContentHash)
+	}
+	if state.MTime != nil {
+		t.Errorf("mtime should be nil when content_hash is set, got %v", state.MTime)
+	}
+}
+
+func TestPutFileStateWithMtime(t *testing.T) {
+	database, router, srcRepo, jobRepo, _, session := setupRouterFull(t)
+	syncState := db.NewSyncStateRepository(database)
+
+	encrypted, _ := crypto.Encrypt(testEncKey, "pass")
+	src := &db.Source{Name: "s", Type: db.SourceTypeFTPES, Host: "h", Port: 21, Username: "u", Password: encrypted}
+	_ = srcRepo.Create(src)
+	job := &db.SyncJob{
+		Name: "j", SourceID: src.ID, RemotePath: "/", LocalDest: "/tmp",
+		IntervalValue: 1, IntervalUnit: "hours", Concurrency: 1, Enabled: true,
+	}
+	_ = jobRepo.Create(job)
+
+	w := do(t, router, "PUT", "/api/jobs/"+job.ID+"/files", map[string]any{
+		"path": "/remote/file.txt", "size_bytes": 1234, "mtime": "2024-01-15T10:30:00.000000000Z",
+	}, session)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("put file state: got %d (body: %s)", w.Code, w.Body.String())
+	}
+
+	state, err := syncState.Get(job.ID, "/remote/file.txt")
+	if err != nil {
+		t.Fatalf("get sync state: %v", err)
+	}
+	if state == nil {
+		t.Fatal("expected sync state to be set")
+	}
+	if state.MTime == nil {
+		t.Fatal("expected mtime to be set")
+	}
+	if state.ContentHash != nil {
+		t.Errorf("content_hash should be nil when mtime is set, got %v", state.ContentHash)
+	}
+	if state.SizeBytes != 1234 {
+		t.Errorf("size_bytes: got %d, want 1234", state.SizeBytes)
+	}
+}
+
+func TestPutFileStateInvalidMtime(t *testing.T) {
+	router, srcRepo, jobRepo, _, session := setupRouter(t)
+
+	encrypted, _ := crypto.Encrypt(testEncKey, "pass")
+	src := &db.Source{Name: "s", Type: db.SourceTypeFTPES, Host: "h", Port: 21, Username: "u", Password: encrypted}
+	_ = srcRepo.Create(src)
+	job := &db.SyncJob{
+		Name: "j", SourceID: src.ID, RemotePath: "/", LocalDest: "/tmp",
+		IntervalValue: 1, IntervalUnit: "hours", Concurrency: 1, Enabled: true,
+	}
+	_ = jobRepo.Create(job)
+
+	w := do(t, router, "PUT", "/api/jobs/"+job.ID+"/files", map[string]any{
+		"path": "/file.txt", "size_bytes": 100, "mtime": "not-a-valid-time",
+	}, session)
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("invalid mtime: got %d, want 400", w.Code)
+	}
+}
+
+func TestPutFileStateMissingPath(t *testing.T) {
+	router, srcRepo, jobRepo, _, session := setupRouter(t)
+
+	src := &db.Source{Name: "gs", Type: db.SourceTypeGit, AuthType: db.AuthTypeNone}
+	_ = srcRepo.Create(src)
+	job := &db.SyncJob{
+		Name: "j", SourceID: src.ID, LocalDest: "/tmp",
+		IntervalValue: 1, IntervalUnit: "hours", Concurrency: 1, Enabled: true,
+	}
+	_ = jobRepo.Create(job)
+
+	w := do(t, router, "PUT", "/api/jobs/"+job.ID+"/files", map[string]any{
+		"size_bytes": 0, "content_hash": "abc",
+	}, session)
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("missing path: got %d, want 400", w.Code)
+	}
+}
+
+func TestDeleteFileState(t *testing.T) {
+	database, router, srcRepo, jobRepo, _, session := setupRouterFull(t)
+	syncState := db.NewSyncStateRepository(database)
+
+	src := &db.Source{Name: "gs", Type: db.SourceTypeGit, AuthType: db.AuthTypeNone}
+	_ = srcRepo.Create(src)
+	job := &db.SyncJob{
+		Name: "j", SourceID: src.ID, LocalDest: "/tmp",
+		IntervalValue: 1, IntervalUnit: "hours", Concurrency: 1, Enabled: true,
+	}
+	_ = jobRepo.Create(job)
+
+	repoURL := "https://github.com/org/repo"
+	hash := "abc123"
+	_ = syncState.Upsert(&db.SyncState{
+		JobID: job.ID, RemotePath: repoURL,
+		ContentHash: &hash, CopiedAt: time.Now(),
+	})
+
+	w := do(t, router, "DELETE", "/api/jobs/"+job.ID+"/files?path="+url.QueryEscape(repoURL), nil, session)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("delete file state: got %d (body: %s)", w.Code, w.Body.String())
+	}
+
+	state, err := syncState.Get(job.ID, repoURL)
+	if err != nil {
+		t.Fatalf("get sync state after delete: %v", err)
+	}
+	if state != nil {
+		t.Error("expected sync state to be deleted, got non-nil")
 	}
 }

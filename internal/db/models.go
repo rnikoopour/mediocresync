@@ -4,12 +4,12 @@ import "time"
 
 // Run status values.
 const (
-	RunStatusRunning      = "running"
-	RunStatusCompleted    = "completed"
+	RunStatusRunning       = "running"
+	RunStatusCompleted     = "completed"
 	RunStatusNothingToSync = "nothing_to_sync"
-	RunStatusFailed       = "failed"
-	RunStatusPartial      = "partial"
-	RunStatusCanceled     = "canceled"
+	RunStatusFailed        = "failed"
+	RunStatusPartial       = "partial"
+	RunStatusCanceled      = "canceled"
 	RunStatusServerStopped = "server_stopped"
 )
 
@@ -22,38 +22,61 @@ const (
 	TransferStatusFailed     = "failed"
 )
 
-type Connection struct {
-	ID            string
-	Name          string
-	Host          string
-	Port          int
-	Username      string
-	Password      []byte // AES-256-GCM encrypted; decrypt only when dialing FTPES
-	SkipTLSVerify bool
-	EnableEPSV    bool
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+// Source type values.
+const (
+	SourceTypeFTPES = "ftpes"
+	SourceTypeGit   = "git"
+)
+
+// Auth type values for Git sources.
+const (
+	AuthTypeNone   = "none"
+	AuthTypeToken  = "token"
+	AuthTypeSSHKey = "ssh_key"
+)
+
+type Source struct {
+	ID             string
+	Name           string
+	Type           string // "ftpes" | "git"
+	Host           string // FTPES only; empty for Git
+	Port           int    // FTPES only; 0 for Git
+	Username       string // FTPES only; empty for Git
+	Password       []byte // AES-256-GCM encrypted; nil for Git
+	SkipTLSVerify  bool   // FTPES only
+	EnableEPSV     bool   // FTPES only
+	AuthType       string // Git only: "none" | "token" | "ssh_key"; empty for FTPES
+	AuthCredential []byte // AES-256-GCM encrypted; Git only; nil for FTPES
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+}
+
+type GitRepo struct {
+	ID     string
+	JobID  string
+	URL    string
+	Branch string
 }
 
 type SyncJob struct {
-	ID             string
-	Name           string
-	ConnectionID   string
-	RemotePath     string
-	LocalDest      string
-	IntervalValue  int
-	IntervalUnit   string // minutes | hours | days
-	Concurrency      int    // number of files to download concurrently (default 1)
-	RetryAttempts    int    // number of attempts per file (1 = no retry)
-	RetryDelaySeconds int   // seconds to wait between attempts
-	Enabled          bool
+	ID                string
+	Name              string
+	SourceID          string
+	RemotePath        string
+	LocalDest         string
+	IntervalValue     int
+	IntervalUnit      string // minutes | hours | days
+	Concurrency       int    // number of files to download concurrently (default 1)
+	RetryAttempts     int    // number of attempts per file (1 = no retry)
+	RetryDelaySeconds int    // seconds to wait between attempts
+	Enabled           bool
 	IncludePathFilters []string // subdirectory names; file must be under at least one (if non-empty)
 	IncludeNameFilters []string // basename glob patterns; file basename must match at least one (if non-empty)
 	ExcludePathFilters []string // file excluded if under any of these
 	ExcludeNameFilters []string // file excluded if basename matches any of these
-	RunRetentionDays int      // days to keep run history; 0 = keep forever
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	RunRetentionDays  int      // days to keep run history; 0 = keep forever
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
 }
 
 type Run struct {
@@ -84,10 +107,11 @@ type Transfer struct {
 	FinishedAt   *time.Time
 }
 
-type FileState struct {
-	JobID      string
-	RemotePath string
-	SizeBytes  int64
-	MTime      time.Time
-	CopiedAt   time.Time
+type SyncState struct {
+	JobID       string
+	RemotePath  string
+	SizeBytes   int64
+	MTime       *time.Time // nil for Git repos
+	ContentHash *string    // git commit hash; nil for FTPES
+	CopiedAt    time.Time
 }

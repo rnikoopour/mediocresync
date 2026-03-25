@@ -1,5 +1,5 @@
 import type {
-  Connection, ConnectionRequest,
+  Source, SourceRequest,
   SyncJob, JobRequest,
   Run, TestResult, PlanResult, BrowseEntry,
   ServerSettings, LogLevel,
@@ -25,17 +25,16 @@ async function request<T>(method: string, path: string, body?: unknown, throw401
   return res.json()
 }
 
-// Connections
 export const api = {
-  connections: {
-    list: () => request<Connection[]>('GET', '/connections'),
-    create: (body: ConnectionRequest) => request<Connection>('POST', '/connections', body),
-    get: (id: string) => request<Connection>('GET', `/connections/${id}`),
-    update: (id: string, body: Partial<ConnectionRequest>) => request<Connection>('PUT', `/connections/${id}`, body),
-    delete: (id: string) => request<void>('DELETE', `/connections/${id}`),
-    test: (id: string) => request<TestResult>('POST', `/connections/${id}/test`),
-    testDirect: (body: ConnectionRequest & { fallback_id?: string }) => request<TestResult>('POST', '/connections/test', body),
-    browse: (id: string, path: string) => request<BrowseEntry[]>('GET', `/connections/${id}/browse?path=${encodeURIComponent(path)}`),
+  sources: {
+    list: () => request<Source[]>('GET', '/sources'),
+    create: (body: SourceRequest) => request<Source>('POST', '/sources', body),
+    get: (id: string) => request<Source>('GET', `/sources/${id}`),
+    update: (id: string, body: Partial<SourceRequest>) => request<Source>('PUT', `/sources/${id}`, body),
+    delete: (id: string) => request<void>('DELETE', `/sources/${id}`),
+    test: (id: string) => request<TestResult>('POST', `/sources/${id}/test`),
+    testDirect: (body: SourceRequest & { fallback_id?: string }) => request<TestResult>('POST', '/sources/test', body),
+    browse: (id: string, path: string) => request<BrowseEntry[]>('GET', `/sources/${id}/browse?path=${encodeURIComponent(path)}`),
   },
 
   jobs: {
@@ -50,8 +49,8 @@ export const api = {
     plan: (id: string) => request<PlanResult>('POST', `/jobs/${id}/plan`),
     dismissPlan: (id: string) => request<void>('DELETE', `/jobs/${id}/plan`),
     deleteFileState: (id: string, path: string) => request<void>('DELETE', `/jobs/${id}/files?path=${encodeURIComponent(path)}`),
-    skipFile: (id: string, path: string, sizeBytes: number, mtime: string) =>
-      request<void>('PUT', `/jobs/${id}/files`, { path, size_bytes: sizeBytes, mtime }),
+    skipFile: (id: string, path: string, sizeBytes: number, mtime: string, commitHash?: string) =>
+      request<void>('PUT', `/jobs/${id}/files`, { path, size_bytes: sizeBytes, mtime, ...(commitHash ? { content_hash: commitHash } : {}) }),
     listRuns: (id: string) => request<Run[]>('GET', `/jobs/${id}/runs`),
   },
 

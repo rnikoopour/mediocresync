@@ -18,11 +18,12 @@ func NewRouter(
 	appCtx context.Context,
 	version string,
 	auth *db.AuthRepository,
-	connections *db.ConnectionRepository,
+	sources *db.SourceRepository,
+	gitRepos *db.GitRepoRepository,
 	jobs *db.JobRepository,
 	runs *db.RunRepository,
 	transfers *db.TransferRepository,
-	fileState *db.FileStateRepository,
+	syncState *db.SyncStateRepository,
 	engine *internalsync.Engine,
 	broker *sse.Broker,
 	encKey []byte,
@@ -41,8 +42,8 @@ func NewRouter(
 	}
 	r.Use(requireSetup(auth))
 
-	conns := &connectionsHandler{repo: connections, encKey: encKey}
-	jobsH := &jobsHandler{repo: jobs, runs: runs, fileState: fileState, engine: engine, broker: broker, appCtx: appCtx}
+	srcsH := &sourcesHandler{repo: sources, encKey: encKey}
+	jobsH := &jobsHandler{repo: jobs, gitRepos: gitRepos, runs: runs, syncState: syncState, engine: engine, broker: broker, appCtx: appCtx}
 	runsH := &runsHandler{runs: runs, transfers: transfers, broker: broker, appCtx: appCtx}
 	authH := &authHandler{repo: auth}
 	settingsH := &settingsHandler{logLevel: logLevel}
@@ -69,15 +70,15 @@ func NewRouter(
 			r.Put("/auth/credentials", authH.updateCredentials)
 			r.Get("/auth/me", authH.me)
 
-			r.Route("/connections", func(r chi.Router) {
-				r.Get("/", conns.list)
-				r.Post("/", conns.create)
-				r.Post("/test", conns.testDirect)
-				r.Get("/{id}", conns.get)
-				r.Put("/{id}", conns.update)
-				r.Delete("/{id}", conns.delete)
-				r.Post("/{id}/test", conns.test)
-				r.Get("/{id}/browse", conns.browse)
+			r.Route("/sources", func(r chi.Router) {
+				r.Get("/", srcsH.list)
+				r.Post("/", srcsH.create)
+				r.Post("/test", srcsH.testDirect)
+				r.Get("/{id}", srcsH.get)
+				r.Put("/{id}", srcsH.update)
+				r.Delete("/{id}", srcsH.delete)
+				r.Post("/{id}/test", srcsH.test)
+				r.Get("/{id}/browse", srcsH.browse)
 			})
 
 			r.Route("/jobs", func(r chi.Router) {
