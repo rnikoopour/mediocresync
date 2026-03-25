@@ -184,10 +184,10 @@ export function SourcesPage() {
                           <option value="git">Git</option>
                         </select>
                       </Field>
-                      <hr className="border-gray-200 dark:border-gray-700" />
                       <Field label="Name">
                         <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
                       </Field>
+                      <hr className="border-gray-200 dark:border-gray-700" />
                       {isFtpes && (
                         <>
                           <div className="flex gap-2">
