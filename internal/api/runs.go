@@ -27,16 +27,18 @@ type runResponse struct {
 }
 
 type transferResponse struct {
-	ID           string  `json:"id"`
-	RemotePath   string  `json:"remote_path"`
-	LocalPath    string  `json:"local_path"`
-	SizeBytes    int64   `json:"size_bytes"`
-	BytesXferred int64   `json:"bytes_xferred"`
-	DurationMs   *int64  `json:"duration_ms,omitempty"`
-	Status       string  `json:"status"`
-	ErrorMsg     *string `json:"error_msg,omitempty"`
-	StartedAt    *string `json:"started_at,omitempty"`
-	FinishedAt   *string `json:"finished_at,omitempty"`
+	ID                 string  `json:"id"`
+	RemotePath         string  `json:"remote_path"`
+	LocalPath          string  `json:"local_path"`
+	SizeBytes          int64   `json:"size_bytes"`
+	BytesXferred       int64   `json:"bytes_xferred"`
+	DurationMs         *int64  `json:"duration_ms,omitempty"`
+	Status             string  `json:"status"`
+	ErrorMsg           *string `json:"error_msg,omitempty"`
+	StartedAt          *string `json:"started_at,omitempty"`
+	FinishedAt         *string `json:"finished_at,omitempty"`
+	PreviousCommitHash *string `json:"previous_commit_hash,omitempty"`
+	CurrentCommitHash  *string `json:"current_commit_hash,omitempty"`
 }
 
 func toRunResponse(run *db.Run, transfers []*db.Transfer) runResponse {
@@ -59,14 +61,16 @@ func toRunResponse(run *db.Run, transfers []*db.Transfer) runResponse {
 	}
 	for _, t := range transfers {
 		tr := transferResponse{
-			ID:           t.ID,
-			RemotePath:   t.RemotePath,
-			LocalPath:    t.LocalPath,
-			SizeBytes:    t.SizeBytes,
-			BytesXferred: t.BytesXferred,
-			DurationMs:   t.DurationMs,
-			Status:       t.Status,
-			ErrorMsg:     t.ErrorMsg,
+			ID:                 t.ID,
+			RemotePath:         t.RemotePath,
+			LocalPath:          t.LocalPath,
+			SizeBytes:          t.SizeBytes,
+			BytesXferred:       t.BytesXferred,
+			DurationMs:         t.DurationMs,
+			Status:             t.Status,
+			ErrorMsg:           t.ErrorMsg,
+			PreviousCommitHash: t.PreviousCommitHash,
+			CurrentCommitHash:  t.CurrentCommitHash,
 		}
 		if t.StartedAt != nil {
 			s := t.StartedAt.Format("2006-01-02T15:04:05Z")

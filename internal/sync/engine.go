@@ -116,12 +116,13 @@ func NewEngine(
 
 // PlanFile describes what would happen to a single remote file if the job ran.
 type PlanFile struct {
-	RemotePath string    `json:"remote_path"`
-	LocalPath  string    `json:"local_path"`
-	SizeBytes  int64     `json:"size_bytes"`
-	MTime      time.Time `json:"mtime"`
-	Action     string    `json:"action"`      // "copy" | "skip"
-	CommitHash string    `json:"commit_hash,omitempty"` // git only
+	RemotePath         string    `json:"remote_path"`
+	LocalPath          string    `json:"local_path"`
+	SizeBytes          int64     `json:"size_bytes"`
+	MTime              time.Time `json:"mtime"`
+	Action             string    `json:"action"`                        // "copy" | "skip"
+	CommitHash         string    `json:"commit_hash,omitempty"`         // git only: current remote hash
+	PreviousCommitHash string    `json:"previous_commit_hash,omitempty"` // git only: last synced hash
 }
 
 // PlanResult is the full output of a dry-run plan.
@@ -250,18 +251,25 @@ func (e *Engine) planGit(ctx context.Context, job *db.SyncJob, src *db.Source) (
 		}
 		state, _ := e.syncState.Get(job.ID, res.Repo.URL)
 		action := "copy"
-		if state != nil && state.ContentHash != nil && *state.ContentHash == res.CommitHash {
-			action = "skip"
-			plan.ToSkip++
+		var prevHash string
+		if state != nil && state.ContentHash != nil {
+			prevHash = *state.ContentHash
+			if prevHash == res.CommitHash {
+				action = "skip"
+				plan.ToSkip++
+			} else {
+				plan.ToCopy++
+			}
 		} else {
 			plan.ToCopy++
 		}
 		plan.Files = append(plan.Files, PlanFile{
-			RemotePath: res.Repo.URL,
-			LocalPath:  res.LocalPath,
-			SizeBytes:  0,
-			Action:     action,
-			CommitHash: res.CommitHash,
+			RemotePath:         res.Repo.URL,
+			LocalPath:          res.LocalPath,
+			SizeBytes:          0,
+			Action:             action,
+			CommitHash:         res.CommitHash,
+			PreviousCommitHash: prevHash,
 		})
 	}
 	return plan, nil
@@ -1022,12 +1030,19 @@ func (e *Engine) executeGitRun(ctx context.Context, job *db.SyncJob, src *db.Sou
 	// Create one transfer record per repo so run history shows repo names.
 	batch := make([]*db.Transfer, len(plan.Files))
 	for i, pf := range plan.Files {
-		batch[i] = &db.Transfer{
+		t := &db.Transfer{
 			RunID:      run.ID,
 			RemotePath: pf.RemotePath,
 			LocalPath:  pf.LocalPath,
 			Status:     db.TransferStatusPending,
 		}
+		if pf.PreviousCommitHash != "" {
+			t.PreviousCommitHash = &pf.PreviousCommitHash
+		}
+		if pf.CommitHash != "" {
+			t.CurrentCommitHash = &pf.CommitHash
+		}
+		batch[i] = t
 	}
 	if err := e.transfers.CreateBatch(batch); err != nil {
 		return fmt.Errorf("create transfer records: %w", err)
@@ -1068,6 +1083,11 @@ func (e *Engine) executeGitRun(ctx context.Context, job *db.SyncJob, src *db.Sou
 				if t != nil {
 					if err := e.transfers.UpdateStatus(t.ID, db.TransferStatusSkipped, nil, nil); err != nil {
 						slog.Error("update transfer status", "transfer_id", t.ID, "err", err)
+					}
+					if planFile.CommitHash != "" {
+						if err := e.transfers.UpdateCurrentCommitHash(t.ID, planFile.CommitHash); err != nil {
+							slog.Error("update transfer commit hash", "transfer_id", t.ID, "err", err)
+						}
 					}
 				}
 				mu.Lock()
@@ -1112,6 +1132,9 @@ func (e *Engine) executeGitRun(ctx context.Context, job *db.SyncJob, src *db.Sou
 				durationMs := time.Since(start).Milliseconds()
 				if err := e.transfers.UpdateStatus(t.ID, db.TransferStatusDone, nil, &durationMs); err != nil {
 					slog.Error("update transfer status", "transfer_id", t.ID, "err", err)
+				}
+				if err := e.transfers.UpdateCurrentCommitHash(t.ID, commitHash); err != nil {
+					slog.Error("update transfer commit hash", "transfer_id", t.ID, "err", err)
 				}
 				e.broker.Publish(run.ID, sse.Event{RunID: run.ID, TransferID: t.ID, RemotePath: planFile.RemotePath, Status: db.TransferStatusDone})
 			}

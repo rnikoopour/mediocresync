@@ -152,10 +152,22 @@ function RunRow({ run: initialRun, remotePath, jobId, isGit }: { run: Run; remot
         ) : isGit ? (
           <div className="border-t border-gray-100 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700">
             {transfers.map((t) => (
-              <div key={t.id} className="flex items-center gap-3 px-4 py-2">
-                <StatusBadge status={t.status} />
-                <span className="font-mono text-xs text-gray-700 dark:text-gray-300 flex-1 min-w-0 break-all">{t.remote_path}</span>
-                {t.error_msg && <span className="text-xs text-red-500 dark:text-red-400 truncate">{t.error_msg}</span>}
+              <div key={t.id} className="px-4 py-2">
+                <div className="flex items-center gap-3">
+                  <StatusBadge status={t.status} />
+                  <span className="font-mono text-xs text-gray-700 dark:text-gray-300 flex-1 min-w-0 break-all">{t.remote_path}</span>
+                  {t.error_msg && <span className="text-xs text-red-500 dark:text-red-400 truncate">{t.error_msg}</span>}
+                </div>
+                {(t.previous_commit_hash || t.current_commit_hash) && (
+                  <div className="font-mono text-xs text-gray-400 dark:text-gray-500 mt-0.5 ml-[calc(1.5rem+0.75rem)]">
+                    {t.status === 'skipped'
+                      ? t.current_commit_hash?.slice(0, 7)
+                      : t.previous_commit_hash
+                        ? <>{t.previous_commit_hash.slice(0, 7)} → {t.current_commit_hash?.slice(0, 7)}</>
+                        : <>new → {t.current_commit_hash?.slice(0, 7)}</>
+                    }
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -469,6 +481,17 @@ function GitRepoRow({ file, onSkip, onUnskip }: {
         <div className="flex md:hidden items-center gap-2 mt-0.5">
           <StatusBadge status={file.action === 'copy' ? 'pending' : 'skipped'} />
         </div>
+        {file.action === 'copy' && (file.previous_commit_hash || file.commit_hash) && (
+          <div className="font-mono text-xs text-gray-400 dark:text-gray-500 mt-0.5 break-all">
+            {file.previous_commit_hash
+              ? <>{file.previous_commit_hash.slice(0, 7)} → {file.commit_hash?.slice(0, 7)}</>
+              : <>new → {file.commit_hash?.slice(0, 7)}</>
+            }
+          </div>
+        )}
+        {file.action === 'skip' && file.commit_hash && (
+          <div className="font-mono text-xs text-gray-400 dark:text-gray-500 mt-0.5">{file.commit_hash.slice(0, 7)}</div>
+        )}
       </div>
       {menu && (
         <div

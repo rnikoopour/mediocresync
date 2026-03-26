@@ -103,6 +103,8 @@ export interface Transfer {
   error_msg?: string
   started_at?: string
   finished_at?: string
+  previous_commit_hash?: string
+  current_commit_hash?: string
 }
 
 export interface ProgressEvent {
@@ -135,6 +137,7 @@ export interface PlanFile {
   mtime: string
   action: 'copy' | 'skip'
   commit_hash?: string
+  previous_commit_hash?: string
 }
 
 export interface PlanResult {

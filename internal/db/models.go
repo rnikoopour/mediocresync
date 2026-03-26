@@ -94,17 +94,19 @@ type Run struct {
 }
 
 type Transfer struct {
-	ID           string
-	RunID        string
-	RemotePath   string
-	LocalPath    string
-	SizeBytes    int64
-	BytesXferred int64
-	DurationMs   *int64
-	Status       string // pending | in_progress | done | skipped | failed
-	ErrorMsg     *string
-	StartedAt    *time.Time
-	FinishedAt   *time.Time
+	ID                 string
+	RunID              string
+	RemotePath         string
+	LocalPath          string
+	SizeBytes          int64
+	BytesXferred       int64
+	DurationMs         *int64
+	Status             string // pending | in_progress | done | skipped | failed
+	ErrorMsg           *string
+	StartedAt          *time.Time
+	FinishedAt         *time.Time
+	PreviousCommitHash *string // git only: hash last synced before this run
+	CurrentCommitHash  *string // git only: hash synced during this run
 }
 
 type SyncState struct {

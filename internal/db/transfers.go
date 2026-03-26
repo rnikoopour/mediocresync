@@ -20,9 +20,9 @@ func (r *TransferRepository) Create(t *Transfer) error {
 	t.ID = uuid.New().String()
 
 	_, err := r.db.Exec(
-		`INSERT INTO transfers (id, run_id, remote_path, local_path, size_bytes, bytes_xferred, status)
-		 VALUES (?, ?, ?, ?, ?, 0, ?)`,
-		t.ID, t.RunID, t.RemotePath, t.LocalPath, t.SizeBytes, t.Status,
+		`INSERT INTO transfers (id, run_id, remote_path, local_path, size_bytes, bytes_xferred, status, previous_commit_hash, current_commit_hash)
+		 VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)`,
+		t.ID, t.RunID, t.RemotePath, t.LocalPath, t.SizeBytes, t.Status, t.PreviousCommitHash, t.CurrentCommitHash,
 	)
 	if err != nil {
 		return fmt.Errorf("insert transfer: %w", err)
@@ -50,8 +50,8 @@ func (r *TransferRepository) CreateBatch(transfers []*Transfer) error {
 	}
 	defer tx.Rollback() //nolint:errcheck
 	stmt, err := tx.Prepare(
-		`INSERT INTO transfers (id, run_id, remote_path, local_path, size_bytes, bytes_xferred, status)
-		 VALUES (?, ?, ?, ?, ?, 0, ?)`,
+		`INSERT INTO transfers (id, run_id, remote_path, local_path, size_bytes, bytes_xferred, status, previous_commit_hash, current_commit_hash)
+		 VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)`,
 	)
 	if err != nil {
 		return fmt.Errorf("prepare batch insert: %w", err)
@@ -59,11 +59,16 @@ func (r *TransferRepository) CreateBatch(transfers []*Transfer) error {
 	defer stmt.Close()
 	for _, t := range transfers {
 		t.ID = uuid.New().String()
-		if _, err := stmt.Exec(t.ID, t.RunID, t.RemotePath, t.LocalPath, t.SizeBytes, t.Status); err != nil {
+		if _, err := stmt.Exec(t.ID, t.RunID, t.RemotePath, t.LocalPath, t.SizeBytes, t.Status, t.PreviousCommitHash, t.CurrentCommitHash); err != nil {
 			return fmt.Errorf("insert transfer: %w", err)
 		}
 	}
 	return tx.Commit()
+}
+
+func (r *TransferRepository) UpdateCurrentCommitHash(id, hash string) error {
+	_, err := r.db.Exec(`UPDATE transfers SET current_commit_hash=? WHERE id=?`, hash, id)
+	return err
 }
 
 func (r *TransferRepository) UpdateStatus(id, status string, errMsg *string, durationMs *int64) error {
@@ -81,7 +86,7 @@ func (r *TransferRepository) UpdateStatus(id, status string, errMsg *string, dur
 
 func (r *TransferRepository) ListByRun(runID string) ([]*Transfer, error) {
 	rows, err := r.db.Query(
-		`SELECT id, run_id, remote_path, local_path, size_bytes, bytes_xferred, duration_ms, status, error_msg, started_at, finished_at
+		`SELECT id, run_id, remote_path, local_path, size_bytes, bytes_xferred, duration_ms, status, error_msg, started_at, finished_at, previous_commit_hash, current_commit_hash
 		 FROM transfers WHERE run_id = ? ORDER BY remote_path`, runID,
 	)
 	if err != nil {
@@ -103,13 +108,13 @@ func (r *TransferRepository) ListByRun(runID string) ([]*Transfer, error) {
 func scanTransfer(s scanner) (*Transfer, error) {
 	var t Transfer
 	var durationMs sql.NullInt64
-	var errMsg sql.NullString
-	var startedAt, finishedAt sql.NullString
+	var errMsg, startedAt, finishedAt, prevHash, currHash sql.NullString
 
 	err := s.Scan(
 		&t.ID, &t.RunID, &t.RemotePath, &t.LocalPath,
 		&t.SizeBytes, &t.BytesXferred, &durationMs,
 		&t.Status, &errMsg, &startedAt, &finishedAt,
+		&prevHash, &currHash,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("scan transfer: %w", err)
@@ -128,6 +133,12 @@ func scanTransfer(s scanner) (*Transfer, error) {
 	if finishedAt.Valid {
 		ts, _ := time.Parse(time.RFC3339, finishedAt.String)
 		t.FinishedAt = &ts
+	}
+	if prevHash.Valid {
+		t.PreviousCommitHash = &prevHash.String
+	}
+	if currHash.Valid {
+		t.CurrentCommitHash = &currHash.String
 	}
 	return &t, nil
 }
