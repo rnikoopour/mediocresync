@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/go-git/go-git/v5"
+	gitconfig "github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
@@ -110,20 +111,39 @@ func Sync(ctx context.Context, repo *db.GitRepo, localPath string, auth transpor
 		if err != nil {
 			return "", fmt.Errorf("clone %s: %w", repo.URL, err)
 		}
+		if err := disableFileMode(r); err != nil {
+			return "", fmt.Errorf("set filemode config %s: %w", repo.URL, err)
+		}
 	} else if err != nil {
 		return "", fmt.Errorf("open %s: %w", localPath, err)
 	} else {
+		if err := disableFileMode(r); err != nil {
+			return "", fmt.Errorf("set filemode config %s: %w", repo.URL, err)
+		}
+		// Fetch then hard-reset to the remote branch tip so local modifications
+		// (e.g. from filesystem tools or OS metadata writes) never block the sync.
+		if err := r.FetchContext(ctx, &git.FetchOptions{
+			RemoteName: "origin",
+			RefSpecs:   []gitconfig.RefSpec{gitconfig.RefSpec("+refs/heads/" + repo.Branch + ":refs/remotes/origin/" + repo.Branch)},
+			Auth:       auth,
+		}); err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) {
+			return "", fmt.Errorf("fetch %s: %w", repo.URL, err)
+		}
+
+		ref, err := r.Reference(plumbing.NewRemoteReferenceName("origin", repo.Branch), true)
+		if err != nil {
+			return "", fmt.Errorf("remote ref %s: %w", repo.URL, err)
+		}
+
 		wt, err := r.Worktree()
 		if err != nil {
 			return "", fmt.Errorf("worktree: %w", err)
 		}
-		err = wt.PullContext(ctx, &git.PullOptions{
-			ReferenceName: branchRef(repo.Branch),
-			SingleBranch:  true,
-			Auth:          auth,
-		})
-		if err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) {
-			return "", fmt.Errorf("pull %s: %w", repo.URL, err)
+		if err := wt.Reset(&git.ResetOptions{
+			Commit: ref.Hash(),
+			Mode:   git.HardReset,
+		}); err != nil {
+			return "", fmt.Errorf("reset %s: %w", repo.URL, err)
 		}
 	}
 
@@ -140,8 +160,9 @@ func AuthMethod(src *db.Source, credPlaintext string) (transport.AuthMethod, err
 	return authForSource(src, credPlaintext)
 }
 
-// currentHash opens or clones to get the current commit hash without a full pull.
-// Used during plan to read what is currently checked out (or HEAD on a fresh clone).
+// currentHash fetches the remote and returns the tip commit hash of the tracked
+// branch without modifying the working tree. Used during plan to detect upstream
+// changes before deciding whether a full pull is needed.
 func currentHash(ctx context.Context, src *db.Source, repo *db.GitRepo, localPath string, auth transport.AuthMethod) (string, error) {
 	r, err := git.PlainOpen(localPath)
 	if errors.Is(err, git.ErrRepositoryNotExists) {
@@ -155,15 +176,31 @@ func currentHash(ctx context.Context, src *db.Source, repo *db.GitRepo, localPat
 		if err != nil {
 			return "", fmt.Errorf("clone: %w", err)
 		}
+		head, err := r.Head()
+		if err != nil {
+			return "", fmt.Errorf("head: %w", err)
+		}
+		return head.Hash().String(), nil
 	} else if err != nil {
 		return "", fmt.Errorf("open: %w", err)
 	}
 
-	head, err := r.Head()
-	if err != nil {
-		return "", fmt.Errorf("head: %w", err)
+	// Repo already cloned — fetch to get the latest remote state, then read
+	// the remote-tracking ref so we see upstream changes without touching the
+	// working tree.
+	if err := r.FetchContext(ctx, &git.FetchOptions{
+		RemoteName: "origin",
+		RefSpecs:   []gitconfig.RefSpec{gitconfig.RefSpec("+refs/heads/" + repo.Branch + ":refs/remotes/origin/" + repo.Branch)},
+		Auth:       auth,
+	}); err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) {
+		return "", fmt.Errorf("fetch: %w", err)
 	}
-	return head.Hash().String(), nil
+
+	ref, err := r.Reference(plumbing.NewRemoteReferenceName("origin", repo.Branch), true)
+	if err != nil {
+		return "", fmt.Errorf("remote ref: %w", err)
+	}
+	return ref.Hash().String(), nil
 }
 
 func branchRef(branch string) plumbing.ReferenceName {
@@ -171,4 +208,16 @@ func branchRef(branch string) plumbing.ReferenceName {
 		branch = "main"
 	}
 	return plumbing.NewBranchReferenceName(branch)
+}
+
+// disableFileMode sets core.fileMode=false in the repo config so that
+// filesystems without Unix permission support (e.g. exFAT) don't mark every
+// file as modified due to mode differences.
+func disableFileMode(r *git.Repository) error {
+	cfg, err := r.Config()
+	if err != nil {
+		return err
+	}
+	cfg.Raw.Section("core").SetOption("fileMode", "false")
+	return r.SetConfig(cfg)
 }
