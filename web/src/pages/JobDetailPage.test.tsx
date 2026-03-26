@@ -8,6 +8,7 @@
  *  3. Button disabled states        — Plan / Run Now / Edit buttons
  */
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, it, expect, beforeAll, afterEach, afterAll } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -229,7 +230,50 @@ describe('buildRunTree and sortNodes — transfer tree structure', () => {
   })
 })
 
-// ── 3. Button disabled states ─────────────────────────────────────────────────
+// ── 3. Hide "Nothing to Sync" toggle ─────────────────────────────────────────
+
+describe('"Hide Nothing to Sync" toggle', () => {
+  it('shows the toggle when nothing_to_sync runs exist and hides/shows them on click', async () => {
+    const nothingRun = buildRun({ id: 'run-nothing', status: 'nothing_to_sync' })
+    const completedRun = buildRun({ id: 'run-done', status: 'completed' })
+    server.use(
+      http.get('/api/jobs/:id/runs', () => HttpResponse.json([nothingRun, completedRun])),
+    )
+
+    renderPage()
+
+    // Wait for runs to load — both rows should be present initially.
+    await waitFor(() => expect(screen.getAllByText(/Started/).length).toBe(2))
+
+    // Toggle switch should appear.
+    const toggleBtn = screen.getByRole('switch')
+    expect(toggleBtn).toBeInTheDocument()
+    expect(toggleBtn).toHaveAttribute('aria-checked', 'false')
+
+    // Click to hide: only the completed run should remain.
+    await userEvent.click(toggleBtn)
+    await waitFor(() => expect(screen.getAllByText(/Started/).length).toBe(1))
+    expect(toggleBtn).toHaveAttribute('aria-checked', 'true')
+
+    // Click again to show both runs.
+    await userEvent.click(toggleBtn)
+    await waitFor(() => expect(screen.getAllByText(/Started/).length).toBe(2))
+    expect(toggleBtn).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('always shows the toggle even when no nothing_to_sync runs exist', async () => {
+    server.use(
+      http.get('/api/jobs/:id/runs', () => HttpResponse.json([buildRun({ status: 'completed' })])),
+    )
+
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText(/Started/)).toBeInTheDocument())
+    expect(screen.getByRole('switch')).toBeInTheDocument()
+  })
+})
+
+// ── 4. Button disabled states ─────────────────────────────────────────────────
 //
 // jobIsRunning  = runs[0]?.status === 'running'
 // Plan button   disabled when jobIsRunning OR planEntry.status === 'running'

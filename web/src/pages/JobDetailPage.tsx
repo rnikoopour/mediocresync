@@ -550,6 +550,7 @@ export function JobDetailPage() {
   }, [id])  // eslint-disable-line react-hooks/exhaustive-deps
 
   const [editOpen, setEditOpen] = useState(false)
+  const [hideNothingToSync, setHideNothingToSync] = useState(false)
   const jobIsRunning = runs[0]?.status === 'running'
 
   const run = useMutation({
@@ -676,6 +677,17 @@ export function JobDetailPage() {
 
       <div className="flex items-center gap-3 mb-3">
         <h2 className="text-sm font-medium text-gray-700 dark:text-gray-300">Run History</h2>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <button
+            role="switch"
+            aria-checked={hideNothingToSync}
+            onClick={() => setHideNothingToSync((v) => !v)}
+            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${hideNothingToSync ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'}`}
+          >
+            <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${hideNothingToSync ? 'translate-x-4' : 'translate-x-0'}`} />
+          </button>
+          <span className="text-xs text-gray-500 dark:text-gray-400">Hide "Nothing to Sync"</span>
+        </label>
         {runs.length > RUNS_LIMIT && (
           <button
             onClick={() => setShowAllRuns((v) => !v)}
@@ -692,9 +704,12 @@ export function JobDetailPage() {
       )}
 
       <div className="space-y-2">
-        {(showAllRuns ? runs : runs.slice(0, RUNS_LIMIT)).map((run) => (
-          <RunRow key={run.id} run={run} remotePath={job?.remote_path ?? ''} jobId={id!} isGit={isGitJob} />
-        ))}
+        {(() => {
+          const filtered = hideNothingToSync ? runs.filter((r) => r.status !== 'nothing_to_sync') : runs
+          return (showAllRuns ? filtered : filtered.slice(0, RUNS_LIMIT)).map((run) => (
+            <RunRow key={run.id} run={run} remotePath={job?.remote_path ?? ''} jobId={id!} isGit={isGitJob} />
+          ))
+        })()}
       </div>
 
       {editOpen && job && (
