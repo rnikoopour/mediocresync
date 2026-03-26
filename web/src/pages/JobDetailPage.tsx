@@ -589,10 +589,11 @@ export function JobDetailPage() {
           {job && (
             <>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                {job.remote_path} → {job.local_dest}
+                {job.git_repos?.length > 0 ? 'Repos' : job.remote_path} → {job.local_dest}
               </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Every {job.interval_value} {job.interval_unit} · {job.concurrency} concurrent · autosync {job.enabled ? 'enabled' : 'disabled'}
+              <p className="text-xs text-gray-400 dark:text-gray-500">{job.concurrency} concurrent downloads</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500">
+                autosync {job.enabled ? 'enabled' : 'disabled'} · every {job.interval_value} {job.interval_unit}
               </p>
             </>
           )}

@@ -185,7 +185,7 @@ function JobRow({ job, onEdit, onDelete }: { job: SyncJob; onEdit: () => void; o
           <Link to={`/jobs/${job.id}`} className="font-medium text-gray-900 dark:text-gray-100 text-sm hover:text-blue-600 dark:hover:text-gray-200">
             {job.name}
           </Link>
-          <p className="text-xs text-gray-500 dark:text-gray-400">{job.remote_path} → {job.local_dest}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">{job.git_repos?.length > 0 ? 'Repos' : job.remote_path} → {job.local_dest}</p>
           <p className="text-xs text-gray-400 dark:text-gray-500">{job.concurrency} concurrent downloads</p>
           <p className="text-xs text-gray-400 dark:text-gray-500">
             autosync {job.enabled ? 'enabled' : 'disabled'} · every {job.interval_value} {job.interval_unit}
