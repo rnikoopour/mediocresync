@@ -153,6 +153,7 @@ function JobRunPreview({ jobId, triggeredAt, onDismiss }: { jobId: string; trigg
 function JobRow({ job, onEdit, onDelete }: { job: SyncJob; onEdit: () => void; onDelete: () => void }) {
   const [showPreview, setShowPreview] = useState(false)
   const [triggeredAt, setTriggeredAt] = useState(0)
+  const qc = useQueryClient()
   const { jobStatuses, subscribeJobEvents } = usePlan()
 
   useEffect(() => subscribeJobEvents(job.id), [job.id]) // eslint-disable-line react-hooks/exhaustive-deps
