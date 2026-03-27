@@ -71,7 +71,7 @@ export function JobFormModal({ editing, onClose }: Props) {
           <form onSubmit={(e) => { e.preventDefault(); save.mutate(form) }} className="flex flex-col sm:flex-row flex-1 min-h-0">
             {/* Mobile horizontal tabs */}
             <div className="sm:hidden flex shrink-0 border-b border-gray-200 dark:border-gray-700">
-              {(['general', ...(!isGit ? ['filters'] : [])] as const).map((tab) => (
+              {(['general', ...(form.source_id && !isGit ? ['filters'] : [])] as const).map((tab) => (
                 <button
                   key={tab}
                   type="button"
@@ -88,7 +88,7 @@ export function JobFormModal({ editing, onClose }: Props) {
             </div>
             {/* Desktop sidebar tabs */}
             <nav className="hidden sm:block w-36 border-r border-gray-200 dark:border-gray-700 py-3 shrink-0">
-              {(['general', ...(!isGit ? ['filters'] : [])] as const).map((tab) => (
+              {(['general', ...(form.source_id && !isGit ? ['filters'] : [])] as const).map((tab) => (
                 <button
                   key={tab}
                   type="button"
@@ -120,97 +120,99 @@ export function JobFormModal({ editing, onClose }: Props) {
                       </select>
                     </Field>
 
-                    {!isGit && (
-                      <Field label="Remote Path">
-                        <div className="flex gap-2">
-                          <input className="input flex-1" value={form.remote_path} onChange={(e) => setForm({ ...form, remote_path: e.target.value })} required />
-                          <button
-                            type="button"
-                            onClick={() => setBrowserOpen(true)}
-                            disabled={!form.source_id}
-                            className="btn-secondary text-xs shrink-0"
-                            title={form.source_id ? 'Browse remote server' : 'Select a source first'}
-                          >
-                            Browse
-                          </button>
+                    {form.source_id && (
+                      <>
+                        {!isGit && (
+                          <Field label="Remote Path">
+                            <div className="flex gap-2">
+                              <input className="input flex-1" value={form.remote_path} onChange={(e) => setForm({ ...form, remote_path: e.target.value })} required />
+                              <button
+                                type="button"
+                                onClick={() => setBrowserOpen(true)}
+                                className="btn-secondary text-xs shrink-0"
+                              >
+                                Browse
+                              </button>
+                            </div>
+                          </Field>
+                        )}
+
+                        {isGit && (
+                          <Field label="Git Repositories">
+                            <RepoList
+                              repos={form.git_repos}
+                              onChange={(repos) => setForm({ ...form, git_repos: repos })}
+                            />
+                          </Field>
+                        )}
+
+                        <Field label="Local Destination">
+                          <div className="flex gap-2">
+                            <input className="input flex-1" value={form.local_dest} onChange={(e) => setForm({ ...form, local_dest: e.target.value })} required />
+                            <button
+                              type="button"
+                              onClick={() => setLocalBrowserOpen(true)}
+                              className="btn-secondary text-xs shrink-0"
+                            >
+                              Browse
+                            </button>
+                          </div>
+                        </Field>
+                        <div className="flex flex-wrap gap-2">
+                          <Field label="Max Concurrent Downloads" className="w-48">
+                            <input className="input" type="number" min={1} max={20} value={form.concurrency} onChange={(e) => setForm({ ...form, concurrency: Number(e.target.value) })} required />
+                          </Field>
+                          {!isGit && (
+                            <>
+                              <Field label="Max Retries" className="w-28">
+                                <input className="input" type="number" min={1} value={form.retry_attempts} onChange={(e) => setForm({ ...form, retry_attempts: Number(e.target.value) })} required />
+                              </Field>
+                              <Field label="Backoff (seconds)" className="w-36">
+                                <input className="input" type="number" min={0} value={form.retry_delay_seconds} onChange={(e) => setForm({ ...form, retry_delay_seconds: Number(e.target.value) })} required />
+                              </Field>
+                            </>
+                          )}
                         </div>
-                      </Field>
+
+                        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide pt-1">Autosync</p>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer shrink-0 w-28">
+                            <span
+                              role="switch"
+                              aria-checked={form.enabled}
+                              onClick={() => setForm({ ...form, enabled: !form.enabled })}
+                              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${form.enabled ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'}`}
+                            >
+                              <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${form.enabled ? 'translate-x-4' : 'translate-x-0'}`} />
+                            </span>
+                            {form.enabled ? 'Enabled' : 'Disabled'}
+                          </label>
+                          <span className="text-sm text-gray-500 dark:text-gray-400 shrink-0">every</span>
+                          <input className="input w-20" type="number" min={1} value={form.interval_value} onChange={(e) => setForm({ ...form, interval_value: Number(e.target.value) })} required />
+                          <select className="input flex-1" value={form.interval_unit} onChange={(e) => setForm({ ...form, interval_unit: e.target.value as JobRequest['interval_unit'] })}>
+                            <option value="minutes">Minutes</option>
+                            <option value="hours">Hours</option>
+                            <option value="days">Days</option>
+                          </select>
+                        </div>
+
+                        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide pt-1">History</p>
+                        <Field label="Run Retention (days)" className="w-48">
+                          <input
+                            className="input"
+                            type="number"
+                            min={0}
+                            value={form.run_retention_days}
+                            onChange={(e) => setForm({ ...form, run_retention_days: Number(e.target.value) })}
+                          />
+                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">0 = keep forever</p>
+                        </Field>
+                      </>
                     )}
-
-                    {isGit && (
-                      <Field label="Git Repositories">
-                        <RepoList
-                          repos={form.git_repos}
-                          onChange={(repos) => setForm({ ...form, git_repos: repos })}
-                        />
-                      </Field>
-                    )}
-
-                    <Field label="Local Destination">
-                      <div className="flex gap-2">
-                        <input className="input flex-1" value={form.local_dest} onChange={(e) => setForm({ ...form, local_dest: e.target.value })} required />
-                        <button
-                          type="button"
-                          onClick={() => setLocalBrowserOpen(true)}
-                          className="btn-secondary text-xs shrink-0"
-                        >
-                          Browse
-                        </button>
-                      </div>
-                    </Field>
-                    <div className="flex flex-wrap gap-2">
-                      <Field label="Max Concurrent Downloads" className="w-48">
-                        <input className="input" type="number" min={1} max={20} value={form.concurrency} onChange={(e) => setForm({ ...form, concurrency: Number(e.target.value) })} required />
-                      </Field>
-                      {!isGit && (
-                        <>
-                          <Field label="Max Retries" className="w-28">
-                            <input className="input" type="number" min={1} value={form.retry_attempts} onChange={(e) => setForm({ ...form, retry_attempts: Number(e.target.value) })} required />
-                          </Field>
-                          <Field label="Backoff (seconds)" className="w-36">
-                            <input className="input" type="number" min={0} value={form.retry_delay_seconds} onChange={(e) => setForm({ ...form, retry_delay_seconds: Number(e.target.value) })} required />
-                          </Field>
-                        </>
-                      )}
-                    </div>
-
-                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide pt-1">Autosync</p>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer shrink-0 w-28">
-                        <span
-                          role="switch"
-                          aria-checked={form.enabled}
-                          onClick={() => setForm({ ...form, enabled: !form.enabled })}
-                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${form.enabled ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'}`}
-                        >
-                          <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${form.enabled ? 'translate-x-4' : 'translate-x-0'}`} />
-                        </span>
-                        {form.enabled ? 'Enabled' : 'Disabled'}
-                      </label>
-                      <span className="text-sm text-gray-500 dark:text-gray-400 shrink-0">every</span>
-                      <input className="input w-20" type="number" min={1} value={form.interval_value} onChange={(e) => setForm({ ...form, interval_value: Number(e.target.value) })} required />
-                      <select className="input flex-1" value={form.interval_unit} onChange={(e) => setForm({ ...form, interval_unit: e.target.value as JobRequest['interval_unit'] })}>
-                        <option value="minutes">Minutes</option>
-                        <option value="hours">Hours</option>
-                        <option value="days">Days</option>
-                      </select>
-                    </div>
-
-                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide pt-1">History</p>
-                    <Field label="Run Retention (days)" className="w-48">
-                      <input
-                        className="input"
-                        type="number"
-                        min={0}
-                        value={form.run_retention_days}
-                        onChange={(e) => setForm({ ...form, run_retention_days: Number(e.target.value) })}
-                      />
-                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">0 = keep forever</p>
-                    </Field>
                   </>
                 )}
 
-                {activeTab === 'filters' && (
+                {activeTab === 'filters' && form.source_id && (
                   <>
                     <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide pt-1">Filters</p>
                     <p className="text-xs text-gray-400 dark:text-gray-500">
