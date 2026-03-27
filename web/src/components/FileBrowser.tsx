@@ -45,7 +45,7 @@ export function FileBrowser({ title, initialPath, queryKey, fetcher, onSelect, o
   const files = entries.filter((e) => !e.is_dir)
 
   return (
-    <Modal height="h-[70dvh]">
+    <Modal height="h-[70dvh]" onClose={onClose}>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
           <h2 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">{title}</h2>
