@@ -10,6 +10,7 @@ import type { RunTab } from '../components/RunTree'
 
 import { usePlan } from '../context/PlanContext'
 import { useSSE } from '../hooks/useSSE'
+import { useLocalStorageBool } from '../hooks/useLocalStorageBool'
 
 function formatDuration(ms: number): string {
   const s = Math.floor(ms / 1000)
@@ -597,7 +598,7 @@ export function JobDetailPage() {
   }, [id])  // eslint-disable-line react-hooks/exhaustive-deps
 
   const [editOpen, setEditOpen] = useState(false)
-  const [hideNothingToSync, setHideNothingToSync] = useState(false)
+  const [hideNothingToSync, setHideNothingToSync] = useLocalStorageBool(`hideNothingToSync:${id}`, true)
   const jobIsRunning = runs[0]?.status === 'running'
 
   const run = useMutation({

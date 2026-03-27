@@ -242,23 +242,21 @@ describe('"Hide Nothing to Sync" toggle', () => {
 
     renderPage()
 
-    // Wait for runs to load — both rows should be present initially.
-    await waitFor(() => expect(screen.getAllByText(/Started/).length).toBe(2))
-
-    // Toggle switch should appear.
+    // Toggle is on by default — only the completed run should be visible initially.
     const toggleBtn = screen.getByRole('switch')
     expect(toggleBtn).toBeInTheDocument()
-    expect(toggleBtn).toHaveAttribute('aria-checked', 'false')
-
-    // Click to hide: only the completed run should remain.
-    await userEvent.click(toggleBtn)
     await waitFor(() => expect(screen.getAllByText(/Started/).length).toBe(1))
     expect(toggleBtn).toHaveAttribute('aria-checked', 'true')
 
-    // Click again to show both runs.
+    // Click to show all runs.
     await userEvent.click(toggleBtn)
     await waitFor(() => expect(screen.getAllByText(/Started/).length).toBe(2))
     expect(toggleBtn).toHaveAttribute('aria-checked', 'false')
+
+    // Click again to hide nothing_to_sync runs.
+    await userEvent.click(toggleBtn)
+    await waitFor(() => expect(screen.getAllByText(/Started/).length).toBe(1))
+    expect(toggleBtn).toHaveAttribute('aria-checked', 'true')
   })
 
   it('always shows the toggle even when no nothing_to_sync runs exist', async () => {
