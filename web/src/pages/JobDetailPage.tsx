@@ -5,7 +5,8 @@ import { api } from '../api/client'
 import type { PlanFile, Run } from '../api/types'
 import { StatusBadge } from '../components/StatusBadge'
 import { JobFormModal } from '../components/JobFormModal'
-import { RunTreeView, formatBytes, formatSpeed } from '../components/RunTree'
+import { RunTreeView, RunTabBar, formatBytes, formatSpeed } from '../components/RunTree'
+import type { RunTab } from '../components/RunTree'
 
 import { usePlan } from '../context/PlanContext'
 import { useSSE } from '../hooks/useSSE'
@@ -36,6 +37,49 @@ function sortNodes<T extends { type: string; name: string }>(nodes: T[]): T[] {
     if (a.type !== b.type) return a.type === 'folder' ? -1 : 1
     return a.name.localeCompare(b.name)
   })
+}
+
+// ── Git run view ─────────────────────────────────────────────────────────────
+
+function GitRunView({ transfers, isRunning }: { transfers: import('../api/types').Transfer[]; isRunning: boolean }) {
+  const [tab, setTab] = useState<RunTab>('planned')
+  const filtered = tab === 'all' ? transfers : transfers.filter((t) => {
+    const status = !isRunning && t.status === 'pending' ? 'not_copied' : t.status
+    if (tab === 'planned')     return status !== 'skipped'
+    if (tab === 'in_progress') return status === 'in_progress' || status === 'pending'
+    if (tab === 'copied')      return status === 'done'
+    if (tab === 'not_copied')  return status === 'not_copied' || status === 'failed'
+    return true
+  })
+  return (
+    <div className="border-t border-gray-100 dark:border-gray-700">
+      <RunTabBar tab={tab} onTab={setTab} isRunning={isRunning} />
+      <div className="divide-y divide-gray-100 dark:divide-gray-700 py-1">
+        {filtered.length === 0
+          ? <p className="px-4 py-4 text-xs text-center text-gray-400 dark:text-gray-500">No repos match this filter.</p>
+          : filtered.map((t) => (
+            <div key={t.id} className="px-4 py-2">
+              <div className="flex items-center gap-3">
+                <StatusBadge status={t.status} />
+                <span className="font-mono text-xs text-gray-700 dark:text-gray-300 flex-1 min-w-0 break-all">{t.remote_path}</span>
+                {t.error_msg && <span className="text-xs text-red-500 dark:text-red-400 truncate">{t.error_msg}</span>}
+              </div>
+              {(t.previous_commit_hash || t.current_commit_hash) && (
+                <div className="font-mono text-xs text-gray-400 dark:text-gray-500 mt-0.5 ml-[calc(1.5rem+0.75rem)]">
+                  {t.status === 'skipped'
+                    ? t.current_commit_hash?.slice(0, 7)
+                    : t.previous_commit_hash
+                      ? <>{t.previous_commit_hash.slice(0, 7)} → {t.current_commit_hash?.slice(0, 7)}</>
+                      : <>new → {t.current_commit_hash?.slice(0, 7)}</>
+                  }
+                </div>
+              )}
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  )
 }
 
 // ── Run row ───────────────────────────────────────────────────────────────────
@@ -150,27 +194,7 @@ function RunRow({ run: initialRun, remotePath, jobId, isGit }: { run: Run; remot
             }
           </div>
         ) : isGit ? (
-          <div className="border-t border-gray-100 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700">
-            {transfers.map((t) => (
-              <div key={t.id} className="px-4 py-2">
-                <div className="flex items-center gap-3">
-                  <StatusBadge status={t.status} />
-                  <span className="font-mono text-xs text-gray-700 dark:text-gray-300 flex-1 min-w-0 break-all">{t.remote_path}</span>
-                  {t.error_msg && <span className="text-xs text-red-500 dark:text-red-400 truncate">{t.error_msg}</span>}
-                </div>
-                {(t.previous_commit_hash || t.current_commit_hash) && (
-                  <div className="font-mono text-xs text-gray-400 dark:text-gray-500 mt-0.5 ml-[calc(1.5rem+0.75rem)]">
-                    {t.status === 'skipped'
-                      ? t.current_commit_hash?.slice(0, 7)
-                      : t.previous_commit_hash
-                        ? <>{t.previous_commit_hash.slice(0, 7)} → {t.current_commit_hash?.slice(0, 7)}</>
-                        : <>new → {t.current_commit_hash?.slice(0, 7)}</>
-                    }
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+          <GitRunView transfers={transfers} isRunning={isRunning} />
         ) : (
           <RunTreeView transfers={transfers} remotePath={remotePath} liveEvents={liveEvents} runEnded={!isRunning} />
         )
