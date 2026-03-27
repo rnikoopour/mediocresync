@@ -71,7 +71,7 @@ export function JobFormModal({ editing, onClose }: Props) {
           <form onSubmit={(e) => { e.preventDefault(); save.mutate(form) }} className="flex flex-col sm:flex-row flex-1 min-h-0">
             {/* Mobile horizontal tabs */}
             <div className="sm:hidden flex shrink-0 border-b border-gray-200 dark:border-gray-700">
-              {(['general', 'filters'] as const).map((tab) => (
+              {(['general', ...(!isGit ? ['filters'] : [])] as const).map((tab) => (
                 <button
                   key={tab}
                   type="button"
@@ -88,7 +88,7 @@ export function JobFormModal({ editing, onClose }: Props) {
             </div>
             {/* Desktop sidebar tabs */}
             <nav className="hidden sm:block w-36 border-r border-gray-200 dark:border-gray-700 py-3 shrink-0">
-              {(['general', 'filters'] as const).map((tab) => (
+              {(['general', ...(!isGit ? ['filters'] : [])] as const).map((tab) => (
                 <button
                   key={tab}
                   type="button"
@@ -114,7 +114,7 @@ export function JobFormModal({ editing, onClose }: Props) {
                       <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
                     </Field>
                     <Field label="Source">
-                      <select className="input" value={form.source_id} onChange={(e) => setForm({ ...form, source_id: e.target.value })} required>
+                      <select className="input" value={form.source_id} onChange={(e) => { const src = sources.find((s) => s.id === e.target.value); if (src?.type === 'git') setActiveTab('general'); setForm({ ...form, source_id: e.target.value }) }} required>
                         <option value="">Select a source…</option>
                         {sources.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.type})</option>)}
                       </select>
