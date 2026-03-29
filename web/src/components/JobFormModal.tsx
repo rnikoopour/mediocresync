@@ -48,6 +48,7 @@ export function JobFormModal({ editing, onClose }: Props) {
   const { data: sources = [] } = useQuery({ queryKey: ['sources'], queryFn: api.sources.list })
   const selectedSource = sources.find((s) => s.id === form.source_id)
   const isGit = selectedSource?.type === 'git'
+  const tabs: Array<'general' | 'filters'> = ['general', ...(form.source_id && !isGit ? ['filters' as const] : [])]
 
   const save = useMutation({
     mutationFn: (req: JobRequest) =>
@@ -71,7 +72,7 @@ export function JobFormModal({ editing, onClose }: Props) {
           <form onSubmit={(e) => { e.preventDefault(); save.mutate(form) }} className="flex flex-col sm:flex-row flex-1 min-h-0">
             {/* Mobile horizontal tabs */}
             <div className="sm:hidden flex shrink-0 border-b border-gray-200 dark:border-gray-700">
-              {(['general', ...(form.source_id && !isGit ? ['filters'] : [])] as const).map((tab) => (
+              {tabs.map((tab) => (
                 <button
                   key={tab}
                   type="button"
@@ -88,7 +89,7 @@ export function JobFormModal({ editing, onClose }: Props) {
             </div>
             {/* Desktop sidebar tabs */}
             <nav className="hidden sm:block w-36 border-r border-gray-200 dark:border-gray-700 py-3 shrink-0">
-              {(['general', ...(form.source_id && !isGit ? ['filters'] : [])] as const).map((tab) => (
+              {tabs.map((tab) => (
                 <button
                   key={tab}
                   type="button"
@@ -175,6 +176,7 @@ export function JobFormModal({ editing, onClose }: Props) {
                         </div>
 
                         <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide pt-1">Autosync</p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500">Runs at clock-aligned boundaries from local midnight (e.g. every 12h → 00:00 and 12:00).</p>
                         <div className="flex flex-wrap items-center gap-3">
                           <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer shrink-0 w-28">
                             <span
