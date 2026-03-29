@@ -115,9 +115,8 @@ func (s *Scheduler) lastRun(jobID string) time.Time {
 }
 
 // isDue returns true if the job has not yet run during the current
-// clock-aligned slot. Slots are computed by truncating the current time to
-// the job's interval, so a 60-minute job fires at 00:00, 01:00, 02:00, etc.
-// and a 30-minute job fires at 00:00, 00:30, 01:00, etc.
+// clock-aligned slot. Slots are anchored to local midnight so e.g. a
+// 12-hour job fires at 00:00 and 12:00 local time.
 func isDue(job *db.SyncJob, lastRun time.Time) bool {
 	var interval time.Duration
 	switch job.IntervalUnit {
@@ -131,6 +130,25 @@ func isDue(job *db.SyncJob, lastRun time.Time) bool {
 		return false
 	}
 
-	slotStart := time.Now().UTC().Truncate(interval)
+	slotStart := currentSlotStart(time.Now(), interval)
 	return lastRun.Before(slotStart)
+}
+
+// currentSlotStart returns the start of the current slot anchored to local
+// midnight. Sub-day intervals (minutes, hours) are divided from today's local
+// midnight; day-based intervals are anchored to a fixed reference date
+// (2000-01-01 local) so multi-day cadences stay consistent.
+func currentSlotStart(now time.Time, interval time.Duration) time.Time {
+	if interval <= 0 {
+		return now
+	}
+	if interval >= 24*time.Hour {
+		ref := time.Date(2000, 1, 1, 0, 0, 0, 0, now.Location())
+		elapsed := now.Sub(ref)
+		return ref.Add((elapsed / interval) * interval)
+	}
+	y, m, d := now.Date()
+	midnight := time.Date(y, m, d, 0, 0, 0, 0, now.Location())
+	elapsed := now.Sub(midnight)
+	return midnight.Add((elapsed / interval) * interval)
 }
