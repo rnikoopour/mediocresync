@@ -176,6 +176,7 @@ export function JobFormModal({ editing, onClose }: Props) {
                         </div>
 
                         <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide pt-1">Autosync</p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500">Runs at clock-aligned boundaries from local midnight (e.g. every 12h → 00:00 and 12:00).</p>
                         <div className="flex flex-wrap items-center gap-3">
                           <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer shrink-0 w-28">
                             <span
