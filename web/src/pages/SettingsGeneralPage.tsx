@@ -131,43 +131,45 @@ export function SettingsGeneralPage() {
         </form>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 mt-6">
-        <h2 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-4">Display</h2>
-        <label className="flex items-center gap-3 cursor-pointer" onClick={() => setUse24h((v) => !v)}>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={use24h}
-            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${use24h ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'}`}
-          >
-            <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${use24h ? 'translate-x-4' : 'translate-x-0'}`} />
-          </button>
-          <span className="text-sm text-gray-700 dark:text-gray-300">Use 24-hour time</span>
-        </label>
-      </div>
-
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 mt-6">
-        <h2 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-4">Logging</h2>
-        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Log Level</label>
-        <div className="flex gap-2">
-          {logLevels.map((level) => (
+      <div className="flex gap-6 mt-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 flex-1">
+          <h2 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-4">Display</h2>
+          <label className="flex items-center gap-3 cursor-pointer" onClick={() => setUse24h((v) => !v)}>
             <button
-              key={level}
-              onClick={() => setLogLevel.mutate(level)}
-              disabled={setLogLevel.isPending}
-              className={`px-3 py-1.5 rounded text-sm font-medium capitalize transition-colors ${
-                settings?.log_level === level
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-              }`}
+              type="button"
+              role="switch"
+              aria-checked={use24h}
+              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${use24h ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'}`}
             >
-              {level}
+              <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${use24h ? 'translate-x-4' : 'translate-x-0'}`} />
             </button>
-          ))}
+            <span className="text-sm text-gray-700 dark:text-gray-300">Use 24-hour time</span>
+          </label>
         </div>
-        {setLogLevel.isError && (
-          <p className="mt-2 text-xs text-red-600 dark:text-red-400">{(setLogLevel.error as Error).message}</p>
-        )}
+
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 flex-1">
+          <h2 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-4">Logging</h2>
+          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Log Level</label>
+          <div className="flex gap-2">
+            {logLevels.map((level) => (
+              <button
+                key={level}
+                onClick={() => setLogLevel.mutate(level)}
+                disabled={setLogLevel.isPending}
+                className={`px-3 py-1.5 rounded text-sm font-medium capitalize transition-colors ${
+                  settings?.log_level === level
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                }`}
+              >
+                {level}
+              </button>
+            ))}
+          </div>
+          {setLogLevel.isError && (
+            <p className="mt-2 text-xs text-red-600 dark:text-red-400">{(setLogLevel.error as Error).message}</p>
+          )}
+        </div>
       </div>
     </div>
   )
