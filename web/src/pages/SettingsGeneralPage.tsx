@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client'
 import type { LogLevel } from '../api/types'
+import { useLocalStorageBool } from '../hooks/useLocalStorageBool'
 
 const logLevels: LogLevel[] = ['debug', 'info', 'warn', 'error']
 
@@ -13,6 +14,8 @@ export function SettingsGeneralPage() {
     mutationFn: (level: LogLevel) => api.settings.setLogLevel(level),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['settings'] }),
   })
+
+  const [use24h, setUse24h] = useLocalStorageBool('use24hTime', false)
 
   const [newUsername, setNewUsername] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -126,6 +129,19 @@ export function SettingsGeneralPage() {
             {loading ? 'Saving…' : 'Save changes'}
           </button>
         </form>
+      </div>
+
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 mt-6">
+        <h2 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-4">Display</h2>
+        <label className="flex items-center gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={use24h}
+            onChange={(e) => setUse24h(e.target.checked)}
+            className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+          />
+          <span className="text-sm text-gray-700 dark:text-gray-300">Use 24-hour time</span>
+        </label>
       </div>
 
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 mt-6">

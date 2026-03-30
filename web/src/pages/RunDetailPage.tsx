@@ -5,10 +5,13 @@ import { api } from '../api/client'
 import { StatusBadge } from '../components/StatusBadge'
 import { RunTreeView, formatBytes, formatSpeed } from '../components/RunTree'
 import { useSSE } from '../hooks/useSSE'
+import { useLocalStorageBool } from '../hooks/useLocalStorageBool'
+import { formatDateTime } from '../utils/time'
 
 export function RunDetailPage() {
   const { id } = useParams<{ id: string }>()
   const qc = useQueryClient()
+  const [use24h] = useLocalStorageBool('use24hTime', false)
 
   const { data: run, isLoading } = useQuery({
     queryKey: ['run', id],
@@ -53,7 +56,7 @@ export function RunDetailPage() {
         <span>/</span>
         <Link to={`/jobs/${run.job_id}`} className="hover:text-gray-700 dark:hover:text-gray-300">{job?.name ?? run.job_id}</Link>
         <span>/</span>
-        <span className="text-gray-900 dark:text-gray-100 font-medium">{new Date(run.started_at).toLocaleString()}</span>
+        <span className="text-gray-900 dark:text-gray-100 font-medium">{formatDateTime(run.started_at, use24h)}</span>
       </div>
 
       <div className="card overflow-hidden mb-6">
@@ -61,7 +64,7 @@ export function RunDetailPage() {
           <StatusBadge status={run.status} />
           <div className="flex-1 min-w-0">
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Started {new Date(run.started_at).toLocaleString()}
+              Started {formatDateTime(run.started_at, use24h)}
               {duration && ` · ${duration}`}
             </p>
           </div>
