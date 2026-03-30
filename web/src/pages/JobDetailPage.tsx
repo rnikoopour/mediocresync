@@ -67,11 +67,9 @@ function GitRunView({ transfers, isRunning }: { transfers: import('../api/types'
               </div>
               {(t.previous_commit_hash || t.current_commit_hash) && (
                 <div className="font-mono text-xs text-gray-400 dark:text-gray-500 mt-0.5 ml-[calc(1.5rem+0.75rem)]">
-                  {t.status === 'skipped'
-                    ? t.current_commit_hash?.slice(0, 7)
-                    : t.previous_commit_hash
-                      ? <>{t.previous_commit_hash.slice(0, 7)} → {t.current_commit_hash?.slice(0, 7)}</>
-                      : <>new → {t.current_commit_hash?.slice(0, 7)}</>
+                  {t.previous_commit_hash
+                    ? <>{t.previous_commit_hash.slice(0, 7)} → {t.current_commit_hash?.slice(0, 7)}</>
+                    : <>new → {t.current_commit_hash?.slice(0, 7)}</>
                   }
                 </div>
               )}
@@ -515,7 +513,12 @@ function GitRepoRow({ file, onSkip, onUnskip }: {
           </div>
         )}
         {file.action === 'skip' && file.commit_hash && (
-          <div className="font-mono text-xs text-gray-400 dark:text-gray-500 mt-0.5">{file.commit_hash.slice(0, 7)}</div>
+          <div className="font-mono text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+            {file.previous_commit_hash
+              ? <>{file.previous_commit_hash.slice(0, 7)} → {file.commit_hash.slice(0, 7)}</>
+              : <>new → {file.commit_hash.slice(0, 7)}</>
+            }
+          </div>
         )}
       </div>
       {menu && (
