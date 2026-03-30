@@ -204,7 +204,7 @@ function RunRow({ run: initialRun, remotePath, jobId, isGit }: { run: Run; remot
 
 // ── Plan tree ────────────────────────────────────────────────────────────────
 
-type TreeFile = { type: 'file'; name: string; remote_path: string; size_bytes: number; mtime: string; action: 'copy' | 'skip' }
+type TreeFile = { type: 'file'; name: string; remote_path: string; size_bytes: number; mtime: string; action: 'copy' | 'skip' | 'error' }
 type TreeFolder = { type: 'folder'; name: string; children: TreeNode[] }
 type TreeNode = TreeFile | TreeFolder
 
