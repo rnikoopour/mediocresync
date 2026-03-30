@@ -27,6 +27,7 @@ type RepoResult struct {
 	Repo       *db.GitRepo
 	LocalPath  string
 	CommitHash string
+	Err        error // non-nil if this repo could not be enumerated
 }
 
 // LocalPath returns the filesystem path where repo should be cloned:
@@ -44,6 +45,22 @@ func LocalPath(localDest, repoURL string) (string, error) {
 	org := parts[len(parts)-2]
 	repoName := strings.TrimSuffix(parts[len(parts)-1], ".git")
 	return filepath.Join(localDest, u.Hostname(), org, repoName), nil
+}
+
+// validateAuthForURL returns a descriptive error when the auth method type is
+// incompatible with the URL scheme (e.g. SSH URL with HTTP token auth).
+func validateAuthForURL(repoURL string, auth transport.AuthMethod) error {
+	isSSH := strings.HasPrefix(repoURL, "git@") || strings.HasPrefix(repoURL, "ssh://")
+	isHTTP := strings.HasPrefix(repoURL, "https://") || strings.HasPrefix(repoURL, "http://")
+	_, isHTTPAuth := auth.(*http.BasicAuth)
+	_, isSSHAuth := auth.(*ssh.PublicKeys)
+	if isSSH && isHTTPAuth {
+		return fmt.Errorf("repo URL %q uses SSH but source is configured with token (HTTP) auth — change the URL to HTTPS or switch the source auth type to SSH key", repoURL)
+	}
+	if isHTTP && isSSHAuth {
+		return fmt.Errorf("repo URL %q uses HTTPS but source is configured with SSH key auth — change the URL to SSH or switch the source auth type to token", repoURL)
+	}
+	return nil
 }
 
 // authForSource returns the go-git transport.AuthMethod for the given source.
@@ -67,23 +84,25 @@ func authForSource(src *db.Source, plaintext string) (transport.AuthMethod, erro
 
 // Enumerate returns a RepoResult for each repo without modifying the filesystem.
 // It clones/pulls to read the current remote HEAD commit hash.
-// If the repo is already cloned, it fetches and reads FETCH_HEAD.
+// Per-repo errors are captured in RepoResult.Err rather than aborting the batch.
 func Enumerate(ctx context.Context, src *db.Source, localDest string, repos []*db.GitRepo, credPlaintext string) ([]RepoResult, error) {
 	auth, err := authForSource(src, credPlaintext)
 	if err != nil {
 		return nil, err
 	}
 
-	var results []RepoResult
+	results := make([]RepoResult, 0, len(repos))
 	for _, repo := range repos {
-		localPath, err := LocalPath(localDest, repo.URL)
-		if err != nil {
-			return nil, err
+		localPath, pathErr := LocalPath(localDest, repo.URL)
+		if pathErr != nil {
+			results = append(results, RepoResult{Repo: repo, Err: pathErr})
+			continue
 		}
 
-		hash, err := currentHash(ctx, src, repo, localPath, auth)
-		if err != nil {
-			return nil, fmt.Errorf("repo %s: %w", repo.URL, err)
+		hash, hashErr := currentHash(ctx, src, repo, localPath, auth)
+		if hashErr != nil {
+			results = append(results, RepoResult{Repo: repo, LocalPath: localPath, Err: hashErr})
+			continue
 		}
 		results = append(results, RepoResult{
 			Repo:       repo,
@@ -96,6 +115,11 @@ func Enumerate(ctx context.Context, src *db.Source, localDest string, repos []*d
 
 // Sync clones or pulls a single repository. Returns the resulting commit hash.
 func Sync(ctx context.Context, repo *db.GitRepo, localPath string, auth transport.AuthMethod) (string, error) {
+	if auth != nil {
+		if err := validateAuthForURL(repo.URL, auth); err != nil {
+			return "", err
+		}
+	}
 	if err := os.MkdirAll(filepath.Dir(localPath), 0o755); err != nil {
 		return "", fmt.Errorf("mkdir %s: %w", filepath.Dir(localPath), err)
 	}
@@ -164,6 +188,11 @@ func AuthMethod(src *db.Source, credPlaintext string) (transport.AuthMethod, err
 // branch without modifying the working tree. Used during plan to detect upstream
 // changes before deciding whether a full pull is needed.
 func currentHash(ctx context.Context, src *db.Source, repo *db.GitRepo, localPath string, auth transport.AuthMethod) (string, error) {
+	if auth != nil {
+		if err := validateAuthForURL(repo.URL, auth); err != nil {
+			return "", err
+		}
+	}
 	r, err := git.PlainOpen(localPath)
 	if errors.Is(err, git.ErrRepositoryNotExists) {
 		// Not cloned yet — clone now so we can read HEAD.

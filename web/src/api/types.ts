@@ -135,9 +135,10 @@ export interface PlanFile {
   local_path: string
   size_bytes: number
   mtime: string
-  action: 'copy' | 'skip'
+  action: 'copy' | 'skip' | 'error'
   commit_hash?: string
   previous_commit_hash?: string
+  error?: string
 }
 
 export interface PlanResult {

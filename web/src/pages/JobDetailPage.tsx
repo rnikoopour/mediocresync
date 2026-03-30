@@ -493,7 +493,7 @@ function GitRepoRow({ file, onSkip, onUnskip }: {
     >
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className="hidden md:inline shrink-0"><StatusBadge status={file.action === 'copy' ? 'pending' : 'skipped'} /></span>
+          <span className="hidden md:inline shrink-0"><StatusBadge status={file.action === 'error' ? 'failed' : file.action === 'copy' ? 'pending' : 'skipped'} /></span>
           <span className="font-mono text-xs text-gray-600 dark:text-gray-300 flex-1 min-w-0 break-all">{file.remote_path}</span>
           <button
             className="md:hidden px-1 py-0.5 text-gray-400 dark:text-gray-500 text-base leading-none shrink-0"
@@ -502,8 +502,11 @@ function GitRepoRow({ file, onSkip, onUnskip }: {
           >⋮</button>
         </div>
         <div className="flex md:hidden items-center gap-2 mt-0.5">
-          <StatusBadge status={file.action === 'copy' ? 'pending' : 'skipped'} />
+          <StatusBadge status={file.action === 'error' ? 'failed' : file.action === 'copy' ? 'pending' : 'skipped'} />
         </div>
+        {file.action === 'error' && file.error && (
+          <div className="text-xs text-red-500 dark:text-red-400 mt-0.5 break-all">{file.error}</div>
+        )}
         {file.action === 'copy' && (file.previous_commit_hash || file.commit_hash) && (
           <div className="font-mono text-xs text-gray-400 dark:text-gray-500 mt-0.5 break-all">
             {file.previous_commit_hash
