@@ -327,6 +327,18 @@ func (e *Engine) PlanThenRun(ctx context.Context, jobID string) error {
 
 	if err != nil {
 		e.broadcastPlanEvent(jobID, PlanEvent{Error: err.Error()})
+		// Record a failed run so the scheduler sees a recent attempt and does
+		// not retry every minute while the error persists.
+		run := &db.Run{JobID: jobID, Status: db.RunStatusRunning}
+		if createErr := e.runs.Create(run); createErr != nil {
+			slog.Error("plan failed: could not record failed run", "job_id", jobID, "err", createErr)
+		} else {
+			msg := err.Error()
+			if updateErr := e.runs.UpdateStatus(run.ID, db.RunStatusFailed, &msg); updateErr != nil {
+				slog.Error("plan failed: could not update run status", "job_id", jobID, "run_id", run.ID, "err", updateErr)
+			}
+			e.broker.Publish(jobID, sse.Event{RunID: run.ID, Status: "failed"})
+		}
 		return fmt.Errorf("plan: %w", err)
 	}
 
