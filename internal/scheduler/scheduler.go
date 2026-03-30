@@ -104,14 +104,24 @@ func (s *Scheduler) tick(ctx context.Context) {
 	}
 }
 
-// lastRun returns the start time of the most recent run for the job, or the
-// zero time if no runs exist.
+// lastRun returns the most recent time that should be considered "covered" for
+// scheduling purposes:
+//   - If the most recent run has finished, use FinishedAt (so a long run that
+//     finished at 04:30 covers the 04:00 slot and won't re-fire until 05:00).
+//   - If the run is still in progress, use time.Now() so isDue returns false
+//     until the run completes and the next slot is reached.
 func (s *Scheduler) lastRun(jobID string) time.Time {
 	runs, err := s.runs.ListByJob(jobID)
 	if err != nil || len(runs) == 0 {
 		return time.Time{}
 	}
-	return runs[0].StartedAt
+	r := runs[0]
+	if r.FinishedAt != nil {
+		return *r.FinishedAt
+	}
+	// Run is still in progress — treat now as the coverage time so we don't
+	// attempt to start a second run for the current slot.
+	return time.Now()
 }
 
 // isDue returns true if the job has not yet run during the current
