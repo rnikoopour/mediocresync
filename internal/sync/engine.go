@@ -120,9 +120,10 @@ type PlanFile struct {
 	LocalPath          string    `json:"local_path"`
 	SizeBytes          int64     `json:"size_bytes"`
 	MTime              time.Time `json:"mtime"`
-	Action             string    `json:"action"`                        // "copy" | "skip"
-	CommitHash         string    `json:"commit_hash,omitempty"`         // git only: current remote hash
+	Action             string    `json:"action"`                         // "copy" | "skip" | "error"
+	CommitHash         string    `json:"commit_hash,omitempty"`          // git only: current remote hash
 	PreviousCommitHash string    `json:"previous_commit_hash,omitempty"` // git only: last synced hash
+	Error              string    `json:"error,omitempty"`                // git only: per-repo plan error
 }
 
 // PlanResult is the full output of a dry-run plan.
@@ -249,6 +250,15 @@ func (e *Engine) planGit(ctx context.Context, job *db.SyncJob, src *db.Source) (
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
+		if res.Err != nil {
+			plan.Files = append(plan.Files, PlanFile{
+				RemotePath: res.Repo.URL,
+				LocalPath:  res.LocalPath,
+				Action:     "error",
+				Error:      res.Err.Error(),
+			})
+			continue
+		}
 		state, _ := e.syncState.Get(job.ID, res.Repo.URL)
 		action := "copy"
 		var prevHash string
@@ -327,6 +337,18 @@ func (e *Engine) PlanThenRun(ctx context.Context, jobID string) error {
 
 	if err != nil {
 		e.broadcastPlanEvent(jobID, PlanEvent{Error: err.Error()})
+		// Record a failed run so the scheduler sees a recent attempt and does
+		// not retry every minute while the error persists.
+		run := &db.Run{JobID: jobID, Status: db.RunStatusRunning}
+		if createErr := e.runs.Create(run); createErr != nil {
+			slog.Error("plan failed: could not record failed run", "job_id", jobID, "err", createErr)
+		} else {
+			msg := err.Error()
+			if updateErr := e.runs.UpdateStatus(run.ID, db.RunStatusFailed, &msg); updateErr != nil {
+				slog.Error("plan failed: could not update run status", "job_id", jobID, "run_id", run.ID, "err", updateErr)
+			}
+			e.broker.Publish(jobID, sse.Event{RunID: run.ID, Status: "failed"})
+		}
 		return fmt.Errorf("plan: %w", err)
 	}
 
@@ -1078,6 +1100,23 @@ func (e *Engine) executeGitRun(ctx context.Context, job *db.SyncJob, src *db.Sou
 
 		wg.Go(func() {
 			defer func() { <-sem }()
+
+			if planFile.Action == "error" {
+				if t != nil {
+					errMsg := planFile.Error
+					if err := e.transfers.UpdateStatus(t.ID, db.TransferStatusFailed, &errMsg, nil); err != nil {
+						slog.Error("update transfer status", "transfer_id", t.ID, "err", err)
+					}
+					e.broker.Publish(run.ID, sse.Event{RunID: run.ID, TransferID: t.ID, RemotePath: planFile.RemotePath, Status: db.TransferStatusFailed, Error: errMsg})
+				}
+				mu.Lock()
+				failed++
+				if err := e.runs.UpdateCounts(run.ID, len(plan.Files), copied, skipped, failed); err != nil {
+					slog.Error("update run counts", "run_id", run.ID, "err", err)
+				}
+				mu.Unlock()
+				return
+			}
 
 			if planFile.Action == "skip" {
 				if t != nil {
