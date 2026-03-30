@@ -133,13 +133,15 @@ export function SettingsGeneralPage() {
 
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 mt-6">
         <h2 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-4">Display</h2>
-        <label className="flex items-center gap-3 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={use24h}
-            onChange={(e) => setUse24h(e.target.checked)}
-            className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
-          />
+        <label className="flex items-center gap-3 cursor-pointer" onClick={() => setUse24h((v) => !v)}>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={use24h}
+            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${use24h ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'}`}
+          >
+            <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${use24h ? 'translate-x-4' : 'translate-x-0'}`} />
+          </button>
           <span className="text-sm text-gray-700 dark:text-gray-300">Use 24-hour time</span>
         </label>
       </div>
