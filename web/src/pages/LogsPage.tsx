@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { openEventSource } from '../hooks/eventSource'
+import { useLocalStorageBool } from '../hooks/useLocalStorageBool'
+import { formatTime } from '../utils/time'
 
 interface LogEntry {
   time: string
@@ -26,6 +28,7 @@ function formatAttrs(attrs: Record<string, unknown>): string {
 
 export function LogsPage() {
   const [entries, setEntries] = useState<LogEntry[]>([])
+  const [use24h] = useLocalStorageBool('use24hTime', false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const [autoScroll, setAutoScroll] = useState(true)
 
@@ -68,7 +71,7 @@ export function LogsPage() {
         {entries.map((entry, i) => (
           <div key={i} className="flex gap-2 leading-5">
             <span className="text-gray-400 dark:text-gray-500 shrink-0">
-              {new Date(entry.time).toLocaleTimeString()}
+              {formatTime(entry.time, use24h)}
             </span>
             <span className={`w-12 shrink-0 font-medium ${levelClass(entry.level)}`}>
               {entry.level.toUpperCase().slice(0, 4)}

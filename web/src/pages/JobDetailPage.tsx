@@ -11,6 +11,7 @@ import type { RunTab } from '../components/RunTree'
 import { usePlan } from '../context/PlanContext'
 import { useSSE } from '../hooks/useSSE'
 import { useLocalStorageBool } from '../hooks/useLocalStorageBool'
+import { formatDateTime } from '../utils/time'
 
 function formatDuration(ms: number): string {
   const s = Math.floor(ms / 1000)
@@ -85,6 +86,7 @@ function GitRunView({ transfers, isRunning }: { transfers: import('../api/types'
 
 function RunRow({ run: initialRun, remotePath, jobId, isGit }: { run: Run; remotePath: string; jobId: string; isGit: boolean }) {
   const qc = useQueryClient()
+  const [use24h] = useLocalStorageBool('use24hTime', false)
   const [open, setOpen] = useState(initialRun.status === 'running')
 
   const { data: run = initialRun } = useQuery({
@@ -146,7 +148,7 @@ function RunRow({ run: initialRun, remotePath, jobId, isGit }: { run: Run; remot
           <StatusBadge status={effectiveStatus} />
           <div className="flex-1 min-w-0">
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Started {new Date(run.started_at).toLocaleString()}
+              Started {formatDateTime(run.started_at, use24h)}
               {duration && ` · ${duration}`}
             </p>
           </div>
