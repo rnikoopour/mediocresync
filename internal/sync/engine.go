@@ -738,11 +738,10 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, src *db.Source
 
 	sem := make(chan struct{}, concurrency)
 	var (
-		mu      sync.Mutex
-		copied  int
-		skipped int
-		failed  int
-		wg      sync.WaitGroup
+		mu     sync.Mutex
+		copied int
+		failed int
+		wg     sync.WaitGroup
 	)
 
 	for _, entry := range entries {
@@ -827,7 +826,7 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, src *db.Source
 				})
 				mu.Lock()
 				failed++
-				if err := e.runs.UpdateCounts(run.ID, len(entries), copied, skipped, failed); err != nil {
+				if err := e.runs.UpdateCounts(run.ID, len(entries), copied, initialSkipped, failed); err != nil {
 					slog.Error("update run counts", "run_id", run.ID, "err", err)
 				}
 				mu.Unlock()
@@ -837,7 +836,7 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, src *db.Source
 			slog.Info("transfer complete", "src", ent.remote.Path, "dst", finalPath(job.LocalDest, job.RemotePath, ent.remote.Path), "size", ent.remote.Size)
 			mu.Lock()
 			copied++
-			if err := e.runs.UpdateCounts(run.ID, len(entries), copied, skipped, failed); err != nil {
+			if err := e.runs.UpdateCounts(run.ID, len(entries), copied, initialSkipped, failed); err != nil {
 				slog.Error("update run counts", "run_id", run.ID, "err", err)
 			}
 			mu.Unlock()
