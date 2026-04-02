@@ -112,6 +112,12 @@ function RunRow({ run: initialRun, remotePath, jobId, isGit }: { run: Run; remot
   useEffect(() => {
     if (runStatus) qc.invalidateQueries({ queryKey: ['run', initialRun.id] })
   }, [runStatus, initialRun.id, qc])
+
+  // When a transfer completes, re-fetch the run to update the copied count.
+  useEffect(() => {
+    const hasDone = Array.from(liveEvents.values()).some((e) => e.status === 'done')
+    if (hasDone) qc.invalidateQueries({ queryKey: ['run', initialRun.id] })
+  }, [liveEvents, initialRun.id, qc])
   const effectiveStatus = (runStatus && runStatus !== 'canceling') ? runStatus : run.status
   const isRunning = effectiveStatus === 'running'
   // Cancelling if this client requested it OR if the server broadcast that
