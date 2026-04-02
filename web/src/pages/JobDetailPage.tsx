@@ -166,6 +166,7 @@ function RunRow({ run: initialRun, remotePath, jobId, isGit }: { run: Run; remot
             <span className="text-green-600 dark:text-green-400">{run.copied_files} copied</span>
             <span className="text-yellow-600 dark:text-yellow-400">{run.skipped_files} skipped</span>
             {run.failed_files > 0 && <span className="text-red-600 dark:text-red-400">{run.failed_files} failed</span>}
+            {isRunning && (() => { const pending = run.total_files - run.copied_files - run.skipped_files - run.failed_files; return pending > 0 ? <span>{pending} pending</span> : null })()}
           </div>
           <span className="text-gray-400 dark:text-gray-500 text-xs w-3 shrink-0">{open ? '▾' : '▸'}</span>
         </button>
