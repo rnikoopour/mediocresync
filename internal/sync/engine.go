@@ -724,7 +724,13 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, src *db.Source
 	if err := e.runs.UpdateTotalSize(run.ID, totalSizeBytes); err != nil {
 		slog.Error("update run total size", "run_id", run.ID, "err", err)
 	}
-	if err := e.runs.UpdateCounts(run.ID, len(entries), 0, 0, 0); err != nil {
+	initialSkipped := 0
+	for _, e := range entries {
+		if e.skip {
+			initialSkipped++
+		}
+	}
+	if err := e.runs.UpdateCounts(run.ID, len(entries), 0, initialSkipped, 0); err != nil {
 		slog.Error("update run counts", "run_id", run.ID, "err", err)
 	}
 
@@ -751,12 +757,6 @@ func (e *Engine) executeRun(ctx context.Context, job *db.SyncJob, src *db.Source
 			defer func() { <-sem }()
 
 			if ent.skip {
-				mu.Lock()
-				skipped++
-				if err := e.runs.UpdateCounts(run.ID, len(entries), copied, skipped, failed); err != nil {
-					slog.Error("update run counts", "run_id", run.ID, "err", err)
-				}
-				mu.Unlock()
 				return
 			}
 
@@ -1045,7 +1045,7 @@ func (e *Engine) executeGitRun(ctx context.Context, job *db.SyncJob, src *db.Sou
 		repoByURL[r.URL] = r
 	}
 
-	if err := e.runs.UpdateCounts(run.ID, len(plan.Files), 0, 0, 0); err != nil {
+	if err := e.runs.UpdateCounts(run.ID, len(plan.Files), 0, plan.ToSkip, 0); err != nil {
 		slog.Error("update run counts", "run_id", run.ID, "err", err)
 	}
 
@@ -1077,11 +1077,10 @@ func (e *Engine) executeGitRun(ctx context.Context, job *db.SyncJob, src *db.Sou
 	concurrency := max(job.Concurrency, 1)
 	sem := make(chan struct{}, concurrency)
 	var (
-		mu      sync.Mutex
-		copied  int
-		skipped int
-		failed  int
-		wg      sync.WaitGroup
+		mu     sync.Mutex
+		copied int
+		failed int
+		wg     sync.WaitGroup
 	)
 
 	for _, pf := range plan.Files {
@@ -1111,7 +1110,7 @@ func (e *Engine) executeGitRun(ctx context.Context, job *db.SyncJob, src *db.Sou
 				}
 				mu.Lock()
 				failed++
-				if err := e.runs.UpdateCounts(run.ID, len(plan.Files), copied, skipped, failed); err != nil {
+				if err := e.runs.UpdateCounts(run.ID, len(plan.Files), copied, plan.ToSkip, failed); err != nil {
 					slog.Error("update run counts", "run_id", run.ID, "err", err)
 				}
 				mu.Unlock()
@@ -1129,12 +1128,6 @@ func (e *Engine) executeGitRun(ctx context.Context, job *db.SyncJob, src *db.Sou
 						}
 					}
 				}
-				mu.Lock()
-				skipped++
-				if err := e.runs.UpdateCounts(run.ID, len(plan.Files), copied, skipped, failed); err != nil {
-					slog.Error("update run counts", "run_id", run.ID, "err", err)
-				}
-				mu.Unlock()
 				return
 			}
 
@@ -1159,7 +1152,7 @@ func (e *Engine) executeGitRun(ctx context.Context, job *db.SyncJob, src *db.Sou
 				}
 				mu.Lock()
 				failed++
-				if err := e.runs.UpdateCounts(run.ID, len(plan.Files), copied, skipped, failed); err != nil {
+				if err := e.runs.UpdateCounts(run.ID, len(plan.Files), copied, plan.ToSkip, failed); err != nil {
 					slog.Error("update run counts", "run_id", run.ID, "err", err)
 				}
 				mu.Unlock()
@@ -1189,7 +1182,7 @@ func (e *Engine) executeGitRun(ctx context.Context, job *db.SyncJob, src *db.Sou
 
 			mu.Lock()
 			copied++
-			if err := e.runs.UpdateCounts(run.ID, len(plan.Files), copied, skipped, failed); err != nil {
+			if err := e.runs.UpdateCounts(run.ID, len(plan.Files), copied, plan.ToSkip, failed); err != nil {
 				slog.Error("update run counts", "run_id", run.ID, "err", err)
 			}
 			mu.Unlock()
