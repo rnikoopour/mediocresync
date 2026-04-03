@@ -1,8 +1,9 @@
-type Status = 'running' | 'completed' | 'partial' | 'nothing_to_sync' | 'failed' | 'canceled' | 'server_stopped' | 'pending' | 'in_progress' | 'done' | 'skipped' | 'not_copied'
+type Status = 'running' | 'completed' | 'partial' | 'nothing_to_sync' | 'failed' | 'canceled' | 'server_stopped' | 'pending' | 'in_progress' | 'done' | 'skipped' | 'not_copied' | 'plan' | 'planning'
 
 const styles: Record<Status, string> = {
   running:        'bg-blue-100 text-blue-800 dark:bg-gray-600 dark:text-gray-100',
   in_progress:    'bg-blue-100 text-blue-800 dark:bg-gray-600 dark:text-gray-100',
+  planning:       'bg-blue-100 text-blue-800 dark:bg-gray-600 dark:text-gray-100',
   completed:      'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
   partial:        'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300',
   nothing_to_sync:'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
@@ -13,11 +14,13 @@ const styles: Record<Status, string> = {
   pending:        'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
   skipped:        'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300',
   not_copied:     'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400',
+  plan:           'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
 }
 
 const labels: Record<Status, string> = {
   running:        'Running',
   in_progress:    'In Progress',
+  planning:       'Planning',
   completed:      'Completed',
   partial:        'Partial',
   nothing_to_sync:'Nothing To Sync',
@@ -28,6 +31,7 @@ const labels: Record<Status, string> = {
   pending:        'Pending',
   skipped:        'Skipped',
   not_copied:     'Not Copied',
+  plan:           'Plan Result',
 }
 
 export function StatusBadge({ status }: { status: string }) {
