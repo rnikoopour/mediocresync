@@ -695,20 +695,30 @@ export function JobDetailPage() {
 
       {planEntry && planEntry.status !== 'error' && (
         <div className="mb-8 card overflow-hidden">
-          <div className="flex items-center gap-4 px-4 py-3">
+          <div className="flex flex-wrap items-center gap-4 px-4 py-3">
             <button
               onClick={() => setPlanOpen((o) => !o)}
               className="flex flex-wrap items-center gap-4 flex-1 min-w-0 hover:opacity-80 transition-opacity text-left"
             >
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Plan Result</span>
-              {planEntry.status === 'running' ? (
-                <span className="text-xs font-normal text-gray-400 dark:text-gray-500">Running…</span>
-              ) : planEntry.result && (
-                <span className="text-xs font-normal text-gray-400 dark:text-gray-500">
-                  {planEntry.result.to_copy} to copy · {planEntry.result.to_skip} to skip · {planEntry.result.files.length} total
-                  {' · '}{formatBytes(planEntry.result.files.filter(f => f.action === 'copy').reduce((s, f) => s + f.size_bytes, 0))}
-                </span>
-              )}
+              <StatusBadge status={planEntry.status === 'running' ? 'planning' : 'plan'} />
+              <div className="flex-1 min-w-0">
+                {planEntry.status === 'running' && (planEntry.scannedFiles > 0 || planEntry.scannedFolders > 0) && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {planEntry.scannedFiles} files, {planEntry.scannedFolders} folders found
+                  </p>
+                )}
+              </div>
+              {planEntry.result && (() => {
+                const planSize = planEntry.result.files.filter(f => f.action === 'copy').reduce((s, f) => s + f.size_bytes, 0)
+                return (
+                  <div className="flex flex-wrap gap-4 text-xs text-gray-500 dark:text-gray-400">
+                    {planSize > 0 && <span>{formatBytes(planSize)}</span>}
+                    <span>{planEntry.result.files.length} total</span>
+                    <span className="text-green-600 dark:text-green-400">{planEntry.result.to_copy} to copy</span>
+                    <span className="text-yellow-600 dark:text-yellow-400">{planEntry.result.to_skip} to skip</span>
+                  </div>
+                )
+              })()}
               <span className="text-gray-400 dark:text-gray-500 text-xs w-3 shrink-0">{planOpen ? '▾' : '▸'}</span>
             </button>
             {planEntry.status !== 'running' && (
