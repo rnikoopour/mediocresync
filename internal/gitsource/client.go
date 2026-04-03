@@ -90,7 +90,13 @@ func Enumerate(ctx context.Context, src *db.Source, localDest string, repos []*d
 	if err != nil {
 		return nil, err
 	}
+	return EnumerateWithAuth(ctx, localDest, repos, auth)
+}
 
+// EnumerateWithAuth is like Enumerate but accepts a pre-built auth method,
+// allowing callers that already hold a transport.AuthMethod to avoid redundant
+// credential decryption.
+func EnumerateWithAuth(ctx context.Context, localDest string, repos []*db.GitRepo, auth transport.AuthMethod) ([]RepoResult, error) {
 	results := make([]RepoResult, 0, len(repos))
 	for _, repo := range repos {
 		localPath, pathErr := LocalPath(localDest, repo.URL)
@@ -99,7 +105,7 @@ func Enumerate(ctx context.Context, src *db.Source, localDest string, repos []*d
 			continue
 		}
 
-		hash, hashErr := currentHash(ctx, src, repo, localPath, auth)
+		hash, hashErr := currentHashWithAuth(ctx, repo, localPath, auth)
 		if hashErr != nil {
 			results = append(results, RepoResult{Repo: repo, LocalPath: localPath, Err: hashErr})
 			continue
@@ -184,10 +190,10 @@ func AuthMethod(src *db.Source, credPlaintext string) (transport.AuthMethod, err
 	return authForSource(src, credPlaintext)
 }
 
-// currentHash fetches the remote and returns the tip commit hash of the tracked
-// branch without modifying the working tree. Used during plan to detect upstream
-// changes before deciding whether a full pull is needed.
-func currentHash(ctx context.Context, src *db.Source, repo *db.GitRepo, localPath string, auth transport.AuthMethod) (string, error) {
+// currentHashWithAuth fetches the remote and returns the tip commit hash of the
+// tracked branch without modifying the working tree. Used during plan to detect
+// upstream changes before deciding whether a full pull is needed.
+func currentHashWithAuth(ctx context.Context, repo *db.GitRepo, localPath string, auth transport.AuthMethod) (string, error) {
 	if auth != nil {
 		if err := validateAuthForURL(repo.URL, auth); err != nil {
 			return "", err
