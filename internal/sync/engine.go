@@ -448,8 +448,6 @@ func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanOutput
 	e.mu.Lock()
 	e.activeRunIDs[jobID] = run.ID
 	e.mu.Unlock()
-	// Notify all clients watching this job that a run has started.
-	e.broker.Publish(jobID, sse.Event{RunID: run.ID, Status: "started"})
 	slog.Info("job started", "job_name", job.Name, "job_id", jobID, "run_id", run.ID)
 
 	// Create transfer records for all plan files, preserving plan order.
@@ -524,6 +522,9 @@ func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanOutput
 	if err := e.runs.UpdateCounts(run.ID, len(plan.Files), 0, initialSkipped, initialFailed); err != nil {
 		slog.Error("update run counts", "run_id", run.ID, "err", err)
 	}
+	// Notify clients now that transfers are created and skips pre-processed.
+	// Any fetch triggered by this event will see the correct initial state.
+	e.broker.Publish(jobID, sse.Event{RunID: run.ID, Status: "started"})
 
 	var (
 		mu     sync.Mutex
