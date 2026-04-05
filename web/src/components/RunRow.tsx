@@ -119,12 +119,12 @@ export function RunRow({ run: initialRun, remotePath, jobId, isGit }: { run: Run
 
   return (
     <div className="card overflow-hidden">
-      <div className="flex items-start gap-2 px-4 py-3">
+      <div className="flex items-center gap-2 px-4 py-3">
         <button
           onClick={() => setOpen((o) => !o)}
-          className="flex items-start gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity text-left"
+          className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity text-left"
         >
-          <div className="mt-0.5 shrink-0"><StatusBadge status={effectiveStatus} /></div>
+          <div className="shrink-0"><StatusBadge status={effectiveStatus} /></div>
           <div className="flex-1 min-w-0 space-y-0.5">
             <p className="text-xs text-gray-500 dark:text-gray-400">
               Started {formatDateTime(run.started_at, use24h)}{duration && ` · ${duration}`}
@@ -144,9 +144,9 @@ export function RunRow({ run: initialRun, remotePath, jobId, isGit }: { run: Run
               </div>
             )}
           </div>
-          <span className="text-gray-400 dark:text-gray-500 text-xs shrink-0 mt-0.5">{open ? '▾' : '▸'}</span>
+          <span className="text-gray-400 dark:text-gray-500 text-xs shrink-0">{open ? '▾' : '▸'}</span>
         </button>
-        <div className="flex items-center gap-2 shrink-0 mt-0.5">
+        <div className="flex items-center gap-2 shrink-0">
           <Link
             to={`/runs/${run.id}`}
             onClick={(e) => e.stopPropagation()}
