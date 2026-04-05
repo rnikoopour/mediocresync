@@ -114,49 +114,57 @@ export function RunRow({ run: initialRun, remotePath, jobId, isGit }: { run: Run
     ? run.total_size_bytes / ((new Date(run.finished_at).getTime() - new Date(run.started_at).getTime()) / 1000)
     : null
 
+  const pendingFiles = run.total_files - run.copied_files - run.skipped_files - run.failed_files
+  const hasSpeedOrSize = run.total_size_bytes > 0 || liveSpeedBps > 0 || avgSpeedBps !== null
+
   return (
     <div className="card overflow-hidden">
-      <div className="flex flex-wrap items-center gap-4 px-4 py-3">
+      <div className="flex items-start gap-2 px-4 py-3">
         <button
           onClick={() => setOpen((o) => !o)}
-          className="flex flex-wrap items-center gap-4 flex-1 min-w-0 hover:opacity-80 transition-opacity text-left"
+          className="flex items-start gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity text-left"
         >
-          <StatusBadge status={effectiveStatus} />
-          <div className="flex-1 min-w-0">
+          <div className="mt-0.5 shrink-0"><StatusBadge status={effectiveStatus} /></div>
+          <div className="flex-1 min-w-0 space-y-0.5">
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Started {formatDateTime(run.started_at, use24h)}
-              {duration && ` · ${duration}`}
+              Started {formatDateTime(run.started_at, use24h)}{duration && ` · ${duration}`}
             </p>
+            <div className="flex flex-wrap gap-x-3 gap-y-0 text-xs text-gray-500 dark:text-gray-400">
+              <span>{run.total_files} total</span>
+              <span className="text-green-600 dark:text-green-400">{run.copied_files} copied</span>
+              <span className="text-yellow-600 dark:text-yellow-400">{run.skipped_files} skipped</span>
+              {run.failed_files > 0 && <span className="text-red-600 dark:text-red-400">{run.failed_files} failed</span>}
+              {isRunning && pendingFiles > 0 && <span>{pendingFiles} pending</span>}
+            </div>
+            {hasSpeedOrSize && (
+              <div className="flex flex-wrap gap-x-3 gap-y-0 text-xs text-gray-500 dark:text-gray-400">
+                {run.total_size_bytes > 0 && <span>{formatBytes(run.total_size_bytes)}</span>}
+                {liveSpeedBps > 0 && <span className="text-blue-600 dark:text-blue-400">{formatSpeed(liveSpeedBps)}</span>}
+                {avgSpeedBps !== null && <span>avg {formatSpeed(avgSpeedBps)}</span>}
+              </div>
+            )}
           </div>
-          <div className="flex flex-wrap gap-4 text-xs text-gray-500 dark:text-gray-400">
-            {run.total_size_bytes > 0 && <span>{formatBytes(run.total_size_bytes)}</span>}
-            {liveSpeedBps > 0 && <span className="text-blue-600 dark:text-blue-400">{formatSpeed(liveSpeedBps)}</span>}
-            {avgSpeedBps !== null && <span>avg {formatSpeed(avgSpeedBps)}</span>}
-            <span>{run.total_files} total</span>
-            <span className="text-green-600 dark:text-green-400">{run.copied_files} copied</span>
-            <span className="text-yellow-600 dark:text-yellow-400">{run.skipped_files} skipped</span>
-            {run.failed_files > 0 && <span className="text-red-600 dark:text-red-400">{run.failed_files} failed</span>}
-            {isRunning && (() => { const pending = run.total_files - run.copied_files - run.skipped_files - run.failed_files; return pending > 0 ? <span>{pending} pending</span> : null })()}
-          </div>
-          <span className="text-gray-400 dark:text-gray-500 text-xs w-3 shrink-0">{open ? '▾' : '▸'}</span>
+          <span className="text-gray-400 dark:text-gray-500 text-xs shrink-0 mt-0.5">{open ? '▾' : '▸'}</span>
         </button>
-        <Link
-          to={`/runs/${run.id}`}
-          onClick={(e) => e.stopPropagation()}
-          className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 text-xs shrink-0"
-          title="View run details"
-        >
-          ↗
-        </Link>
-        {(effectiveStatus === 'running' || isCancelling) && (
-          <button
-            onClick={() => cancel.mutate()}
-            disabled={isCancelling}
-            className="btn-danger text-xs shrink-0"
+        <div className="flex items-center gap-2 shrink-0 mt-0.5">
+          <Link
+            to={`/runs/${run.id}`}
+            onClick={(e) => e.stopPropagation()}
+            className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 text-xs"
+            title="View run details"
           >
-            {isCancelling ? 'Cancelling…' : 'Cancel'}
-          </button>
-        )}
+            ↗
+          </Link>
+          {(effectiveStatus === 'running' || isCancelling) && (
+            <button
+              onClick={() => cancel.mutate()}
+              disabled={isCancelling}
+              className="btn-danger text-xs"
+            >
+              {isCancelling ? 'Cancelling…' : 'Cancel'}
+            </button>
+          )}
+        </div>
       </div>
 
       {open && (
