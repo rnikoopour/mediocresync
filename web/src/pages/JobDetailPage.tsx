@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../api/client'
 import { StatusBadge } from '../components/StatusBadge'
@@ -13,8 +13,6 @@ import { useLocalStorageBool } from '../hooks/useLocalStorageBool'
 
 export function JobDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const qc = useQueryClient()
-
   const { data: job } = useQuery({ queryKey: ['jobs', id], queryFn: () => api.jobs.get(id!) })
   const { data: sources = [] } = useQuery({ queryKey: ['sources'], queryFn: api.sources.list })
   const isGitJob = !!sources.find((s) => s.id === job?.source_id && s.type === 'git')
@@ -51,7 +49,9 @@ export function JobDetailPage() {
   const run = useMutation({
     mutationFn: () => api.jobs.run(id!),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['runs', id] })
+      // Don't invalidate ['runs'] here — the 'started' SSE event fires after
+      // transfers are created and skips pre-processed, so RunRow never fetches
+      // while transfers are still in pending-limbo.
       if (id) dismissPlan(id)
     },
   })
