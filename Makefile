@@ -34,6 +34,7 @@ test:
 	  go test ./... ; GO_EXIT=$$? ; \
 	  rm -rf ui/dist && mv $$DIST_BACKUP/dist ui/dist && touch ui/dist/.gitkeep && \
 	  exit $$GO_EXIT
+	cd web && npx tsc -b --noEmit
 	cd web && npm test -- --run
 
 lint:
