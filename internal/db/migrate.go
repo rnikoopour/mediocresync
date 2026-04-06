@@ -260,6 +260,32 @@ var versionedMigrations = []struct {
 		},
 	},
 	{
+		key: "transfers_allow_not_copied_and_canceled",
+		stmts: []string{
+			`PRAGMA foreign_keys=OFF`,
+			`DROP TABLE IF EXISTS transfers_new`,
+			`CREATE TABLE transfers_new (
+				id                   TEXT PRIMARY KEY,
+				run_id               TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+				remote_path          TEXT NOT NULL,
+				local_path           TEXT NOT NULL,
+				size_bytes           INTEGER NOT NULL DEFAULT 0,
+				bytes_xferred        INTEGER NOT NULL DEFAULT 0,
+				duration_ms          INTEGER,
+				status               TEXT NOT NULL CHECK(status IN ('pending','in_progress','done','skipped','failed','not_copied','canceled')),
+				error_msg            TEXT,
+				started_at           TEXT,
+				finished_at          TEXT,
+				previous_commit_hash TEXT,
+				current_commit_hash  TEXT
+			)`,
+			`INSERT INTO transfers_new SELECT id,run_id,remote_path,local_path,size_bytes,bytes_xferred,duration_ms,status,error_msg,started_at,finished_at,previous_commit_hash,current_commit_hash FROM transfers`,
+			`DROP TABLE transfers`,
+			`ALTER TABLE transfers_new RENAME TO transfers`,
+			`PRAGMA foreign_keys=ON`,
+		},
+	},
+	{
 		key: "runs_add_transfer_tracking",
 		stmts: []string{
 			`PRAGMA foreign_keys=OFF`,

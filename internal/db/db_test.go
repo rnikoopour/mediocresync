@@ -258,6 +258,48 @@ func TestRunLifecycle(t *testing.T) {
 	}
 }
 
+// TestTransferStatusConstraint verifies that all defined transfer status values
+// satisfy the CHECK constraint. This test would have caught the missing
+// not_copied and canceled statuses before they hit production.
+func TestTransferStatusConstraint(t *testing.T) {
+	srcRepo, jobRepo, runRepo, transferRepo, _ := openAllRepos(t)
+
+	src := &Source{Name: "c", Type: SourceTypeFTPES, Host: "h", Port: 21, Username: "u", Password: []byte("p")}
+	_ = srcRepo.Create(src)
+	job := &SyncJob{Name: "j", SourceID: src.ID, RemotePath: "/", LocalDest: "/tmp", IntervalValue: 1, IntervalUnit: "hours", Concurrency: 1, Enabled: true}
+	_ = jobRepo.Create(job)
+	run := &Run{JobID: job.ID, Status: RunStatusRunning}
+	_ = runRepo.Create(run)
+
+	statuses := []string{
+		TransferStatusPending,
+		TransferStatusInProgress,
+		TransferStatusDone,
+		TransferStatusSkipped,
+		TransferStatusFailed,
+		TransferStatusNotCopied,
+		TransferStatusCanceled,
+	}
+
+	for _, status := range statuses {
+		t.Run(status, func(t *testing.T) {
+			transfers := []*Transfer{{RunID: run.ID, RemotePath: "/f", LocalPath: "/l", Status: status}}
+			if err := transferRepo.CreateBatch(transfers); err != nil {
+				t.Fatalf("CreateBatch with status %q: %v", status, err)
+			}
+			// Also exercise UpdateStatus to confirm the constraint allows the value.
+			if err := transferRepo.UpdateStatus(transfers[0].ID, status, nil, nil); err != nil {
+				t.Fatalf("UpdateStatus to %q: %v", status, err)
+			}
+		})
+	}
+
+	// MarkPendingNotCopied must not fail — exercises the not_copied status path.
+	if err := transferRepo.MarkPendingNotCopied(run.ID); err != nil {
+		t.Fatalf("MarkPendingNotCopied: %v", err)
+	}
+}
+
 // --- SyncStateRepository ---
 
 func TestSyncStateUpsert(t *testing.T) {

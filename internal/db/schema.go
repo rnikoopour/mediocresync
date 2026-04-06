@@ -116,7 +116,7 @@ var schema = []string{
 		size_bytes    INTEGER NOT NULL DEFAULT 0,
 		bytes_xferred INTEGER NOT NULL DEFAULT 0,
 		duration_ms   INTEGER,
-		status        TEXT NOT NULL CHECK(status IN ('pending','in_progress','done','skipped','failed')),
+		status        TEXT NOT NULL CHECK(status IN ('pending','in_progress','done','skipped','failed','not_copied','canceled')),
 		error_msg     TEXT,
 		started_at    TEXT,
 		finished_at   TEXT
