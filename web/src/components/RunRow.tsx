@@ -134,7 +134,7 @@ export function RunRow({ run: initialRun, remotePath, jobId, isGit }: { run: Run
               <span className="text-green-600 dark:text-green-400">{run.copied_files} copied</span>
               <span className="text-yellow-600 dark:text-yellow-400">{run.skipped_files} skipped</span>
               {run.failed_files > 0 && <span className="text-red-600 dark:text-red-400">{run.failed_files} failed</span>}
-              {isRunning && pendingFiles > 0 && <span>{pendingFiles} pending</span>}
+              {pendingFiles > 0 && <span>{isRunning ? `${pendingFiles} pending` : `${pendingFiles} not synced`}</span>}
             </div>
             {hasSpeedOrSize && (
               <div className="flex flex-wrap gap-x-3 gap-y-0 text-xs text-gray-500 dark:text-gray-400">

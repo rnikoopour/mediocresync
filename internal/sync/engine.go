@@ -621,6 +621,11 @@ func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanOutput
 
 	syncErr := source.Sync(jobCtx, SyncInput{Plan: plan, OnEvent: onEvent})
 
+	// Mark any transfers still pending/in_progress as not_copied.
+	if err := e.transfers.MarkPendingNotCopied(run.ID); err != nil {
+		slog.Error("mark pending transfers not_copied", "run_id", run.ID, "err", err)
+	}
+
 	mu.Lock()
 	finalCopied := copied
 	finalFailed := failed

@@ -20,6 +20,7 @@ const (
 	TransferStatusDone       = "done"
 	TransferStatusSkipped    = "skipped"
 	TransferStatusFailed     = "failed"
+	TransferStatusNotCopied  = "not_copied"
 )
 
 // Source type values.

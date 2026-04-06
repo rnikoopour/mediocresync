@@ -73,13 +73,25 @@ func (r *TransferRepository) UpdateCurrentCommitHash(id, hash string) error {
 
 func (r *TransferRepository) UpdateStatus(id, status string, errMsg *string, durationMs *int64) error {
 	var finishedAt *string
-	if status == TransferStatusDone || status == TransferStatusFailed || status == TransferStatusSkipped {
+	if status == TransferStatusDone || status == TransferStatusFailed || status == TransferStatusSkipped || status == TransferStatusNotCopied {
 		s := formatTime(time.Now().UTC())
 		finishedAt = &s
 	}
 	_, err := r.db.Exec(
 		`UPDATE transfers SET status=?, error_msg=?, duration_ms=?, finished_at=? WHERE id=?`,
 		status, errMsg, durationMs, finishedAt, id,
+	)
+	return err
+}
+
+// MarkPendingNotCopied marks all pending (and in_progress) transfers for a run
+// as not_copied. Call this after a run ends to ensure no transfers are left in
+// a transient state.
+func (r *TransferRepository) MarkPendingNotCopied(runID string) error {
+	finished := formatTime(time.Now().UTC())
+	_, err := r.db.Exec(
+		`UPDATE transfers SET status=?, finished_at=? WHERE run_id=? AND status IN (?, ?)`,
+		TransferStatusNotCopied, finished, runID, TransferStatusPending, TransferStatusInProgress,
 	)
 	return err
 }

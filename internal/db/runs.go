@@ -84,13 +84,24 @@ func (r *RunRepository) UpdateStatus(id, status string, errMsg *string) error {
 }
 
 // CancelStaleRuns marks any runs still in "running" state as "server_stopped"
-// and marks their in-progress transfers as "failed".
+// and marks their transient transfers as terminal states.
 // Call this on startup to clean up runs that were interrupted by an unclean shutdown.
 func (r *RunRepository) CancelStaleRuns() error {
 	finished := formatTime(time.Now().UTC())
+	// in_progress transfers were interrupted mid-flight — treat as failed.
 	_, err := r.db.Exec(
-		fmt.Sprintf(`UPDATE transfers SET status='%s' WHERE status='%s' AND run_id IN (SELECT id FROM runs WHERE status='%s')`,
+		fmt.Sprintf(`UPDATE transfers SET status='%s', finished_at=? WHERE status='%s' AND run_id IN (SELECT id FROM runs WHERE status='%s')`,
 			TransferStatusFailed, TransferStatusInProgress, RunStatusRunning),
+		finished,
+	)
+	if err != nil {
+		return err
+	}
+	// pending transfers were never started — mark as not_copied.
+	_, err = r.db.Exec(
+		fmt.Sprintf(`UPDATE transfers SET status='%s', finished_at=? WHERE status='%s' AND run_id IN (SELECT id FROM runs WHERE status='%s')`,
+			TransferStatusNotCopied, TransferStatusPending, RunStatusRunning),
+		finished,
 	)
 	if err != nil {
 		return err
