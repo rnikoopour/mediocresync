@@ -99,7 +99,7 @@ export interface Transfer {
   size_bytes: number
   bytes_xferred: number
   duration_ms?: number
-  status: 'pending' | 'in_progress' | 'done' | 'skipped' | 'failed'
+  status: 'pending' | 'in_progress' | 'done' | 'skipped' | 'failed' | 'not_copied' | 'canceled'
   error_msg?: string
   started_at?: string
   finished_at?: string
