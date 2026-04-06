@@ -93,6 +93,16 @@ export function RunRow({ run: initialRun, remotePath, jobId, isGit }: { run: Run
     const hasDone = Array.from(liveEvents.values()).some((e) => e.status === 'done')
     if (hasDone) qc.invalidateQueries({ queryKey: ['run', initialRun.id] })
   }, [liveEvents, initialRun.id, qc])
+
+  // When the run reaches a terminal status, re-fetch to get finished_at,
+  // bytes_copied, and transfers_started_at for the final avg speed display.
+  const terminalStatuses = ['completed', 'failed', 'partial', 'canceled', 'server_stopped', 'nothing_to_sync']
+  useEffect(() => {
+    if (runStatus && terminalStatuses.includes(runStatus)) {
+      qc.invalidateQueries({ queryKey: ['run', initialRun.id] })
+      qc.invalidateQueries({ queryKey: ['runs', initialRun.job_id] })
+    }
+  }, [runStatus, initialRun.id, initialRun.job_id, qc])
   const effectiveStatus = (runStatus && runStatus !== 'canceling') ? runStatus : run.status
   const isRunning = effectiveStatus === 'running'
   const isCancelling = cancelling || runStatus === 'canceling'
