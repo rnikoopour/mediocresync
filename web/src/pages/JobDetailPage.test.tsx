@@ -336,7 +336,7 @@ describe('JobDetailPage button disabled states', () => {
 // ── 5. Run header pending / not-synced counts ─────────────────────────────────
 //
 // When total_files > copied + skipped + failed, the leftover count must be
-// labelled "N pending" during a run and "N not synced" after it finishes.
+// labelled "N pending" during a run and "N not copied" after it finishes.
 // This ensures the header counts always add up visibly.
 
 describe('Run header pending / not-synced counts', () => {
@@ -360,8 +360,8 @@ describe('Run header pending / not-synced counts', () => {
     await waitFor(() => expect(screen.getByText(/2 pending/)).toBeInTheDocument())
   })
 
-  it('shows "N not synced" for a finished run with leftover files', async () => {
-    // total=10, copied=1, skipped=5, failed=2 → 2 not synced
+  it('shows "N not copied" for a finished run with leftover files', async () => {
+    // total=10, copied=1, skipped=5, failed=2 → 2 not copied
     const run = buildRun({
       status: 'canceled',
       total_files: 10,
@@ -376,7 +376,7 @@ describe('Run header pending / not-synced counts', () => {
 
     renderPage()
 
-    await waitFor(() => expect(screen.getByText(/2 not synced/)).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText(/2 not copied/)).toBeInTheDocument())
     expect(screen.queryByText(/pending/)).not.toBeInTheDocument()
   })
 
@@ -390,6 +390,6 @@ describe('Run header pending / not-synced counts', () => {
     renderPage()
 
     await waitFor(() => expect(screen.getByText(/Started/)).toBeInTheDocument())
-    expect(screen.queryByText(/pending|not synced/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/pending|not copied/)).not.toBeInTheDocument()
   })
 })
