@@ -149,6 +149,22 @@ func (h *runsHandler) progress(w http.ResponseWriter, r *http.Request) {
 	ch, unsub := h.broker.Subscribe(runID)
 	defer unsub()
 
+	// If the run already finished before we subscribed (e.g. client reconnected
+	// after the broker was closed), the channel will never receive events.
+	// Detect this by checking the DB and send the final status immediately.
+	if run, err := h.runs.Get(runID); err == nil && run != nil {
+		switch run.Status {
+		case db.RunStatusCompleted, db.RunStatusFailed, db.RunStatusPartial,
+			db.RunStatusCanceled, db.RunStatusServerStopped, db.RunStatusNothingToSync:
+			ev := sse.Event{RunID: runID, RunStatus: run.Status}
+			data, _ := json.Marshal(ev)
+			fmt.Fprintf(w, "event: run_status\ndata: %s\n\n", data)
+			fmt.Fprintf(w, "event: done\ndata: {}\n\n")
+			flusher.Flush()
+			return
+		}
+	}
+
 	for {
 		select {
 		case ev, ok := <-ch:

@@ -5,6 +5,7 @@ import { openEventSource } from './eventSource'
 export interface SSEResult {
   events: Map<string, ProgressEvent>
   runStatus: string | null
+  isDone: boolean
 }
 
 // Returns live transfer events and the final run status once emitted.
@@ -13,6 +14,7 @@ export interface SSEResult {
 export function useSSE(runID: string | null): SSEResult {
   const [events, setEvents] = useState<Map<string, ProgressEvent>>(new Map())
   const [runStatus, setRunStatus] = useState<string | null>(null)
+  const [isDone, setIsDone] = useState(false)
 
   useEffect(() => {
     if (!runID) return
@@ -43,6 +45,7 @@ export function useSSE(runID: string | null): SSEResult {
       })
 
       es.addEventListener('done', () => {
+        setIsDone(true)
         markDone() // run finished — don't reconnect
       })
 
@@ -56,7 +59,8 @@ export function useSSE(runID: string | null): SSEResult {
   useEffect(() => {
     setEvents(new Map())
     setRunStatus(null)
+    setIsDone(false)
   }, [runID])
 
-  return { events, runStatus }
+  return { events, runStatus, isDone }
 }

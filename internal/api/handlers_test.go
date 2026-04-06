@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"testing/fstest"
 	"time"
@@ -476,6 +477,42 @@ func TestRunErrorMsgPersistedOnFailure(t *testing.T) {
 	}
 	if *got.ErrorMsg != errMsg {
 		t.Errorf("error_msg: got %q, want %q", *got.ErrorMsg, errMsg)
+	}
+}
+
+// TestRunProgressSSEAlreadyFinished verifies that a client connecting to the
+// run progress SSE endpoint after the run has already completed receives the
+// terminal run_status event and done event immediately, rather than hanging
+// forever on a channel that will never receive events.
+func TestRunProgressSSEAlreadyFinished(t *testing.T) {
+	_, router, srcRepo, jobRepo, runRepo, session := setupRouterFull(t)
+
+	encrypted, _ := crypto.Encrypt(testEncKey, "pass")
+	src := &db.Source{Name: "c", Type: db.SourceTypeFTPES, Host: "h", Port: 21, Username: "u", Password: encrypted}
+	_ = srcRepo.Create(src)
+	job := &db.SyncJob{Name: "j", SourceID: src.ID, RemotePath: "/", LocalDest: "/tmp", IntervalValue: 1, IntervalUnit: "hours", Concurrency: 1, Enabled: true}
+	_ = jobRepo.Create(job)
+
+	run := &db.Run{JobID: job.ID, Status: db.RunStatusRunning}
+	_ = runRepo.Create(run)
+	_ = runRepo.UpdateStatus(run.ID, db.RunStatusCompleted, nil)
+
+	// The broker has no record of this run (it was never published to).
+	// The handler must detect the terminal state via the DB and respond immediately.
+	w := do(t, router, "GET", "/api/runs/"+run.ID+"/progress", nil, session)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("got %d, want 200", w.Code)
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "run_status") {
+		t.Errorf("expected run_status event in response, got: %s", body)
+	}
+	if !strings.Contains(body, "completed") {
+		t.Errorf("expected completed status in response, got: %s", body)
+	}
+	if !strings.Contains(body, "event: done") {
+		t.Errorf("expected done event in response, got: %s", body)
 	}
 }
 

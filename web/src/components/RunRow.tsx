@@ -86,7 +86,7 @@ export function RunRow({ run: initialRun, remotePath, jobId, isGit }: { run: Run
     onSuccess: () => setCancelling(true),
   })
 
-  const { events: liveEvents, runStatus } = useSSE(open ? run.id : null)
+  const { events: liveEvents, runStatus, isDone } = useSSE(open ? run.id : null)
 
   // When a transfer completes, re-fetch the run to update the copied count.
   useEffect(() => {
@@ -96,13 +96,16 @@ export function RunRow({ run: initialRun, remotePath, jobId, isGit }: { run: Run
 
   // When the run reaches a terminal status, re-fetch to get finished_at,
   // bytes_copied, and transfers_started_at for the final avg speed display.
+  // Also fires when isDone is set — handles the case where the run_status event
+  // was dropped (non-blocking broker buffer overflow) but done was still received.
   const terminalStatuses = ['completed', 'failed', 'partial', 'canceled', 'server_stopped', 'nothing_to_sync']
   useEffect(() => {
-    if (runStatus && terminalStatuses.includes(runStatus)) {
+    const isTerminalStatus = runStatus && terminalStatuses.includes(runStatus)
+    if (isTerminalStatus || isDone) {
       qc.invalidateQueries({ queryKey: ['run', initialRun.id] })
       qc.invalidateQueries({ queryKey: ['runs', initialRun.job_id] })
     }
-  }, [runStatus, initialRun.id, initialRun.job_id, qc])
+  }, [runStatus, isDone, initialRun.id, initialRun.job_id, qc])
   const effectiveStatus = (runStatus && runStatus !== 'canceling') ? runStatus : run.status
   const isRunning = effectiveStatus === 'running'
   const isCancelling = cancelling || runStatus === 'canceling'
