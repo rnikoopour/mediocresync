@@ -535,7 +535,22 @@ func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanOutput
 	onEvent := func(ev TransferEvent) {
 		t := transferByPath[ev.RemotePath]
 		switch ev.Kind {
-		case TransferEventStarted:
+		case TransferEventRetrying:
+		if t != nil {
+			var pct float64
+			if ev.SizeBytes > 0 {
+				pct = float64(ev.BytesXferred) / float64(ev.SizeBytes) * 100
+			}
+			e.broker.Publish(run.ID, sse.Event{
+				RunID: run.ID, TransferID: t.ID,
+				RemotePath:   ev.RemotePath,
+				SizeBytes:    ev.SizeBytes,
+				BytesXferred: ev.BytesXferred,
+				Percent:      pct,
+				Status:       "retrying",
+			})
+		}
+	case TransferEventStarted:
 			if t != nil {
 				if err := e.transfers.UpdateStatus(t.ID, db.TransferStatusInProgress, nil, nil); err != nil {
 					slog.Error("update transfer status", "transfer_id", t.ID, "err", err)

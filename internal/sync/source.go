@@ -45,6 +45,10 @@ const (
 	TransferEventStarted TransferEventKind = "started"
 	// TransferEventProgress carries byte-level progress (FTPES only).
 	TransferEventProgress TransferEventKind = "progress"
+	// TransferEventRetrying signals that a failed attempt is being retried.
+	// BytesXferred carries the safely staged byte count so the UI can preserve
+	// the progress floor instead of resetting to 0.
+	TransferEventRetrying TransferEventKind = "retrying"
 	// TransferEventDone signals a successful transfer completion.
 	TransferEventDone TransferEventKind = "done"
 	// TransferEventFailed signals a transfer failure.

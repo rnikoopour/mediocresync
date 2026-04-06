@@ -1,8 +1,9 @@
-type Status = 'running' | 'completed' | 'partial' | 'nothing_to_sync' | 'failed' | 'canceled' | 'server_stopped' | 'pending' | 'in_progress' | 'done' | 'skipped' | 'not_copied' | 'plan' | 'planning'
+type Status = 'running' | 'completed' | 'partial' | 'nothing_to_sync' | 'failed' | 'canceled' | 'server_stopped' | 'pending' | 'in_progress' | 'retrying' | 'done' | 'skipped' | 'not_copied' | 'plan' | 'planning'
 
 const styles: Record<Status, string> = {
   running:        'bg-blue-100 text-blue-800 dark:bg-gray-600 dark:text-gray-100',
   in_progress:    'bg-blue-100 text-blue-800 dark:bg-gray-600 dark:text-gray-100',
+  retrying:       'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300',
   planning:       'bg-blue-100 text-blue-800 dark:bg-gray-600 dark:text-gray-100',
   completed:      'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
   partial:        'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300',
@@ -20,6 +21,7 @@ const styles: Record<Status, string> = {
 const labels: Record<Status, string> = {
   running:        'Running',
   in_progress:    'In Progress',
+  retrying:       'Retrying',
   planning:       'Planning',
   completed:      'Completed',
   partial:        'Partial',

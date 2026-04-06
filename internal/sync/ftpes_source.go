@@ -186,6 +186,18 @@ func (s *FTPESSource) Sync(ctx context.Context, in SyncInput) error {
 				}
 				if attempt > 1 {
 					slog.Warn("retrying transfer", "src", remote.Path, "dst", finalPath(s.localDest, s.remotePath, remote.Path), "attempt", attempt, "err", lastErr)
+					// Report staged bytes so the UI can preserve the progress
+					// floor instead of resetting to 0 on retry.
+					var bytesStaged int64
+					if fi, statErr := os.Stat(stagingPath(s.localDest, remote.Path)); statErr == nil && fi.Size() > 0 && fi.Size() < remote.Size {
+						bytesStaged = fi.Size()
+					}
+					in.OnEvent(TransferEvent{
+						Kind:         TransferEventRetrying,
+						RemotePath:   remote.Path,
+						SizeBytes:    remote.Size,
+						BytesXferred: bytesStaged,
+					})
 					select {
 					case <-time.After(time.Duration(s.retryDelaySeconds) * time.Second):
 					case <-ctx.Done():
