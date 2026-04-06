@@ -631,6 +631,20 @@ func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanOutput
 				slog.Error("update run counts", "run_id", run.ID, "err", err)
 			}
 			mu.Unlock()
+		case TransferEventCanceled:
+			// The transfer was interrupted by cancellation, not a real failure.
+			// Mark it canceled and do not increment the failure counter.
+			if t != nil {
+				if err := e.transfers.UpdateStatus(t.ID, db.TransferStatusCanceled, nil, nil); err != nil {
+					slog.Error("update transfer status", "transfer_id", t.ID, "err", err)
+				}
+				e.broker.Publish(run.ID, sse.Event{
+					RunID: run.ID, TransferID: t.ID,
+					RemotePath: ev.RemotePath,
+					SizeBytes:  ev.SizeBytes,
+					Status:     db.TransferStatusCanceled,
+				})
+			}
 		}
 	}
 

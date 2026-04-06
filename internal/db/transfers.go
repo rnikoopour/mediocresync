@@ -73,7 +73,7 @@ func (r *TransferRepository) UpdateCurrentCommitHash(id, hash string) error {
 
 func (r *TransferRepository) UpdateStatus(id, status string, errMsg *string, durationMs *int64) error {
 	var finishedAt *string
-	if status == TransferStatusDone || status == TransferStatusFailed || status == TransferStatusSkipped || status == TransferStatusNotCopied {
+	if status == TransferStatusDone || status == TransferStatusFailed || status == TransferStatusSkipped || status == TransferStatusNotCopied || status == TransferStatusCanceled {
 		s := formatTime(time.Now().UTC())
 		finishedAt = &s
 	}

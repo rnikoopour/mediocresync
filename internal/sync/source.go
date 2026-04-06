@@ -53,6 +53,11 @@ const (
 	TransferEventDone TransferEventKind = "done"
 	// TransferEventFailed signals a transfer failure.
 	TransferEventFailed TransferEventKind = "failed"
+	// TransferEventCanceled signals that a transfer was interrupted by a
+	// user- or server-initiated cancellation. The transfer did not fail —
+	// it was stopped externally. The engine marks it as canceled rather
+	// than failed and does not increment the failure counter.
+	TransferEventCanceled TransferEventKind = "canceled"
 )
 
 // TransferEvent is emitted by Source.Sync via the SyncInput.OnEvent callback.

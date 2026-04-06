@@ -156,20 +156,19 @@ func (s *GitSource) Sync(ctx context.Context, in SyncInput) error {
 			start := time.Now()
 			commitHash, syncErr := gitsource.Sync(ctx, repo, planFile.LocalPath, auth)
 			if syncErr != nil {
-				slog.Error("git sync failed", "repo", planFile.RemotePath, "err", syncErr)
-				errMsg := syncErr.Error()
 				if errors.Is(syncErr, context.Canceled) || ctx.Err() != nil {
-					if s.appCtx.Err() != nil {
-						errMsg = "canceled by server"
-					} else {
-						errMsg = "canceled by client"
-					}
+					in.OnEvent(TransferEvent{
+						Kind:       TransferEventCanceled,
+						RemotePath: planFile.RemotePath,
+					})
+				} else {
+					slog.Error("git sync failed", "repo", planFile.RemotePath, "err", syncErr)
+					in.OnEvent(TransferEvent{
+						Kind:       TransferEventFailed,
+						RemotePath: planFile.RemotePath,
+						Error:      syncErr.Error(),
+					})
 				}
-				in.OnEvent(TransferEvent{
-					Kind:       TransferEventFailed,
-					RemotePath: planFile.RemotePath,
-					Error:      errMsg,
-				})
 				return
 			}
 

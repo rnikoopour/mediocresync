@@ -217,23 +217,25 @@ func (s *FTPESSource) Sync(ctx context.Context, in SyncInput) error {
 
 			if lastErr != nil {
 				os.Remove(stagingPath(s.localDest, remote.Path))
-				slog.Error("transfer failed", "src", remote.Path, "dst", finalPath(s.localDest, s.remotePath, remote.Path), "err", lastErr)
-				errMsg := lastErr.Error()
-				if errors.Is(lastErr, errTransferStalled) {
-					errMsg = "transfer stalled: no data received"
-				} else if errors.Is(lastErr, context.Canceled) || ctx.Err() != nil {
-					if s.appCtx.Err() != nil {
-						errMsg = "canceled by server"
-					} else {
-						errMsg = "canceled by client"
+				if errors.Is(lastErr, context.Canceled) || ctx.Err() != nil {
+					in.OnEvent(TransferEvent{
+						Kind:       TransferEventCanceled,
+						RemotePath: remote.Path,
+						SizeBytes:  remote.Size,
+					})
+				} else {
+					slog.Error("transfer failed", "src", remote.Path, "dst", finalPath(s.localDest, s.remotePath, remote.Path), "err", lastErr)
+					errMsg := lastErr.Error()
+					if errors.Is(lastErr, errTransferStalled) {
+						errMsg = "transfer stalled: no data received"
 					}
+					in.OnEvent(TransferEvent{
+						Kind:       TransferEventFailed,
+						RemotePath: remote.Path,
+						SizeBytes:  remote.Size,
+						Error:      errMsg,
+					})
 				}
-				in.OnEvent(TransferEvent{
-					Kind:       TransferEventFailed,
-					RemotePath: remote.Path,
-					SizeBytes:  remote.Size,
-					Error:      errMsg,
-				})
 				return
 			}
 

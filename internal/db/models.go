@@ -21,6 +21,7 @@ const (
 	TransferStatusSkipped    = "skipped"
 	TransferStatusFailed     = "failed"
 	TransferStatusNotCopied  = "not_copied"
+	TransferStatusCanceled   = "canceled"
 )
 
 // Source type values.
@@ -102,7 +103,7 @@ type Transfer struct {
 	SizeBytes          int64
 	BytesXferred       int64
 	DurationMs         *int64
-	Status             string // pending | in_progress | done | skipped | failed
+	Status             string // pending | in_progress | done | skipped | failed | not_copied | canceled
 	ErrorMsg           *string
 	StartedAt          *time.Time
 	FinishedAt         *time.Time
