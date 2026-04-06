@@ -93,17 +93,19 @@ var schema = []string{
 	)`,
 
 	`CREATE TABLE IF NOT EXISTS runs (
-		id               TEXT PRIMARY KEY,
-		job_id           TEXT NOT NULL REFERENCES sync_jobs(id) ON DELETE CASCADE,
-		status           TEXT NOT NULL CHECK(status IN ('running','completed','nothing_to_sync','failed','partial','canceled','server_stopped')),
-		started_at       TEXT NOT NULL,
-		finished_at      TEXT,
-		total_files      INTEGER NOT NULL DEFAULT 0,
-		copied_files     INTEGER NOT NULL DEFAULT 0,
-		skipped_files    INTEGER NOT NULL DEFAULT 0,
-		failed_files     INTEGER NOT NULL DEFAULT 0,
-		total_size_bytes INTEGER NOT NULL DEFAULT 0,
-		error_msg        TEXT
+		id                   TEXT PRIMARY KEY,
+		job_id               TEXT NOT NULL REFERENCES sync_jobs(id) ON DELETE CASCADE,
+		status               TEXT NOT NULL CHECK(status IN ('running','completed','nothing_to_sync','failed','partial','canceled','server_stopped')),
+		started_at           TEXT NOT NULL,
+		finished_at          TEXT,
+		total_files          INTEGER NOT NULL DEFAULT 0,
+		copied_files         INTEGER NOT NULL DEFAULT 0,
+		skipped_files        INTEGER NOT NULL DEFAULT 0,
+		failed_files         INTEGER NOT NULL DEFAULT 0,
+		total_size_bytes     INTEGER NOT NULL DEFAULT 0,
+		bytes_copied         INTEGER NOT NULL DEFAULT 0,
+		transfers_started_at TEXT,
+		error_msg            TEXT
 	)`,
 
 	`CREATE TABLE IF NOT EXISTS transfers (

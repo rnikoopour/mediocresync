@@ -21,8 +21,10 @@ type runResponse struct {
 	CopiedFiles    int                `json:"copied_files"`
 	SkippedFiles   int                `json:"skipped_files"`
 	FailedFiles    int                `json:"failed_files"`
-	TotalSizeBytes int64              `json:"total_size_bytes"`
-	ErrorMsg       *string            `json:"error_msg,omitempty"`
+	TotalSizeBytes      int64              `json:"total_size_bytes"`
+	BytesCopied         int64              `json:"bytes_copied"`
+	TransfersStartedAt  *string            `json:"transfers_started_at,omitempty"`
+	ErrorMsg            *string            `json:"error_msg,omitempty"`
 	Transfers      []transferResponse `json:"transfers"`
 }
 
@@ -52,12 +54,17 @@ func toRunResponse(run *db.Run, transfers []*db.Transfer) runResponse {
 		SkippedFiles:   run.SkippedFiles,
 		FailedFiles:    run.FailedFiles,
 		TotalSizeBytes: run.TotalSizeBytes,
+		BytesCopied:    run.BytesCopied,
 		ErrorMsg:       run.ErrorMsg,
 		Transfers:      []transferResponse{},
 	}
 	if run.FinishedAt != nil {
 		s := run.FinishedAt.Format("2006-01-02T15:04:05Z")
 		r.FinishedAt = &s
+	}
+	if run.TransfersStartedAt != nil {
+		s := run.TransfersStartedAt.Format("2006-01-02T15:04:05Z")
+		r.TransfersStartedAt = &s
 	}
 	for _, t := range transfers {
 		tr := transferResponse{

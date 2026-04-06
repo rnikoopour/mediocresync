@@ -88,6 +88,8 @@ export interface Run {
   skipped_files: number
   failed_files: number
   total_size_bytes: number
+  bytes_copied: number
+  transfers_started_at?: string
   error_msg?: string
   transfers?: Transfer[]
 }

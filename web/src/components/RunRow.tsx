@@ -110,12 +110,12 @@ export function RunRow({ run: initialRun, remotePath, jobId, isGit }: { run: Run
     ? Array.from(liveEvents.values()).reduce((s, e) => e.status === 'in_progress' ? s + e.speed_bps : s, 0)
     : 0
 
-  const avgSpeedBps = !isRunning && run.finished_at && run.total_size_bytes > 0
-    ? run.total_size_bytes / ((new Date(run.finished_at).getTime() - new Date(run.started_at).getTime()) / 1000)
+  const avgSpeedBps = !isRunning && run.finished_at && run.bytes_copied > 0 && run.transfers_started_at
+    ? run.bytes_copied / ((new Date(run.finished_at).getTime() - new Date(run.transfers_started_at).getTime()) / 1000)
     : null
 
   const pendingFiles = run.total_files - run.copied_files - run.skipped_files - run.failed_files
-  const hasSpeedOrSize = run.total_size_bytes > 0 || liveSpeedBps > 0 || avgSpeedBps !== null
+  const hasSpeedOrSize = run.total_size_bytes > 0 || run.bytes_copied > 0 || liveSpeedBps > 0 || avgSpeedBps !== null
 
   return (
     <div className="card overflow-hidden">
@@ -138,7 +138,9 @@ export function RunRow({ run: initialRun, remotePath, jobId, isGit }: { run: Run
             </div>
             {hasSpeedOrSize && (
               <div className="flex flex-wrap gap-x-3 gap-y-0 text-xs text-gray-500 dark:text-gray-400">
-                {run.total_size_bytes > 0 && <span>{formatBytes(run.total_size_bytes)}</span>}
+                {(run.bytes_copied > 0 || run.total_size_bytes > 0) && (
+                  <span>{formatBytes(isRunning ? run.total_size_bytes : (run.bytes_copied || run.total_size_bytes))}</span>
+                )}
                 {liveSpeedBps > 0 && <span className="text-blue-600 dark:text-blue-400">{formatSpeed(liveSpeedBps)}</span>}
                 {avgSpeedBps !== null && <span>avg {formatSpeed(avgSpeedBps)}</span>}
               </div>

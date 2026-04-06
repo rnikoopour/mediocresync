@@ -57,6 +57,8 @@ function buildRun(overrides: Partial<Run> = {}): Run {
     skipped_files:  1,
     failed_files:   0,
     total_size_bytes: 2_097_152, // 2.0 MB
+    bytes_copied: 2_097_152,
+    transfers_started_at: '2024-01-01T00:00:05.000Z',
     ...overrides,
   }
 }
@@ -132,6 +134,7 @@ describe('formatBytes and formatDuration — rendered in run rows', () => {
       label: 'displays size in KB and duration in minutes+seconds',
       run: buildRun({
         total_size_bytes: 3_072,         // 3.0 KB
+        bytes_copied: 3_072,
         started_at:  '2024-01-01T00:00:00.000Z',
         finished_at: '2024-01-01T00:02:30.000Z', // 2m 30s
       }),
@@ -142,6 +145,7 @@ describe('formatBytes and formatDuration — rendered in run rows', () => {
       label: 'displays size in GB and duration in hours+minutes+seconds',
       run: buildRun({
         total_size_bytes: 2_147_483_648,  // 2.0 GB
+        bytes_copied: 2_147_483_648,
         started_at:  '2024-01-01T00:00:00.000Z',
         finished_at: '2024-01-01T01:02:03.000Z', // 1h 2m 3s
       }),
@@ -152,6 +156,7 @@ describe('formatBytes and formatDuration — rendered in run rows', () => {
       label: 'omits size when total_size_bytes is 0',
       run: buildRun({
         total_size_bytes: 0,
+        bytes_copied: 0,
         started_at:  '2024-01-01T00:00:00.000Z',
         finished_at: '2024-01-01T00:01:05.000Z', // 1m 5s
       }),

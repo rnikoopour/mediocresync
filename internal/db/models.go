@@ -82,17 +82,19 @@ type SyncJob struct {
 }
 
 type Run struct {
-	ID             string
-	JobID          string
-	Status         string // running | completed | nothing_to_sync | failed | canceled | server_stopped
-	StartedAt      time.Time
-	FinishedAt     *time.Time
-	TotalFiles     int
-	CopiedFiles    int
-	SkippedFiles   int
-	FailedFiles    int
-	TotalSizeBytes int64
-	ErrorMsg       *string
+	ID                  string
+	JobID               string
+	Status              string // running | completed | nothing_to_sync | failed | canceled | server_stopped
+	StartedAt           time.Time
+	FinishedAt          *time.Time
+	TotalFiles          int
+	CopiedFiles         int
+	SkippedFiles        int
+	FailedFiles         int
+	TotalSizeBytes      int64
+	BytesCopied         int64
+	TransfersStartedAt  *time.Time
+	ErrorMsg            *string
 }
 
 type Transfer struct {

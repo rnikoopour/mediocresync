@@ -519,7 +519,7 @@ func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanOutput
 			initialFailed++
 		}
 	}
-	if err := e.runs.UpdateCounts(run.ID, len(plan.Files), 0, initialSkipped, initialFailed); err != nil {
+	if err := e.runs.UpdateCounts(run.ID, len(plan.Files), 0, initialSkipped, initialFailed, 0); err != nil {
 		slog.Error("update run counts", "run_id", run.ID, "err", err)
 	}
 	// Notify clients now that transfers are created and skips pre-processed.
@@ -527,9 +527,10 @@ func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanOutput
 	e.broker.Publish(jobID, sse.Event{RunID: run.ID, Status: "started"})
 
 	var (
-		mu     sync.Mutex
-		copied int
-		failed = initialFailed // starts seeded with plan-time error count
+		mu          sync.Mutex
+		copied      int
+		failed      = initialFailed // starts seeded with plan-time error count
+		bytesCopied int64
 	)
 
 	onEvent := func(ev TransferEvent) {
@@ -551,6 +552,9 @@ func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanOutput
 			})
 		}
 	case TransferEventStarted:
+			if err := e.runs.MarkTransfersStarted(run.ID, time.Now()); err != nil {
+				slog.Error("mark transfers started", "run_id", run.ID, "err", err)
+			}
 			if t != nil {
 				if err := e.transfers.UpdateStatus(t.ID, db.TransferStatusInProgress, nil, nil); err != nil {
 					slog.Error("update transfer status", "transfer_id", t.ID, "err", err)
@@ -562,6 +566,9 @@ func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanOutput
 				})
 			}
 		case TransferEventProgress:
+			if err := e.runs.MarkTransfersStarted(run.ID, time.Now()); err != nil {
+				slog.Error("mark transfers started", "run_id", run.ID, "err", err)
+			}
 			if t != nil {
 				if err := e.transfers.UpdateProgress(t.ID, ev.BytesXferred); err != nil {
 					slog.Error("update transfer progress", "transfer_id", t.ID, "err", err)
@@ -607,7 +614,8 @@ func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanOutput
 			}
 			mu.Lock()
 			copied++
-			if err := e.runs.UpdateCounts(run.ID, len(plan.Files), copied, initialSkipped, failed); err != nil {
+			bytesCopied += ev.SizeBytes
+			if err := e.runs.UpdateCounts(run.ID, len(plan.Files), copied, initialSkipped, failed, bytesCopied); err != nil {
 				slog.Error("update run counts", "run_id", run.ID, "err", err)
 			}
 			mu.Unlock()
@@ -627,7 +635,7 @@ func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanOutput
 			}
 			mu.Lock()
 			failed++
-			if err := e.runs.UpdateCounts(run.ID, len(plan.Files), copied, initialSkipped, failed); err != nil {
+			if err := e.runs.UpdateCounts(run.ID, len(plan.Files), copied, initialSkipped, failed, bytesCopied); err != nil {
 				slog.Error("update run counts", "run_id", run.ID, "err", err)
 			}
 			mu.Unlock()

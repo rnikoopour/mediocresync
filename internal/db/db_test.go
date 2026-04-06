@@ -234,7 +234,7 @@ func TestRunLifecycle(t *testing.T) {
 		t.Fatalf("Create run: %v", err)
 	}
 
-	if err := runRepo.UpdateCounts(run.ID, 10, 8, 1, 1); err != nil {
+	if err := runRepo.UpdateCounts(run.ID, 10, 8, 1, 1, 1024); err != nil {
 		t.Fatalf("UpdateCounts: %v", err)
 	}
 	if err := runRepo.UpdateStatus(run.ID, RunStatusCompleted, nil); err != nil {

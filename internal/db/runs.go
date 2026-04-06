@@ -39,7 +39,7 @@ func (r *RunRepository) UpdateTotalSize(id string, bytes int64) error {
 
 func (r *RunRepository) Get(id string) (*Run, error) {
 	row := r.db.QueryRow(
-		`SELECT id, job_id, status, started_at, finished_at, total_files, copied_files, skipped_files, failed_files, total_size_bytes, error_msg
+		`SELECT id, job_id, status, started_at, finished_at, total_files, copied_files, skipped_files, failed_files, total_size_bytes, bytes_copied, transfers_started_at, error_msg
 		 FROM runs WHERE id = ?`, id,
 	)
 	run, err := scanRun(row)
@@ -51,7 +51,7 @@ func (r *RunRepository) Get(id string) (*Run, error) {
 
 func (r *RunRepository) ListByJob(jobID string) ([]*Run, error) {
 	rows, err := r.db.Query(
-		`SELECT id, job_id, status, started_at, finished_at, total_files, copied_files, skipped_files, failed_files, total_size_bytes, error_msg
+		`SELECT id, job_id, status, started_at, finished_at, total_files, copied_files, skipped_files, failed_files, total_size_bytes, bytes_copied, transfers_started_at, error_msg
 		 FROM runs WHERE job_id = ? ORDER BY started_at DESC`, jobID,
 	)
 	if err != nil {
@@ -128,10 +128,20 @@ func (r *RunRepository) PruneForJob(jobID string, retentionDays int) error {
 	return err
 }
 
-func (r *RunRepository) UpdateCounts(id string, total, copied, skipped, failed int) error {
+func (r *RunRepository) UpdateCounts(id string, total, copied, skipped, failed int, bytesCopied int64) error {
 	_, err := r.db.Exec(
-		`UPDATE runs SET total_files=?, copied_files=?, skipped_files=?, failed_files=? WHERE id=?`,
-		total, copied, skipped, failed, id,
+		`UPDATE runs SET total_files=?, copied_files=?, skipped_files=?, failed_files=?, bytes_copied=? WHERE id=?`,
+		total, copied, skipped, failed, bytesCopied, id,
+	)
+	return err
+}
+
+// MarkTransfersStarted records the wall-clock time when the first transfer
+// began. Called once on the first TransferEventStarted or TransferEventProgress.
+func (r *RunRepository) MarkTransfersStarted(id string, at time.Time) error {
+	_, err := r.db.Exec(
+		`UPDATE runs SET transfers_started_at=? WHERE id=? AND transfers_started_at IS NULL`,
+		formatTime(at), id,
 	)
 	return err
 }
@@ -139,11 +149,12 @@ func (r *RunRepository) UpdateCounts(id string, total, copied, skipped, failed i
 func scanRun(s scanner) (*Run, error) {
 	var run Run
 	var startedAt string
-	var finishedAt *string
+	var finishedAt, transfersStartedAt *string
 
 	err := s.Scan(
 		&run.ID, &run.JobID, &run.Status, &startedAt, &finishedAt,
 		&run.TotalFiles, &run.CopiedFiles, &run.SkippedFiles, &run.FailedFiles, &run.TotalSizeBytes,
+		&run.BytesCopied, &transfersStartedAt,
 		&run.ErrorMsg,
 	)
 	if err != nil {
@@ -154,6 +165,10 @@ func scanRun(s scanner) (*Run, error) {
 	if finishedAt != nil {
 		t, _ := time.Parse(time.RFC3339, *finishedAt)
 		run.FinishedAt = &t
+	}
+	if transfersStartedAt != nil {
+		t, _ := time.Parse(time.RFC3339, *transfersStartedAt)
+		run.TransfersStartedAt = &t
 	}
 	return &run, nil
 }
