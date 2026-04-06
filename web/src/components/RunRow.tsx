@@ -37,7 +37,7 @@ function GitRunView({ transfers, isRunning }: { transfers: import('../api/types'
     if (tab === 'planned')     return status !== 'skipped'
     if (tab === 'in_progress') return status === 'in_progress' || status === 'pending'
     if (tab === 'copied')      return status === 'done'
-    if (tab === 'not_copied')  return status === 'not_copied' || status === 'failed'
+    if (tab === 'not_copied')  return status === 'not_copied' || status === 'failed' || status === 'canceled'
     return true
   })
   return (
