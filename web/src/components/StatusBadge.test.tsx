@@ -6,6 +6,8 @@ describe('StatusBadge', () => {
   const statusLabelTable: Array<{ status: string; expectedLabel: string }> = [
     { status: 'running',        expectedLabel: 'Running'         },
     { status: 'in_progress',    expectedLabel: 'In Progress'     },
+    { status: 'retrying',       expectedLabel: 'Retrying'        },
+    { status: 'planning',       expectedLabel: 'Planning'        },
     { status: 'completed',      expectedLabel: 'Completed'       },
     { status: 'nothing_to_sync',expectedLabel: 'Nothing To Sync' },
     { status: 'done',           expectedLabel: 'Copied'          },
