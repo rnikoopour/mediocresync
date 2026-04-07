@@ -256,16 +256,33 @@ func TestRunWithPlan_RetrySSE(t *testing.T) {
 	plan := &PlanOutput{ToCopy: 1}
 	plan.Files = append(plan.Files, PlanFile{RemotePath: copyPath, LocalPath: "/local/file.txt", Action: "copy", SizeBytes: fileSize})
 
-	// runReady is sent on by the listener goroutine once it has subscribed to
-	// the run channel. syncFunc blocks on it so no events are emitted before
-	// the subscriber is in place.
-	runReady := make(chan struct{}, 1)
+	// Capture the run ID from the job-level "started" SSE event so we can
+	// query the DB mid-run without waiting for the run to complete.
+	runIDCh := make(chan string, 1)
+	go func() {
+		jobCh, unsub := eng.broker.Subscribe(jobID)
+		defer unsub()
+		for ev := range jobCh {
+			if ev.Status == "started" {
+				runIDCh <- ev.RunID
+				return
+			}
+		}
+	}()
+
+	// retryReady is closed by syncFunc after the retry event (and its DB write)
+	// are complete. retryDone is closed by the test to let syncFunc proceed.
+	retryReady := make(chan struct{})
+	retryDone  := make(chan struct{})
+	runReady   := make(chan struct{}, 1)
 
 	mock := &mockSource{
 		planResult: plan,
 		syncFunc: func(ctx context.Context, in SyncInput) {
 			<-runReady
 			in.OnEvent(TransferEvent{Kind: TransferEventRetrying, RemotePath: copyPath, SizeBytes: fileSize, BytesXferred: stagedBytes})
+			close(retryReady)
+			<-retryDone
 			in.OnEvent(TransferEvent{Kind: TransferEventDone, RemotePath: copyPath, SizeBytes: fileSize})
 		},
 	}
@@ -274,9 +291,25 @@ func TestRunWithPlan_RetrySSE(t *testing.T) {
 	out := make(chan []sse.Event, 1)
 	go listenRunSSE(eng, jobID, runReady, out)
 
-	// Run in a goroutine because syncFunc blocks until the listener is ready.
 	runErr := make(chan error, 1)
 	go func() { runErr <- eng.runWithPlan(context.Background(), jobID, plan) }()
+
+	runID := <-runIDCh
+
+	// Pause after retry and verify bytes_xferred was persisted to the DB so a
+	// fresh page load can show the correct progress floor without a live SSE event.
+	<-retryReady
+	dbTransfers, err := eng.transfers.ListByRun(runID)
+	if err != nil {
+		t.Fatalf("ListByRun after retry: %v", err)
+	}
+	if len(dbTransfers) != 1 {
+		t.Fatalf("expected 1 transfer, got %d", len(dbTransfers))
+	}
+	if dbTransfers[0].BytesXferred != stagedBytes {
+		t.Errorf("DB bytes_xferred after retry = %d, want %d", dbTransfers[0].BytesXferred, stagedBytes)
+	}
+	close(retryDone)
 
 	if err := <-runErr; err != nil {
 		t.Fatalf("runWithPlan: %v", err)

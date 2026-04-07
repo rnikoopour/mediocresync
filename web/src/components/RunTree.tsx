@@ -94,8 +94,13 @@ function RunFileRow({ node, liveEvents, runEnded }: { node: RunTreeFile; liveEve
   const live = liveEvents.get(t.id)
   const status = live?.status ?? (runEnded && t.status === 'pending' ? 'not_copied' : t.status)
   const speed = live?.speed_bps
-  const percent = live?.percent ?? (t.status === 'done' ? 100 : 0)
   const isFailed = status === 'failed'
+  const isRetrying = status === 'retrying'
+  const isInProgress = status === 'in_progress'
+  const isDone = status === 'done'
+  const isNotCopied = status === 'not_copied'
+  const percent = live?.percent ?? (t.size_bytes > 0 ? (t.bytes_xferred / t.size_bytes) * 100 : 0)
+  const showProgressBar = isInProgress || isDone || isFailed || isNotCopied || isRetrying
 
   return (
     <div className="py-1 hover:bg-gray-50 dark:hover:bg-gray-700/50"
@@ -107,14 +112,14 @@ function RunFileRow({ node, liveEvents, runEnded }: { node: RunTreeFile; liveEve
             <span className="hidden md:inline shrink-0"><StatusBadge status={status} /></span>
             <span className={`font-mono text-xs break-all flex-1 min-w-0 ${isFailed ? 'text-red-500 dark:text-red-400' : 'text-gray-600 dark:text-gray-300'}`}>{node.name}</span>
             <span className="hidden md:inline text-xs text-gray-400 dark:text-gray-500 shrink-0">{formatBytes(t.size_bytes)}</span>
-            {status === 'in_progress' && speed !== undefined && speed > 0 && (
+            {isInProgress && speed !== undefined && speed > 0 && (
               <span className="hidden md:inline text-xs text-gray-400 dark:text-gray-500 shrink-0">{formatSpeed(speed)}</span>
             )}
-            {(status === 'in_progress' || status === 'done' || isFailed || status === 'not_copied') && (
+            {showProgressBar && (
               <div className="hidden md:block w-32 shrink-0">
                 <ProgressBar
-                  percent={isFailed || status === 'not_copied' ? 0 : percent}
-                  variant={isFailed ? 'failed' : status === 'not_copied' ? 'not_copied' : 'default'}
+                  percent={isFailed || isNotCopied ? 0 : percent}
+                  variant={isFailed ? 'failed' : isNotCopied ? 'not_copied' : (isInProgress && !live) ? 'loading' : 'default'}
                 />
               </div>
             )}
@@ -122,15 +127,15 @@ function RunFileRow({ node, liveEvents, runEnded }: { node: RunTreeFile; liveEve
           <div className="flex md:hidden items-center gap-2 mt-0.5">
             <StatusBadge status={status} />
             <span className="text-xs text-gray-400 dark:text-gray-500">{formatBytes(t.size_bytes)}</span>
-            {status === 'in_progress' && speed !== undefined && speed > 0 && (
+            {isInProgress && speed !== undefined && speed > 0 && (
               <span className="text-xs text-gray-400 dark:text-gray-500">{formatSpeed(speed)}</span>
             )}
           </div>
-          {(status === 'in_progress' || status === 'done' || isFailed || status === 'not_copied') && (
+          {showProgressBar && (
             <div className="md:hidden mt-1">
               <ProgressBar
-                percent={isFailed || status === 'not_copied' ? 0 : percent}
-                variant={isFailed ? 'failed' : status === 'not_copied' ? 'not_copied' : 'default'}
+                percent={isFailed || isNotCopied ? 0 : percent}
+                variant={isFailed ? 'failed' : isNotCopied ? 'not_copied' : 'default'}
               />
             </div>
           )}

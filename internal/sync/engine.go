@@ -542,6 +542,9 @@ func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanOutput
 			if ev.SizeBytes > 0 {
 				pct = float64(ev.BytesXferred) / float64(ev.SizeBytes) * 100
 			}
+			if err := e.transfers.UpdateProgress(t.ID, ev.BytesXferred); err != nil {
+				slog.Error("update transfer progress on retry", "transfer_id", t.ID, "err", err)
+			}
 			e.broker.Publish(run.ID, sse.Event{
 				RunID: run.ID, TransferID: t.ID,
 				RemotePath:   ev.RemotePath,
@@ -570,9 +573,6 @@ func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanOutput
 				slog.Error("mark transfers started", "run_id", run.ID, "err", err)
 			}
 			if t != nil {
-				if err := e.transfers.UpdateProgress(t.ID, ev.BytesXferred); err != nil {
-					slog.Error("update transfer progress", "transfer_id", t.ID, "err", err)
-				}
 				var pct float64
 				if ev.SizeBytes > 0 {
 					pct = float64(ev.BytesXferred) / float64(ev.SizeBytes) * 100
@@ -589,8 +589,8 @@ func (e *Engine) runWithPlan(ctx context.Context, jobID string, plan *PlanOutput
 			}
 		case TransferEventDone:
 			if t != nil {
-				if err := e.transfers.UpdateStatus(t.ID, db.TransferStatusDone, nil, ev.DurationMs); err != nil {
-					slog.Error("update transfer status", "transfer_id", t.ID, "err", err)
+				if err := e.transfers.CompleteTransfer(t.ID, ev.SizeBytes, ev.DurationMs); err != nil {
+					slog.Error("complete transfer", "transfer_id", t.ID, "err", err)
 				}
 				if ev.CommitHash != nil {
 					if err := e.transfers.UpdateCurrentCommitHash(t.ID, *ev.CommitHash); err != nil {

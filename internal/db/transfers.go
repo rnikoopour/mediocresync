@@ -71,6 +71,22 @@ func (r *TransferRepository) UpdateCurrentCommitHash(id, hash string) error {
 	return err
 }
 
+func (r *TransferRepository) CompleteTransfer(id string, sizeBytes int64, durationMs *int64) error {
+	finished := formatTime(time.Now().UTC())
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin complete transfer: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+	if _, err := tx.Exec(
+		`UPDATE transfers SET bytes_xferred=?, status=?, duration_ms=?, finished_at=? WHERE id=?`,
+		sizeBytes, TransferStatusDone, durationMs, finished, id,
+	); err != nil {
+		return fmt.Errorf("complete transfer: %w", err)
+	}
+	return tx.Commit()
+}
+
 func (r *TransferRepository) UpdateStatus(id, status string, errMsg *string, durationMs *int64) error {
 	var finishedAt *string
 	if status == TransferStatusDone || status == TransferStatusFailed || status == TransferStatusSkipped || status == TransferStatusNotCopied || status == TransferStatusCanceled {
