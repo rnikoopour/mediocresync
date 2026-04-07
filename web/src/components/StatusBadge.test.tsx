@@ -5,6 +5,7 @@ import { StatusBadge } from './StatusBadge'
 describe('StatusBadge', () => {
   const statusLabelTable: Array<{ status: string; expectedLabel: string }> = [
     { status: 'running',        expectedLabel: 'Running'         },
+    { status: 'canceling',      expectedLabel: 'Canceling'       },
     { status: 'in_progress',    expectedLabel: 'In Progress'     },
     { status: 'retrying',       expectedLabel: 'Retrying'        },
     { status: 'planning',       expectedLabel: 'Planning'        },

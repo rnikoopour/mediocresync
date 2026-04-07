@@ -177,6 +177,7 @@ func (s *FTPESSource) Sync(ctx context.Context, in SyncInput) error {
 			}
 
 			slog.Info("transfer started", "src", remote.Path, "dst", finalPath(s.localDest, s.remotePath, remote.Path), "size", remote.Size)
+			in.OnEvent(TransferEvent{Kind: TransferEventStarted, RemotePath: remote.Path, SizeBytes: remote.Size})
 			maxAttempts := max(s.retryAttempts, 1)
 			var lastErr error
 			for attempt := 1; attempt <= maxAttempts; attempt++ {

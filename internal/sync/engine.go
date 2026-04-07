@@ -731,9 +731,12 @@ func (e *Engine) CancelJob(jobID string) error {
 	if !ok {
 		return fmt.Errorf("job %s is not running", jobID)
 	}
-	// Notify all clients immediately so they can show a cancelling state
-	// before the run actually stops and the final status event is published.
+	// Persist canceling status and notify all clients immediately so they can
+	// show a cancelling state before the run actually stops.
 	if runID != "" {
+		if err := e.runs.UpdateStatus(runID, db.RunStatusCanceling, nil); err != nil {
+			slog.Error("update run status to canceling", "run_id", runID, "err", err)
+		}
 		e.broker.Publish(runID, sse.Event{RunID: runID, RunStatus: "canceling"})
 	}
 	cancel()

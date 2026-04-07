@@ -9,6 +9,7 @@ const (
 	RunStatusNothingToSync = "nothing_to_sync"
 	RunStatusFailed        = "failed"
 	RunStatusPartial       = "partial"
+	RunStatusCanceling     = "canceling"
 	RunStatusCanceled      = "canceled"
 	RunStatusServerStopped = "server_stopped"
 )

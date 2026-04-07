@@ -141,7 +141,7 @@ function JobRunPreview({ jobId, triggeredAt, onDismiss }: { jobId: string; trigg
           </div>
         </div>
       )}
-      {transfers.length === 0 && run.status === 'running' && (
+      {transfers.length === 0 && (run.status === 'running' || run.status === 'canceling') && (
         <div className="border-t border-gray-100 dark:border-gray-700 px-4 py-3 text-xs text-gray-400 dark:text-gray-500">
           Enumerating files…
         </div>

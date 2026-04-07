@@ -74,11 +74,13 @@ export function RunRow({ run: initialRun, remotePath, jobId, isGit }: { run: Run
   const [use24h] = useLocalStorageBool('use24hTime', false)
   const [open, setOpen] = useState(initialRun.status === 'running')
 
-  const { data: run = initialRun } = useQuery({
+  const { data: fetchedRun } = useQuery({
     queryKey: ['run', initialRun.id],
     queryFn: () => api.runs.get(initialRun.id),
     enabled: open,
   })
+  const run = fetchedRun ?? initialRun
+  const isDetailLoaded = fetchedRun !== undefined
 
   const [cancelling, setCancelling] = useState(false)
   const cancel = useMutation({
@@ -107,8 +109,8 @@ export function RunRow({ run: initialRun, remotePath, jobId, isGit }: { run: Run
     }
   }, [runStatus, isDone, initialRun.id, initialRun.job_id, qc])
   const effectiveStatus = (runStatus && runStatus !== 'canceling') ? runStatus : run.status
-  const isRunning = effectiveStatus === 'running'
-  const isCancelling = cancelling || runStatus === 'canceling'
+  const isRunning = effectiveStatus === 'running' || effectiveStatus === 'canceling'
+  const isCancelling = cancelling || runStatus === 'canceling' || run.status === 'canceling'
   const elapsed = useElapsed(run.started_at, isRunning)
 
   if (cancelling && !isRunning && runStatus !== 'canceling') setCancelling(false)
@@ -183,11 +185,11 @@ export function RunRow({ run: initialRun, remotePath, jobId, isGit }: { run: Run
       </div>
 
       {open && (
-        transfers === undefined ? (
+        !isDetailLoaded ? (
           <p className="border-t border-gray-100 dark:border-gray-700 px-4 py-4 text-xs text-center text-gray-400 dark:text-gray-500">
-            Processing plan…
+            Loading…
           </p>
-        ) : transfers.length === 0 ? (
+        ) : !transfers?.length ? (
           <div className="border-t border-gray-100 dark:border-gray-700 px-4 py-4 text-xs text-center text-gray-400 dark:text-gray-500">
             {run.error_msg
               ? <p className="text-red-500 dark:text-red-400 font-mono break-all">{run.error_msg}</p>

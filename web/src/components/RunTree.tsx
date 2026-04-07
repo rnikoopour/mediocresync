@@ -99,8 +99,9 @@ function RunFileRow({ node, liveEvents, runEnded }: { node: RunTreeFile; liveEve
   const isInProgress = status === 'in_progress'
   const isDone = status === 'done'
   const isNotCopied = status === 'not_copied'
+  const isCanceled = status === 'canceled'
   const percent = live?.percent ?? (t.size_bytes > 0 ? (t.bytes_xferred / t.size_bytes) * 100 : 0)
-  const showProgressBar = isInProgress || isDone || isFailed || isNotCopied || isRetrying
+  const showProgressBar = isInProgress || isDone || isFailed || isNotCopied || isRetrying || isCanceled
 
   return (
     <div className="py-1 hover:bg-gray-50 dark:hover:bg-gray-700/50"
@@ -118,8 +119,8 @@ function RunFileRow({ node, liveEvents, runEnded }: { node: RunTreeFile; liveEve
             {showProgressBar && (
               <div className="hidden md:block w-32 shrink-0">
                 <ProgressBar
-                  percent={isFailed || isNotCopied ? 0 : percent}
-                  variant={isFailed ? 'failed' : isNotCopied ? 'not_copied' : (isInProgress && !live) ? 'loading' : 'default'}
+                  percent={isFailed || isNotCopied || isCanceled ? 0 : percent}
+                  variant={isFailed ? 'failed' : (isNotCopied || isCanceled) ? 'not_copied' : (isInProgress && !live) ? 'loading' : 'default'}
                 />
               </div>
             )}

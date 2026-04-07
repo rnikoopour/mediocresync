@@ -24,7 +24,7 @@ export function RunDetailPage() {
     enabled: !!run,
   })
 
-  const { events: liveEvents, runStatus } = useSSE(run?.status === 'running' ? id! : null)
+  const { events: liveEvents, runStatus } = useSSE(run?.status === 'running' || run?.status === 'canceling' ? id! : null)
 
   // When the run finishes (SSE run_status fires), fetch the final state.
   useEffect(() => {
@@ -34,7 +34,7 @@ export function RunDetailPage() {
   if (isLoading) return <p className="text-gray-500 dark:text-gray-400 text-sm">Loading…</p>
   if (!run) return <p className="text-red-500 text-sm">Run not found.</p>
 
-  const runEnded = run.status !== 'running'
+  const runEnded = run.status !== 'running' && run.status !== 'canceling'
   const transfers = run.transfers ?? []
 
   const duration = run.finished_at
