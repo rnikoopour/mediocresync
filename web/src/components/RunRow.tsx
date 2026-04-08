@@ -10,6 +10,7 @@ import { useRunState } from '../hooks/useRunState'
 import { useLocalStorageBool } from '../hooks/useLocalStorageBool'
 import { formatDateTime } from '../utils/time'
 import { formatDuration } from '../utils/format'
+import { resolveTransferStatus } from '../utils/runStatus'
 
 export function useElapsed(startedAt: string, isRunning: boolean): string {
   const [now, setNow] = useState(() => Date.now())
@@ -24,7 +25,7 @@ export function useElapsed(startedAt: string, isRunning: boolean): string {
 function GitRunView({ transfers, isRunning }: { transfers: import('../api/types').Transfer[]; isRunning: boolean }) {
   const [tab, setTab] = useState<RunTab>('planned')
   const filtered = tab === 'all' ? transfers : transfers.filter((t) => {
-    const status = !isRunning && t.status === 'pending' ? 'not_copied' : t.status
+    const status = resolveTransferStatus(t.status, !isRunning)
     if (tab === 'planned')     return status !== 'skipped'
     if (tab === 'in_progress') return status === 'in_progress' || status === 'pending'
     if (tab === 'copied')      return status === 'done'
@@ -78,7 +79,7 @@ export function RunRow({ run: initialRun, remotePath, jobId, isGit }: { run: Run
     onSuccess: () => setCancelling(true),
   })
 
-  const { liveEvents, effectiveStatus, isRunning, isCanceling } = useRunState(
+  const { liveEvents, effectiveStatus, isRunning, isCanceling, liveSpeedBps, avgSpeedBps } = useRunState(
     open ? run.id : null,
     run.job_id,
     run,
@@ -93,14 +94,6 @@ export function RunRow({ run: initialRun, remotePath, jobId, isGit }: { run: Run
   const duration = run.finished_at
     ? formatDuration(new Date(run.finished_at).getTime() - new Date(run.started_at).getTime())
     : isRunning ? elapsed : null
-
-  const liveSpeedBps = isRunning
-    ? Array.from(liveEvents.values()).reduce((s, e) => e.status === 'in_progress' ? s + e.speed_bps : s, 0)
-    : 0
-
-  const avgSpeedBps = !isRunning && run.finished_at && run.bytes_copied > 0 && run.transfers_started_at
-    ? run.bytes_copied / ((new Date(run.finished_at).getTime() - new Date(run.transfers_started_at).getTime()) / 1000)
-    : null
 
   const pendingFiles = run.total_files - run.copied_files - run.skipped_files - run.failed_files
   const hasSpeedOrSize = run.total_size_bytes > 0 || run.bytes_copied > 0 || liveSpeedBps > 0 || avgSpeedBps !== null

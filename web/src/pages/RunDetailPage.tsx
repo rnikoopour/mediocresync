@@ -24,7 +24,7 @@ export function RunDetailPage() {
   })
 
   const isActive = run?.status === 'running' || run?.status === 'canceling'
-  const { liveEvents, runEnded } = useRunState(isActive ? id! : null, run?.job_id ?? '', run)
+  const { liveEvents, runEnded, liveSpeedBps, avgSpeedBps } = useRunState(isActive ? id! : null, run?.job_id ?? '', run)
 
   if (isLoading) return <p className="text-gray-500 dark:text-gray-400 text-sm">Loading…</p>
   if (!run) return <p className="text-red-500 text-sm">Run not found.</p>
@@ -32,14 +32,6 @@ export function RunDetailPage() {
 
   const duration = run.finished_at
     ? formatDuration(new Date(run.finished_at).getTime() - new Date(run.started_at).getTime())
-    : null
-
-  const liveSpeedBps = !runEnded
-    ? Array.from(liveEvents.values()).reduce((s, e) => e.status === 'in_progress' ? s + e.speed_bps : s, 0)
-    : 0
-
-  const avgSpeedBps = runEnded && run.finished_at && run.total_size_bytes > 0
-    ? run.total_size_bytes / ((new Date(run.finished_at).getTime() - new Date(run.started_at).getTime()) / 1000)
     : null
 
   return (

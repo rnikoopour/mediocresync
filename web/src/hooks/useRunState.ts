@@ -14,6 +14,10 @@ export interface RunState {
   isRunning: boolean
   isCanceling: boolean
   runEnded: boolean
+  // Speed — live aggregated from in-progress SSE events while running;
+  // avg computed from bytes_copied / transfer duration once finished.
+  liveSpeedBps: number
+  avgSpeedBps: number | null
 }
 
 /**
@@ -53,5 +57,18 @@ export function useRunState(runID: string | null, jobID: string, run: Run | unde
   const isCanceling = effectiveStatus === 'canceling'
   const runEnded    = !isRunning
 
-  return { liveEvents, runStatus, isDone, effectiveStatus, isRunning, isCanceling, runEnded }
+  const liveSpeedBps = isRunning
+    ? Array.from(liveEvents.values()).reduce((s, e) => e.status === 'in_progress' ? s + e.speed_bps : s, 0)
+    : 0
+
+  // Use bytes_copied / transfer duration for accuracy — excludes planning
+  // time and only counts bytes that were actually transferred.
+  const avgSpeedBps = (() => {
+    if (!runEnded || !run?.finished_at || !run.bytes_copied) return null
+    const start = run.transfers_started_at ?? run.started_at
+    const durationSec = (new Date(run.finished_at).getTime() - new Date(start).getTime()) / 1000
+    return durationSec > 0 ? run.bytes_copied / durationSec : null
+  })()
+
+  return { liveEvents, runStatus, isDone, effectiveStatus, isRunning, isCanceling, runEnded, liveSpeedBps, avgSpeedBps }
 }

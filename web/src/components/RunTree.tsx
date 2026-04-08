@@ -4,6 +4,7 @@ import { StatusBadge } from './StatusBadge'
 import { ProgressBar } from './ProgressBar'
 import { formatBytes, formatSpeed } from '../utils/format'
 import { sortNodes } from '../utils/tree'
+import { resolveTransferStatus } from '../utils/runStatus'
 
 export { formatBytes, formatSpeed }
 
@@ -78,7 +79,7 @@ export function RunTabBar({ tab, onTab, isRunning }: { tab: RunTab; onTab: (t: R
 function RunFileRow({ node, liveEvents, runEnded }: { node: RunTreeFile; liveEvents: Map<string, LiveEvent>; runEnded: boolean }) {
   const t = node.transfer
   const live = liveEvents.get(t.id)
-  const status = live?.status ?? (runEnded && t.status === 'pending' ? 'not_copied' : t.status)
+  const status = live?.status ?? resolveTransferStatus(t.status, runEnded)
   const speed = live?.speed_bps
   const isFailed = status === 'failed'
   const isRetrying = status === 'retrying'
@@ -173,7 +174,7 @@ export function RunTreeView({ transfers, remotePath, liveEvents, runEnded, scrol
   const [tab, setTab] = useState<RunTab>('planned')
   const filtered = tab === 'all' ? transfers : transfers.filter((t) => {
     const raw = liveEvents.get(t.id)?.status ?? t.status
-    const status = runEnded && raw === 'pending' ? 'not_copied' : raw
+    const status = resolveTransferStatus(raw, runEnded)
     if (tab === 'planned')     return status !== 'skipped'
     if (tab === 'in_progress') return status === 'in_progress' || status === 'pending'
     if (tab === 'copied')      return status === 'done'
