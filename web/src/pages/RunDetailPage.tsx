@@ -1,16 +1,15 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../api/client'
 import { StatusBadge } from '../components/StatusBadge'
 import { RunTreeView, formatBytes, formatSpeed } from '../components/RunTree'
-import { useSSE } from '../hooks/useSSE'
+import { useRunState } from '../hooks/useRunState'
 import { useLocalStorageBool } from '../hooks/useLocalStorageBool'
 import { formatDateTime } from '../utils/time'
+import { formatDuration } from '../utils/format'
 
 export function RunDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const qc = useQueryClient()
   const [use24h] = useLocalStorageBool('use24hTime', false)
 
   const { data: run, isLoading } = useQuery({
@@ -24,17 +23,11 @@ export function RunDetailPage() {
     enabled: !!run,
   })
 
-  const { events: liveEvents, runStatus } = useSSE(run?.status === 'running' || run?.status === 'canceling' ? id! : null)
-
-  // When the run finishes (SSE run_status fires), fetch the final state.
-  useEffect(() => {
-    if (runStatus) qc.invalidateQueries({ queryKey: ['run', id] })
-  }, [runStatus, id, qc])
+  const isActive = run?.status === 'running' || run?.status === 'canceling'
+  const { liveEvents, runEnded } = useRunState(isActive ? id! : null, run?.job_id ?? '', run)
 
   if (isLoading) return <p className="text-gray-500 dark:text-gray-400 text-sm">Loading…</p>
   if (!run) return <p className="text-red-500 text-sm">Run not found.</p>
-
-  const runEnded = run.status !== 'running' && run.status !== 'canceling'
   const transfers = run.transfers ?? []
 
   const duration = run.finished_at
@@ -104,12 +97,3 @@ export function RunDetailPage() {
   )
 }
 
-function formatDuration(ms: number): string {
-  const s = Math.floor(ms / 1000)
-  const h = Math.floor(s / 3600)
-  const m = Math.floor((s % 3600) / 60)
-  const sec = s % 60
-  if (h > 0) return `${h}h ${m}m ${sec}s`
-  if (m > 0) return `${m}m ${sec}s`
-  return `${sec}s`
-}
