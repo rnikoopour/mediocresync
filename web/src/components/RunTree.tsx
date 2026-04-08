@@ -2,24 +2,11 @@ import { useState } from 'react'
 import type { Transfer } from '../api/types'
 import { StatusBadge } from './StatusBadge'
 import { ProgressBar } from './ProgressBar'
+import { formatBytes, formatSpeed } from '../utils/format'
+import { sortNodes } from '../utils/tree'
+import { resolveTransferStatus } from '../utils/runStatus'
 
-export function formatBytes(b: number): string {
-  if (b >= 1_073_741_824) return `${(b / 1_073_741_824).toFixed(1)} GB`
-  if (b >= 1_048_576)     return `${(b / 1_048_576).toFixed(1)} MB`
-  if (b >= 1_024)         return `${(b / 1_024).toFixed(1)} KB`
-  return `${b} B`
-}
-
-export function formatSpeed(bps: number): string {
-  return `${formatBytes(bps)}/s`
-}
-
-function sortNodes<T extends { type: string; name: string }>(nodes: T[]): T[] {
-  return [...nodes].sort((a, b) => {
-    if (a.type !== b.type) return a.type === 'folder' ? -1 : 1
-    return a.name.localeCompare(b.name)
-  })
-}
+export { formatBytes, formatSpeed }
 
 type RunTreeFile   = { type: 'file'; name: string; transfer: Transfer }
 type RunTreeFolder = { type: 'folder'; name: string; children: RunTreeNode[] }
@@ -92,7 +79,7 @@ export function RunTabBar({ tab, onTab, isRunning }: { tab: RunTab; onTab: (t: R
 function RunFileRow({ node, liveEvents, runEnded }: { node: RunTreeFile; liveEvents: Map<string, LiveEvent>; runEnded: boolean }) {
   const t = node.transfer
   const live = liveEvents.get(t.id)
-  const status = live?.status ?? (runEnded && t.status === 'pending' ? 'not_copied' : t.status)
+  const status = live?.status ?? resolveTransferStatus(t.status, runEnded)
   const speed = live?.speed_bps
   const isFailed = status === 'failed'
   const isRetrying = status === 'retrying'
@@ -187,7 +174,7 @@ export function RunTreeView({ transfers, remotePath, liveEvents, runEnded, scrol
   const [tab, setTab] = useState<RunTab>('planned')
   const filtered = tab === 'all' ? transfers : transfers.filter((t) => {
     const raw = liveEvents.get(t.id)?.status ?? t.status
-    const status = runEnded && raw === 'pending' ? 'not_copied' : raw
+    const status = resolveTransferStatus(raw, runEnded)
     if (tab === 'planned')     return status !== 'skipped'
     if (tab === 'in_progress') return status === 'in_progress' || status === 'pending'
     if (tab === 'copied')      return status === 'done'

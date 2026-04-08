@@ -11,6 +11,7 @@ import { SettingsGeneralPage } from './pages/SettingsGeneralPage'
 import { SettingsIndexPage } from './pages/SettingsIndexPage'
 import { LogsPage } from './pages/LogsPage'
 import { PlanProvider } from './context/PlanContext'
+import { RunStateProvider } from './context/RunStateContext'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 10_000 } },
@@ -20,6 +21,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <PlanProvider>
+      <RunStateProvider>
       <BrowserRouter>
         <Routes>
           <Route path="login" element={<LoginPage />} />
@@ -36,6 +38,7 @@ export default function App() {
           </Route>
         </Routes>
       </BrowserRouter>
+      </RunStateProvider>
       </PlanProvider>
     </QueryClientProvider>
   )

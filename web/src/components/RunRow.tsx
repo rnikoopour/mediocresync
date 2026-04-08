@@ -1,24 +1,16 @@
 import { useState, useEffect } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import type { Run } from '../api/types'
 import { StatusBadge } from './StatusBadge'
 import { RunTreeView, RunTabBar, formatBytes, formatSpeed } from './RunTree'
 import type { RunTab } from './RunTree'
-import { useSSE } from '../hooks/useSSE'
+import { useRunState } from '../hooks/useRunState'
 import { useLocalStorageBool } from '../hooks/useLocalStorageBool'
 import { formatDateTime } from '../utils/time'
-
-export function formatDuration(ms: number): string {
-  const s = Math.floor(ms / 1000)
-  const h = Math.floor(s / 3600)
-  const m = Math.floor((s % 3600) / 60)
-  const sec = s % 60
-  if (h > 0) return `${h}h ${m}m ${sec}s`
-  if (m > 0) return `${m}m ${sec}s`
-  return `${sec}s`
-}
+import { formatDuration } from '../utils/format'
+import { resolveTransferStatus } from '../utils/runStatus'
 
 export function useElapsed(startedAt: string, isRunning: boolean): string {
   const [now, setNow] = useState(() => Date.now())
@@ -33,7 +25,7 @@ export function useElapsed(startedAt: string, isRunning: boolean): string {
 function GitRunView({ transfers, isRunning }: { transfers: import('../api/types').Transfer[]; isRunning: boolean }) {
   const [tab, setTab] = useState<RunTab>('planned')
   const filtered = tab === 'all' ? transfers : transfers.filter((t) => {
-    const status = !isRunning && t.status === 'pending' ? 'not_copied' : t.status
+    const status = resolveTransferStatus(t.status, !isRunning)
     if (tab === 'planned')     return status !== 'skipped'
     if (tab === 'in_progress') return status === 'in_progress' || status === 'pending'
     if (tab === 'copied')      return status === 'done'
@@ -70,7 +62,6 @@ function GitRunView({ transfers, isRunning }: { transfers: import('../api/types'
 }
 
 export function RunRow({ run: initialRun, remotePath, jobId, isGit }: { run: Run; remotePath: string; jobId: string; isGit: boolean }) {
-  const qc = useQueryClient()
   const [use24h] = useLocalStorageBool('use24hTime', false)
   const [open, setOpen] = useState(initialRun.status === 'running')
 
@@ -88,46 +79,21 @@ export function RunRow({ run: initialRun, remotePath, jobId, isGit }: { run: Run
     onSuccess: () => setCancelling(true),
   })
 
-  const { events: liveEvents, runStatus, isDone } = useSSE(open ? run.id : null)
-
-  // When a transfer completes, re-fetch the run to update the copied count.
-  useEffect(() => {
-    const hasDone = Array.from(liveEvents.values()).some((e) => e.status === 'done')
-    if (hasDone) qc.invalidateQueries({ queryKey: ['run', initialRun.id] })
-  }, [liveEvents, initialRun.id, qc])
-
-  // When the run reaches a terminal status, re-fetch to get finished_at,
-  // bytes_copied, and transfers_started_at for the final avg speed display.
-  // Also fires when isDone is set — handles the case where the run_status event
-  // was dropped (non-blocking broker buffer overflow) but done was still received.
-  const terminalStatuses = ['completed', 'failed', 'partial', 'canceled', 'server_stopped', 'nothing_to_sync']
-  useEffect(() => {
-    const isTerminalStatus = runStatus && terminalStatuses.includes(runStatus)
-    if (isTerminalStatus || isDone) {
-      qc.invalidateQueries({ queryKey: ['run', initialRun.id] })
-      qc.invalidateQueries({ queryKey: ['runs', initialRun.job_id] })
-    }
-  }, [runStatus, isDone, initialRun.id, initialRun.job_id, qc])
-  const effectiveStatus = (runStatus && runStatus !== 'canceling') ? runStatus : run.status
-  const isRunning = effectiveStatus === 'running' || effectiveStatus === 'canceling'
-  const isCancelling = cancelling || runStatus === 'canceling' || run.status === 'canceling'
+  const { liveEvents, effectiveStatus, isRunning, isCanceling, liveSpeedBps, avgSpeedBps } = useRunState(
+    open ? run.id : null,
+    run.job_id,
+    run,
+  )
+  const isCancelling = cancelling || isCanceling
   const elapsed = useElapsed(run.started_at, isRunning)
 
-  if (cancelling && !isRunning && runStatus !== 'canceling') setCancelling(false)
+  if (cancelling && !isRunning && !isCanceling) setCancelling(false)
 
   const transfers = run.transfers
 
   const duration = run.finished_at
     ? formatDuration(new Date(run.finished_at).getTime() - new Date(run.started_at).getTime())
     : isRunning ? elapsed : null
-
-  const liveSpeedBps = isRunning
-    ? Array.from(liveEvents.values()).reduce((s, e) => e.status === 'in_progress' ? s + e.speed_bps : s, 0)
-    : 0
-
-  const avgSpeedBps = !isRunning && run.finished_at && run.bytes_copied > 0 && run.transfers_started_at
-    ? run.bytes_copied / ((new Date(run.finished_at).getTime() - new Date(run.transfers_started_at).getTime()) / 1000)
-    : null
 
   const pendingFiles = run.total_files - run.copied_files - run.skipped_files - run.failed_files
   const hasSpeedOrSize = run.total_size_bytes > 0 || run.bytes_copied > 0 || liveSpeedBps > 0 || avgSpeedBps !== null

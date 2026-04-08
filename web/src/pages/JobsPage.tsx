@@ -6,20 +6,9 @@ import type { SyncJob, Transfer } from '../api/types'
 import { JobFormModal } from '../components/JobFormModal'
 import { StatusBadge } from '../components/StatusBadge'
 import { ProgressBar } from '../components/ProgressBar'
-import { useSSE } from '../hooks/useSSE'
+import { useRunState } from '../hooks/useRunState'
 import { usePlan } from '../context/PlanContext'
-
-function formatBytes(b: number): string {
-  if (b >= 1_000_000) return `${(b / 1_000_000).toFixed(1)} MB`
-  if (b >= 1_000)     return `${(b / 1_000).toFixed(1)} KB`
-  return `${b} B`
-}
-
-function formatSpeed(bps: number): string {
-  if (bps >= 1_000_000) return `${(bps / 1_000_000).toFixed(1)} MB/s`
-  if (bps >= 1_000)     return `${(bps / 1_000).toFixed(1)} KB/s`
-  return `${Math.round(bps)} B/s`
-}
+import { formatBytes, formatSpeed } from '../utils/format'
 
 function TransferRow({ transfer, liveEvent }: {
   transfer: Transfer
@@ -71,20 +60,17 @@ function JobRunPreview({ jobId, triggeredAt, onDismiss }: { jobId: string; trigg
 
   const runId = runs.find(r => new Date(r.started_at).getTime() >= triggeredAt)?.id
 
-  const qc = useQueryClient()
-
   const { data: run } = useQuery({
     queryKey: ['run', runId],
     queryFn: () => api.runs.get(runId!),
     enabled: !!runId,
   })
 
-  const { events: liveEvents, runStatus } = useSSE(run?.status === 'running' ? runId! : null)
-
-  // When the run finishes (SSE run_status fires), fetch the final state.
-  useEffect(() => {
-    if (runStatus && runId) qc.invalidateQueries({ queryKey: ['run', runId] })
-  }, [runStatus, runId, qc])
+  const { liveEvents } = useRunState(
+    run?.status === 'running' ? runId! : null,
+    jobId,
+    run,
+  )
 
   if (!run) {
     if (planEntry?.status === 'running') {

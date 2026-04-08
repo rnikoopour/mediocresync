@@ -16,6 +16,7 @@ import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { JobDetailPage } from './JobDetailPage'
 import { PlanProvider } from '../context/PlanContext'
+import { RunStateProvider } from '../context/RunStateContext'
 import type { SyncJob, Run, Transfer } from '../api/types'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -80,11 +81,13 @@ function renderPage(jobId = 'job-1') {
   return render(
     <QueryClientProvider client={qc}>
       <PlanProvider>
-        <MemoryRouter initialEntries={[`/jobs/${jobId}`]}>
-          <Routes>
-            <Route path="/jobs/:id" element={<JobDetailPage />} />
-          </Routes>
-        </MemoryRouter>
+        <RunStateProvider>
+          <MemoryRouter initialEntries={[`/jobs/${jobId}`]}>
+            <Routes>
+              <Route path="/jobs/:id" element={<JobDetailPage />} />
+            </Routes>
+          </MemoryRouter>
+        </RunStateProvider>
       </PlanProvider>
     </QueryClientProvider>,
   )
