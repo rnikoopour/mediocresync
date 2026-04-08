@@ -9,6 +9,15 @@ export function formatSpeed(bps: number): string {
   return `${formatBytes(bps)}/s`
 }
 
+export function formatETA(seconds: number): string {
+  if (seconds < 60) return `${Math.round(seconds)}s`
+  const m = Math.floor(seconds / 60)
+  const s = Math.round(seconds % 60)
+  if (m < 60) return `${m}m ${s}s`
+  const h = Math.floor(m / 60)
+  return `${h}h ${m % 60}m`
+}
+
 export function formatDuration(ms: number): string {
   const s = Math.floor(ms / 1000)
   const h = Math.floor(s / 3600)

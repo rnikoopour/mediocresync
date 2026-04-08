@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { Transfer } from '../api/types'
 import { StatusBadge } from './StatusBadge'
 import { ProgressBar } from './ProgressBar'
-import { formatBytes, formatSpeed } from '../utils/format'
+import { formatBytes, formatSpeed, formatETA } from '../utils/format'
 import { sortNodes } from '../utils/tree'
 import { resolveTransferStatus } from '../utils/runStatus'
 
@@ -47,7 +47,7 @@ export function buildRunTree(transfers: Transfer[], remotePath: string): RunTree
 
 export type RunTab = 'all' | 'planned' | 'in_progress' | 'copied' | 'not_copied'
 
-type LiveEvent = { percent: number; speed_bps: number; status: string }
+type LiveEvent = { percent: number; speed_bps: number; status: string; bytes_xferred: number }
 
 function TabBtn<T extends string>({ value, current, label, onTab }: { value: T; current: T; label: string; onTab: (t: T) => void }) {
   return (
@@ -89,6 +89,8 @@ function RunFileRow({ node, liveEvents, runEnded }: { node: RunTreeFile; liveEve
   const isCanceled = status === 'canceled'
   const percent = live?.percent ?? (t.size_bytes > 0 ? (t.bytes_xferred / t.size_bytes) * 100 : 0)
   const showProgressBar = isInProgress || isDone || isFailed || isNotCopied || isRetrying || isCanceled
+  const bytesXferred = live?.bytes_xferred ?? t.bytes_xferred
+  const etaSec = isInProgress && speed && speed > 0 ? (t.size_bytes - bytesXferred) / speed : null
 
   return (
     <div className="py-1 hover:bg-gray-50 dark:hover:bg-gray-700/50"
@@ -100,9 +102,6 @@ function RunFileRow({ node, liveEvents, runEnded }: { node: RunTreeFile; liveEve
             <span className="hidden md:inline shrink-0"><StatusBadge status={status} /></span>
             <span className={`font-mono text-xs break-all flex-1 min-w-0 ${isFailed ? 'text-red-500 dark:text-red-400' : 'text-gray-600 dark:text-gray-300'}`}>{node.name}</span>
             <span className="hidden md:inline text-xs text-gray-400 dark:text-gray-500 shrink-0">{formatBytes(t.size_bytes)}</span>
-            {isInProgress && speed !== undefined && speed > 0 && (
-              <span className="hidden md:inline text-xs text-gray-400 dark:text-gray-500 shrink-0">{formatSpeed(speed)}</span>
-            )}
             {showProgressBar && (
               <div className="hidden md:block w-32 shrink-0">
                 <ProgressBar
@@ -112,13 +111,24 @@ function RunFileRow({ node, liveEvents, runEnded }: { node: RunTreeFile; liveEve
               </div>
             )}
           </div>
+          {isInProgress && speed !== undefined && speed > 0 && etaSec !== null && (
+            <div className="hidden md:flex justify-end mt-0.5">
+              <span className="text-xs text-gray-400 dark:text-gray-500 font-mono">
+                {formatSpeed(speed)} · ETA {formatETA(etaSec)}
+              </span>
+            </div>
+          )}
           <div className="flex md:hidden items-center gap-2 mt-0.5">
             <StatusBadge status={status} />
             <span className="text-xs text-gray-400 dark:text-gray-500">{formatBytes(t.size_bytes)}</span>
-            {isInProgress && speed !== undefined && speed > 0 && (
-              <span className="text-xs text-gray-400 dark:text-gray-500">{formatSpeed(speed)}</span>
-            )}
           </div>
+          {isInProgress && speed !== undefined && speed > 0 && etaSec !== null && (
+            <div className="md:hidden mt-0.5">
+              <span className="text-xs text-gray-400 dark:text-gray-500 font-mono">
+                {formatSpeed(speed)} · ETA {formatETA(etaSec)}
+              </span>
+            </div>
+          )}
           {showProgressBar && (
             <div className="md:hidden mt-1">
               <ProgressBar

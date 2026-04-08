@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatBytes, formatSpeed, formatDuration } from './format'
+import { formatBytes, formatSpeed, formatDuration, formatETA } from './format'
 
 describe('formatBytes', () => {
   it.each([
@@ -24,6 +24,24 @@ describe('formatSpeed', () => {
     { bps: 1_048_576, expected: '1.0 MB/s'  },
   ])('$bps bps → $expected', ({ bps, expected }) => {
     expect(formatSpeed(bps)).toBe(expected)
+  })
+})
+
+describe('formatETA', () => {
+  it.each([
+    { seconds: 0,      expected: '0s'     },
+    { seconds: 1,      expected: '1s'     },
+    { seconds: 59,     expected: '59s'    },
+    { seconds: 59.4,   expected: '59s'    },
+    { seconds: 59.5,   expected: '60s'    },
+    { seconds: 60,     expected: '1m 0s'  },
+    { seconds: 90,     expected: '1m 30s' },
+    { seconds: 3599,   expected: '59m 59s'},
+    { seconds: 3600,   expected: '1h 0m'  },
+    { seconds: 3661,   expected: '1h 1m'  },
+    { seconds: 7322,   expected: '2h 2m'  },
+  ])('$seconds s → $expected', ({ seconds, expected }) => {
+    expect(formatETA(seconds)).toBe(expected)
   })
 })
 
