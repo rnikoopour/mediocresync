@@ -1,8 +1,10 @@
 import { createContext, useContext, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { openEventSource } from '../hooks/eventSource'
+import { openEventSource as defaultOpenEventSource } from '../hooks/eventSource'
 import type { ProgressEvent } from '../api/types'
 import { isTerminalStatus } from '../utils/runStatus'
+
+type OpenEventSourceFn = typeof defaultOpenEventSource
 
 export interface RunSnapshot {
   events: Map<string, ProgressEvent>
@@ -34,7 +36,13 @@ interface RunStateContextValue {
 
 const RunStateContext = createContext<RunStateContextValue | null>(null)
 
-export function RunStateProvider({ children }: { children: React.ReactNode }) {
+export function RunStateProvider({
+  children,
+  openEventSource = defaultOpenEventSource,
+}: {
+  children: React.ReactNode
+  openEventSource?: OpenEventSourceFn
+}) {
   const qc = useQueryClient()
 
   // All mutable state lives in refs — the provider never re-renders on its own.
