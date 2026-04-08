@@ -1,19 +1,14 @@
-import { useState, useEffect, useLayoutEffect, useRef } from 'react'
+import { useState } from 'react'
 import type { PlanFile } from '../api/types'
 import { StatusBadge } from './StatusBadge'
-import { formatBytes } from './RunTree'
+import { formatBytes } from '../utils/format'
+import { sortNodes } from '../utils/tree'
+import { useContextMenu } from '../hooks/useContextMenu'
 
 export type TreeFile = { type: 'file'; name: string; remote_path: string; size_bytes: number; mtime: string; action: 'copy' | 'skip' | 'error' }
 type TreeFolder = { type: 'folder'; name: string; children: TreeNode[] }
 type TreeNode = TreeFile | TreeFolder
 
-// Folders first, then files, each group alpha-sorted by name.
-function sortNodes<T extends { type: string; name: string }>(nodes: T[]): T[] {
-  return [...nodes].sort((a, b) => {
-    if (a.type !== b.type) return a.type === 'folder' ? -1 : 1
-    return a.name.localeCompare(b.name)
-  })
-}
 
 function buildTree(files: PlanFile[], remotePath: string): TreeNode[] {
   const base = remotePath.replace(/\/+$/, '')
@@ -60,26 +55,8 @@ function collectFiles(folder: TreeFolder): TreeFile[] {
 
 function FolderNode({ node, depth, onSkip, onUnskip }: { node: TreeFolder; depth: number; onSkip: (f: TreeFile) => Promise<void>; onUnskip: (remotePath: string) => Promise<void> }) {
   const [open, setOpen] = useState(true)
-  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
-  const menuRef = useRef<HTMLDivElement>(null)
+  const { menu, setMenu, menuRef } = useContextMenu()
   const indent = depth * 16
-
-  useEffect(() => {
-    if (!menu) return
-    function close(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenu(null)
-    }
-    document.addEventListener('mousedown', close)
-    return () => document.removeEventListener('mousedown', close)
-  }, [menu])
-
-  useLayoutEffect(() => {
-    if (!menu || !menuRef.current) return
-    const el = menuRef.current
-    const r = el.getBoundingClientRect()
-    if (r.right  > window.innerWidth)  el.style.left = `${menu.x - r.width}px`
-    if (r.bottom > window.innerHeight) el.style.top  = `${menu.y - r.height}px`
-  }, [menu])
 
   const leaves = collectFiles(node)
   const hasCopy = leaves.some((f) => f.action === 'copy')
@@ -144,25 +121,7 @@ function FolderNode({ node, depth, onSkip, onUnskip }: { node: TreeFolder; depth
 }
 
 function FileRow({ node, onSkip, onUnskip }: { node: TreeFile; depth: number; onSkip?: (f: TreeFile) => Promise<void>; onUnskip?: (remotePath: string) => Promise<void> }) {
-  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
-  const menuRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!menu) return
-    function close(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenu(null)
-    }
-    document.addEventListener('mousedown', close)
-    return () => document.removeEventListener('mousedown', close)
-  }, [menu])
-
-  useLayoutEffect(() => {
-    if (!menu || !menuRef.current) return
-    const el = menuRef.current
-    const r = el.getBoundingClientRect()
-    if (r.right  > window.innerWidth)  el.style.left = `${menu.x - r.width}px`
-    if (r.bottom > window.innerHeight) el.style.top  = `${menu.y - r.height}px`
-  }, [menu])
+  const { menu, setMenu, menuRef } = useContextMenu()
 
   return (
     <div
@@ -268,25 +227,7 @@ function GitRepoRow({ file, onSkip, onUnskip }: {
   onSkip: (path: string, commitHash: string) => Promise<void>
   onUnskip: (path: string) => Promise<void>
 }) {
-  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
-  const menuRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!menu) return
-    function close(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenu(null)
-    }
-    document.addEventListener('mousedown', close)
-    return () => document.removeEventListener('mousedown', close)
-  }, [menu])
-
-  useLayoutEffect(() => {
-    if (!menu || !menuRef.current) return
-    const el = menuRef.current
-    const r = el.getBoundingClientRect()
-    if (r.right  > window.innerWidth)  el.style.left = `${menu.x - r.width}px`
-    if (r.bottom > window.innerHeight) el.style.top  = `${menu.y - r.height}px`
-  }, [menu])
+  const { menu, setMenu, menuRef } = useContextMenu()
 
   return (
     <div

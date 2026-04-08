@@ -2,24 +2,10 @@ import { useState } from 'react'
 import type { Transfer } from '../api/types'
 import { StatusBadge } from './StatusBadge'
 import { ProgressBar } from './ProgressBar'
+import { formatBytes, formatSpeed } from '../utils/format'
+import { sortNodes } from '../utils/tree'
 
-export function formatBytes(b: number): string {
-  if (b >= 1_073_741_824) return `${(b / 1_073_741_824).toFixed(1)} GB`
-  if (b >= 1_048_576)     return `${(b / 1_048_576).toFixed(1)} MB`
-  if (b >= 1_024)         return `${(b / 1_024).toFixed(1)} KB`
-  return `${b} B`
-}
-
-export function formatSpeed(bps: number): string {
-  return `${formatBytes(bps)}/s`
-}
-
-function sortNodes<T extends { type: string; name: string }>(nodes: T[]): T[] {
-  return [...nodes].sort((a, b) => {
-    if (a.type !== b.type) return a.type === 'folder' ? -1 : 1
-    return a.name.localeCompare(b.name)
-  })
-}
+export { formatBytes, formatSpeed }
 
 type RunTreeFile   = { type: 'file'; name: string; transfer: Transfer }
 type RunTreeFolder = { type: 'folder'; name: string; children: RunTreeNode[] }
