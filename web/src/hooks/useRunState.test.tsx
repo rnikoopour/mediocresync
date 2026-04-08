@@ -36,45 +36,34 @@ function makeWrapper(openEventSource: ReturnType<typeof makeMockOpenEventSource>
 }
 
 describe('useRunState — status derivation', () => {
+  // Each case fires the given SSE runStatus event (or none if null) and asserts
+  // the derived fields. Using non-optional connection access so a missing
+  // connection causes an immediate failure rather than a vacuous pass.
   it.each([
-    { runStatus: null,        runDbStatus: 'running',   expected: 'running'   },
-    { runStatus: null,        runDbStatus: 'canceling', expected: 'canceling' },
-    { runStatus: 'completed', runDbStatus: 'running',   expected: 'completed' },
-    { runStatus: 'failed',    runDbStatus: 'running',   expected: 'failed'    },
-    // 'canceling' from SSE defers to run.status (fires before DB transition)
-    { runStatus: 'canceling', runDbStatus: 'running',   expected: 'running'   },
-    { runStatus: 'canceling', runDbStatus: 'canceling', expected: 'canceling' },
-  ])('runStatus=$runStatus + run.status=$runDbStatus → effectiveStatus=$expected', async ({ runStatus, runDbStatus, expected }) => {
+    { sseStatus: null,        dbStatus: 'running',   effectiveStatus: 'running',   isRunning: true,  runEnded: false },
+    { sseStatus: null,        dbStatus: 'canceling', effectiveStatus: 'canceling', isRunning: true,  runEnded: false },
+    { sseStatus: 'completed', dbStatus: 'running',   effectiveStatus: 'completed', isRunning: false, runEnded: true  },
+    { sseStatus: 'failed',    dbStatus: 'running',   effectiveStatus: 'failed',    isRunning: false, runEnded: true  },
+    // SSE 'canceling' fires before the DB transition — effectiveStatus defers
+    // to run.status so the component reflects the DB value, not a transient SSE one.
+    { sseStatus: 'canceling', dbStatus: 'running',   effectiveStatus: 'running',   isRunning: true,  runEnded: false },
+    { sseStatus: 'canceling', dbStatus: 'canceling', effectiveStatus: 'canceling', isRunning: true,  runEnded: false },
+  ])('sseStatus=$sseStatus + dbStatus=$dbStatus → effectiveStatus=$effectiveStatus', ({ sseStatus, dbStatus, effectiveStatus, isRunning, runEnded }) => {
     const mock = makeMockOpenEventSource()
-    const run = buildRun({ status: runDbStatus as Run['status'] })
+    const run = buildRun({ status: dbStatus as Run['status'] })
     const { result } = renderHook(
       () => useRunState('run-1', 'job-1', run),
       { wrapper: makeWrapper(mock.openEventSource) },
     )
-    if (runStatus) {
-      act(() => { mock.connections[0]?.es.fireEvent('run_status', { run_status: runStatus }) })
-    }
-    expect(result.current.effectiveStatus).toBe(expected)
-  })
 
-  it.each([
-    { effectiveStatus: 'running',   isRunning: true,  runEnded: false },
-    { effectiveStatus: 'canceling', isRunning: true,  runEnded: false },
-    { effectiveStatus: 'completed', isRunning: false, runEnded: true  },
-    { effectiveStatus: 'failed',    isRunning: false, runEnded: true  },
-  ])('effectiveStatus=$effectiveStatus → isRunning=$isRunning, runEnded=$runEnded', async ({ effectiveStatus, isRunning, runEnded }) => {
-    const mock = makeMockOpenEventSource()
-    const status = effectiveStatus === 'running' || effectiveStatus === 'canceling'
-      ? effectiveStatus as Run['status']
-      : 'running'
-    const run = buildRun({ status })
-    const { result } = renderHook(
-      () => useRunState('run-1', 'job-1', run),
-      { wrapper: makeWrapper(mock.openEventSource) },
-    )
-    if (effectiveStatus !== status) {
-      act(() => { mock.connections[0]?.es.fireEvent('run_status', { run_status: effectiveStatus }) })
+    // Connection must be open before we can fire SSE events
+    expect(mock.connections).toHaveLength(1)
+
+    if (sseStatus) {
+      act(() => { mock.connections[0].es.fireEvent('run_status', { run_status: sseStatus }) })
     }
+
+    expect(result.current.effectiveStatus).toBe(effectiveStatus)
     expect(result.current.isRunning).toBe(isRunning)
     expect(result.current.runEnded).toBe(runEnded)
   })
@@ -91,6 +80,7 @@ describe('useRunState — speed calculations', () => {
       () => useRunState('run-1', 'job-1', run),
       { wrapper: makeWrapper(mock.openEventSource) },
     )
+    expect(mock.connections).toHaveLength(1)
     act(() => {
       mock.connections[0].es.fireMessage({ transfer_id: 'tx-1', status: 'in_progress', speed_bps: 500, percent: 50 })
       mock.connections[0].es.fireMessage({ transfer_id: 'tx-2', status: 'in_progress', speed_bps: 300, percent: 30 })
@@ -104,6 +94,7 @@ describe('useRunState — speed calculations', () => {
       () => useRunState('run-1', 'job-1', run),
       { wrapper: makeWrapper(mock.openEventSource) },
     )
+    expect(mock.connections).toHaveLength(1)
     act(() => {
       mock.connections[0].es.fireMessage({ transfer_id: 'tx-1', status: 'done', speed_bps: 999, percent: 100 })
     })
@@ -119,42 +110,28 @@ describe('useRunState — speed calculations', () => {
     expect(result.current.liveSpeedBps).toBe(0)
   })
 
-  it('computes avgSpeedBps from bytes_copied and transfers_started_at', () => {
-    const run = buildRun({
-      status: 'completed',
-      bytes_copied: 1_048_576,
-      finished_at: '2024-01-01T00:00:10Z',
-      transfers_started_at: '2024-01-01T00:00:00Z', // 10 seconds
-    })
+  it.each([
+    {
+      label: 'uses transfers_started_at when present',
+      run: { bytes_copied: 1_048_576, finished_at: '2024-01-01T00:00:10Z', transfers_started_at: '2024-01-01T00:00:00Z' },
+      expectedBps: 1_048_576 / 10,
+    },
+    {
+      label: 'falls back to started_at when transfers_started_at is absent',
+      run: { bytes_copied: 1_048_576, started_at: '2024-01-01T00:00:00Z', finished_at: '2024-01-01T00:00:10Z', transfers_started_at: undefined },
+      expectedBps: 1_048_576 / 10,
+    },
+  ])('avgSpeedBps: $label', ({ run: overrides, expectedBps }) => {
+    const run = buildRun({ status: 'completed', ...overrides })
     const { result } = renderHook(
       () => useRunState(null, 'job-1', run),
       { wrapper: makeWrapper(mock.openEventSource) },
     )
-    // 1 MB / 10s = 104857.6 B/s
-    expect(result.current.avgSpeedBps).toBeCloseTo(104857.6)
-  })
-
-  it('falls back to started_at when transfers_started_at is absent', () => {
-    const run = buildRun({
-      status: 'completed',
-      bytes_copied: 1_048_576,
-      started_at: '2024-01-01T00:00:00Z',
-      finished_at: '2024-01-01T00:00:10Z',
-      transfers_started_at: undefined,
-    })
-    const { result } = renderHook(
-      () => useRunState(null, 'job-1', run),
-      { wrapper: makeWrapper(mock.openEventSource) },
-    )
-    expect(result.current.avgSpeedBps).toBeCloseTo(104857.6)
+    expect(result.current.avgSpeedBps).toBeCloseTo(expectedBps)
   })
 
   it('returns avgSpeedBps=null when run has no bytes_copied', () => {
-    const run = buildRun({
-      status: 'completed',
-      bytes_copied: 0,
-      finished_at: '2024-01-01T00:00:10Z',
-    })
+    const run = buildRun({ status: 'completed', bytes_copied: 0, finished_at: '2024-01-01T00:00:10Z' })
     const { result } = renderHook(
       () => useRunState(null, 'job-1', run),
       { wrapper: makeWrapper(mock.openEventSource) },
@@ -171,8 +148,10 @@ describe('useRunState — null runID', () => {
       () => useRunState(null, 'job-1', run),
       { wrapper: makeWrapper(mock.openEventSource) },
     )
-    expect(mock.openEventSource).not.toHaveBeenCalled()
+    expect(mock.connections).toHaveLength(0)
     expect(result.current.liveEvents.size).toBe(0)
     expect(result.current.runStatus).toBeNull()
+    expect(result.current.liveSpeedBps).toBe(0)
+    expect(result.current.avgSpeedBps).toBeNull()
   })
 })
