@@ -11,7 +11,7 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-COPY --from=web /app/web/dist ui/dist/
+COPY --from=web /app/ui/dist ui/dist/
 RUN touch ui/dist/.gitkeep
 RUN GOOS=linux GOARCH=amd64 go build -ldflags "-X main.version=${VERSION}" -o bin/mediocresync ./cmd/server
 
