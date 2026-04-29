@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -19,9 +20,10 @@ import (
 	internalsync "github.com/rnikoopour/mediocresync/internal/sync"
 	"github.com/rnikoopour/mediocresync/internal/sse"
 	"github.com/rnikoopour/mediocresync/ui"
+	"gopkg.in/lumberjack.v2"
 )
 
-func initLogger(level config.LogLevel) (*slog.LevelVar, *logbuffer.Buffer) {
+func initLogger(level config.LogLevel, logFile string) (*slog.LevelVar, *logbuffer.Buffer, func()) {
 	var lv slog.LevelVar
 	switch level {
 	case config.LogLevelDebug:
@@ -34,9 +36,19 @@ func initLogger(level config.LogLevel) (*slog.LevelVar, *logbuffer.Buffer) {
 		lv.Set(slog.LevelInfo)
 	}
 	opts := &slog.HandlerOptions{Level: &lv}
-	buf := logbuffer.New(logbuffer.DefaultSize, slog.NewTextHandler(os.Stderr, opts))
+
+	roller := &lumberjack.Logger{
+		Filename:   logFile,
+		MaxSize:    100, // MB before rotation
+		MaxBackups: 5,
+		MaxAge:     30, // days
+		Compress:   true,
+	}
+	w := io.MultiWriter(os.Stderr, roller)
+
+	buf := logbuffer.New(logbuffer.DefaultSize, slog.NewTextHandler(w, opts))
 	slog.SetDefault(slog.New(buf))
-	return &lv, buf
+	return &lv, buf, func() { roller.Close() }
 }
 
 // version is set at build time via -ldflags "-X main.version=vX.Y.Z".
@@ -44,7 +56,8 @@ var version = "dev"
 
 func main() {
 	cfg := config.Load()
-	logLevel, logBuf := initLogger(cfg.LogLevel)
+	logLevel, logBuf, closeLogFile := initLogger(cfg.LogLevel, cfg.LogFile)
+	defer closeLogFile()
 
 	database, err := db.Open(cfg.DBPath)
 	if err != nil {

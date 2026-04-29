@@ -17,6 +17,7 @@ const (
 type Config struct {
 	ListenAddr string
 	DBPath     string
+	LogFile    string
 	DevMode    bool
 	LogLevel   LogLevel
 }
@@ -43,9 +44,19 @@ func Load() *Config {
 		logLevel = LogLevelInfo
 	}
 
+	logFile := os.Getenv("LOG_FILE")
+	if logFile == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			home = "."
+		}
+		logFile = filepath.Join(home, ".mediocresync", "mediocresync.log")
+	}
+
 	return &Config{
 		ListenAddr: listenAddr,
 		DBPath:     dbPath,
+		LogFile:    logFile,
 		DevMode:    os.Getenv("DEV_MODE") == "true",
 		LogLevel:   logLevel,
 	}
