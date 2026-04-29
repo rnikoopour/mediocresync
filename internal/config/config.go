@@ -23,12 +23,12 @@ type Config struct {
 }
 
 func Load() *Config {
-	listenAddr := os.Getenv("LISTEN_ADDR")
+	listenAddr := os.Getenv("MEDIOCRESYNC_LISTEN_ADDR")
 	if listenAddr == "" {
 		listenAddr = ":8080"
 	}
 
-	dbPath := os.Getenv("DB_PATH")
+	dbPath := os.Getenv("MEDIOCRESYNC_DB_PATH")
 	if dbPath == "" {
 		home, err := os.UserHomeDir()
 		if err != nil {
@@ -37,14 +37,14 @@ func Load() *Config {
 		dbPath = filepath.Join(home, ".mediocresync", "mediocresync.db")
 	}
 
-	logLevel := LogLevel(os.Getenv("LOG_LEVEL"))
+	logLevel := LogLevel(os.Getenv("MEDIOCRESYNC_LOG_LEVEL"))
 	switch logLevel {
 	case LogLevelDebug, LogLevelInfo, LogLevelWarn, LogLevelError:
 	default:
 		logLevel = LogLevelInfo
 	}
 
-	logFile := os.Getenv("LOG_FILE")
+	logFile := os.Getenv("MEDIOCRESYNC_LOG_FILE")
 	if logFile == "" {
 		home, err := os.UserHomeDir()
 		if err != nil {
@@ -57,7 +57,7 @@ func Load() *Config {
 		ListenAddr: listenAddr,
 		DBPath:     dbPath,
 		LogFile:    logFile,
-		DevMode:    os.Getenv("DEV_MODE") == "true",
+		DevMode:    os.Getenv("MEDIOCRESYNC_DEV_MODE") == "true",
 		LogLevel:   logLevel,
 	}
 }
