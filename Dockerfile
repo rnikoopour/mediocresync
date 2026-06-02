@@ -20,9 +20,10 @@ RUN apk add --no-cache ca-certificates
 WORKDIR /app
 COPY --from=builder /app/bin/mediocresync ./mediocresync
 
-ENV LISTEN_ADDR=:8080
-ENV DB_PATH=/data/mediocresync.db
-ENV LOG_LEVEL=info
+ENV MEDIOCRESYNC_LISTEN_ADDR=:8080
+ENV MEDIOCRESYNC_DB_PATH=/data/mediocresync.db
+ENV MEDIOCRESYNC_LOG_FILE=/data/mediocresync.log
+ENV MEDIOCRESYNC_LOG_LEVEL=info
 VOLUME ["/data"]
 EXPOSE 8080
 

@@ -5,20 +5,48 @@ A web application for scheduling and monitoring sync jobs from FTPES (FTP over E
 ## Requirements
 
 - Go 1.25+
-- Node.js 25.8.0+ (for building the frontend)
+- Node.js 25.8.1+ (for building the frontend)
 
 ## Configuration
 
 All configuration is via environment variables:
 
-| Variable      | Required | Default      | Description |
-|---------------|----------|--------------|-------------|
-| `LISTEN_ADDR` | No       | `:8080`      | Address and port the server listens on |
-| `DB_PATH`     | No       | `~/.mediocresync/mediocresync.db` | Path to the SQLite database file |
-| `DEV_MODE`    | No       | `false`      | Enables CORS headers for local frontend development |
-| `LOG_LEVEL`   | No       | `info`       | Initial log verbosity: `debug`, `info`, `warn`, or `error`. Can be changed at runtime via the Settings page. |
+| Variable                      | Required | Default      | Description |
+|-------------------------------|----------|--------------|-------------|
+| `MEDIOCRESYNC_LISTEN_ADDR`    | No       | `:8080`      | Address and port the server listens on |
+| `MEDIOCRESYNC_DB_PATH`        | No       | `~/.mediocresync/mediocresync.db` | Path to the SQLite database file |
+| `MEDIOCRESYNC_LOG_FILE`       | No       | `~/.mediocresync/mediocresync.log` | Path to the log file (rotated automatically) |
+| `MEDIOCRESYNC_LOG_LEVEL`      | No       | `info`       | Initial log verbosity: `debug`, `info`, `warn`, or `error`. Can be changed at runtime via the Settings page. |
+| `MEDIOCRESYNC_DEV_MODE`       | No       | `false`      | Enables CORS headers for local frontend development |
 
 On first startup the server generates a random AES-256 encryption key and stores it in the database. Stored FTPES passwords are encrypted with that key. Deleting or replacing the database will make existing credentials unreadable.
+
+## Deploying with Docker
+
+Images are published to `ghcr.io/rnikoopour/mediocresync` on each version tag. Replace `<version>` with the desired release (e.g. `v1.2.0`):
+
+```sh
+docker run -d \
+  --name mediocresync \
+  --restart unless-stopped \
+  -p 8080:8080 \
+  -v /path/to/data:/data \
+  ghcr.io/rnikoopour/mediocresync:<version>
+```
+
+The `/data` volume holds the SQLite database and log file. To override any environment variable:
+
+```sh
+docker run -d \
+  --name mediocresync \
+  --restart unless-stopped \
+  -p 8080:8080 \
+  -v /path/to/data:/data \
+  -e MEDIOCRESYNC_LISTEN_ADDR=:9000 \
+  ghcr.io/rnikoopour/mediocresync:<version>
+```
+
+Open `http://localhost:8080` in your browser.
 
 ## Building
 
@@ -41,7 +69,7 @@ Open `http://localhost:8080` in your browser.
 Start the Go server and Vite dev server concurrently:
 
 ```sh
-export DEV_MODE=true
+export MEDIOCRESYNC_DEV_MODE=true
 make run-dev
 ```
 
@@ -52,31 +80,6 @@ The React app runs at `http://localhost:5173` with `/api/*` proxied to the Go se
 ```sh
 make test
 ```
-
-## Deploying on Linux (systemd)
-
-Run the install script as root:
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/rnikoopour/mediocresync/main/install-with-systemd.sh | sudo bash
-```
-
-The script downloads the latest `mediocresync-linux-amd64` binary and `mediocresync.service` from the GitHub release, installs them, and starts the service. Re-running it will stop the service, upgrade the binary, and restart.
-
-The service listens on port `5000` and stores its database at `/var/lib/mediocresync/mediocresync.db` (created automatically by systemd). To override environment variables without editing the unit file directly (so your changes survive upgrades), use:
-
-```sh
-sudo systemctl edit mediocresync
-```
-
-Add your overrides in the `[Service]` section, for example:
-
-```ini
-[Service]
-Environment=LISTEN_ADDR=:8080
-```
-
-Then reload and restart: `sudo systemctl daemon-reload && sudo systemctl restart mediocresync`.
 
 ## How it works
 
