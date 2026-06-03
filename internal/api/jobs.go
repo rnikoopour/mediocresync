@@ -89,8 +89,8 @@ func toJobResponse(j *db.SyncJob, repos []*db.GitRepo) jobResponse {
 		ExcludeNameFilters: j.ExcludeNameFilters,
 		RunRetentionDays:   j.RunRetentionDays,
 		GitRepos:           gitRepos,
-		CreatedAt:          j.CreatedAt.Format("2006-01-02T15:04:05Z"),
-		UpdatedAt:          j.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+		CreatedAt:          j.CreatedAt.Format(apiTimeFormat),
+		UpdatedAt:          j.UpdatedAt.Format(apiTimeFormat),
 	}
 }
 
@@ -384,17 +384,10 @@ func (h *jobsHandler) planEvents(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = job
 
-	flusher, ok := w.(http.Flusher)
+	flusher, ok := setupSSE(w)
 	if !ok {
-		writeError(w, http.StatusInternalServerError, "streaming not supported")
 		return
 	}
-
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("X-Accel-Buffering", "no")
-	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
 
 	ch, unsub := h.engine.SubscribePlan(jobID)
@@ -423,17 +416,10 @@ func (h *jobsHandler) planEvents(w http.ResponseWriter, r *http.Request) {
 func (h *jobsHandler) jobEvents(w http.ResponseWriter, r *http.Request) {
 	jobID := chi.URLParam(r, "id")
 
-	flusher, ok := w.(http.Flusher)
+	flusher, ok := setupSSE(w)
 	if !ok {
-		writeError(w, http.StatusInternalServerError, "streaming not supported")
 		return
 	}
-
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("X-Accel-Buffering", "no")
-	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
 
 	ch, unsub := h.broker.Subscribe(jobID)

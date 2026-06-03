@@ -162,13 +162,7 @@ func scanRun(s scanner) (*Run, error) {
 	}
 
 	run.StartedAt, _ = time.Parse(time.RFC3339, startedAt)
-	if finishedAt != nil {
-		t, _ := time.Parse(time.RFC3339, *finishedAt)
-		run.FinishedAt = &t
-	}
-	if transfersStartedAt != nil {
-		t, _ := time.Parse(time.RFC3339, *transfersStartedAt)
-		run.TransfersStartedAt = &t
-	}
+	run.FinishedAt = parseTimePtr(finishedAt)
+	run.TransfersStartedAt = parseTimePtr(transfersStartedAt)
 	return &run, nil
 }
