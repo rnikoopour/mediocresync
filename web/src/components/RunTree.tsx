@@ -4,8 +4,8 @@ import { StatusBadge } from './StatusBadge'
 import { ProgressBar } from './ProgressBar'
 import { TabBtn } from './TabBtn'
 import { formatBytes, formatSpeed, formatETA } from '../utils/format'
-import { sortNodes } from '../utils/tree'
-import { resolveTransferStatus } from '../utils/runStatus'
+import { buildPathTree } from '../utils/tree'
+import { getStatusFlags, resolveTransferStatus } from '../utils/runStatus'
 
 export { formatBytes, formatSpeed }
 
@@ -14,36 +14,7 @@ type RunTreeFolder = { type: 'folder'; name: string; children: RunTreeNode[] }
 type RunTreeNode   = RunTreeFile | RunTreeFolder
 
 export function buildRunTree(transfers: Transfer[], remotePath: string): RunTreeNode[] {
-  const base = remotePath.replace(/\/+$/, '')
-  const root: RunTreeFolder = { type: 'folder', name: '', children: [] }
-
-  for (const t of transfers) {
-    const rel = t.remote_path.startsWith(base + '/')
-      ? t.remote_path.slice(base.length + 1)
-      : t.remote_path
-    const segments = rel.split('/').filter(Boolean)
-    if (segments.length === 0) continue
-
-    let cur = root
-    for (let i = 0; i < segments.length - 1; i++) {
-      const seg = segments[i]
-      let child = cur.children.find((c): c is RunTreeFolder => c.type === 'folder' && c.name === seg)
-      if (!child) {
-        child = { type: 'folder', name: seg, children: [] }
-        cur.children.push(child)
-      }
-      cur = child
-    }
-    cur.children.push({ type: 'file', name: segments[segments.length - 1], transfer: t })
-  }
-
-  function sortFolder(folder: RunTreeFolder) {
-    folder.children = sortNodes(folder.children)
-    folder.children.forEach((c) => { if (c.type === 'folder') sortFolder(c) })
-  }
-  sortFolder(root)
-
-  return root.children
+  return buildPathTree(transfers, remotePath, (t, name) => ({ type: 'file' as const, name, transfer: t })) as RunTreeNode[]
 }
 
 export type RunTab = 'all' | 'planned' | 'in_progress' | 'copied' | 'not_copied'
@@ -67,12 +38,7 @@ function RunFileRow({ node, liveEvents, runEnded }: { node: RunTreeFile; liveEve
   const live = liveEvents.get(t.id)
   const status = live?.status ?? resolveTransferStatus(t.status, runEnded)
   const speed = live?.speed_bps
-  const isFailed = status === 'failed'
-  const isRetrying = status === 'retrying'
-  const isInProgress = status === 'in_progress'
-  const isDone = status === 'done'
-  const isNotCopied = status === 'not_copied'
-  const isCanceled = status === 'canceled'
+  const { isFailed, isRetrying, isInProgress, isDone, isNotCopied, isCanceled } = getStatusFlags(status)
   const percent = live?.percent ?? (t.size_bytes > 0 ? (t.bytes_xferred / t.size_bytes) * 100 : 0)
   const showProgressBar = isInProgress || isDone || isFailed || isNotCopied || isRetrying || isCanceled
   const bytesXferred = live?.bytes_xferred ?? t.bytes_xferred

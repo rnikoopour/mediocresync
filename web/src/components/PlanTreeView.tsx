@@ -3,7 +3,7 @@ import type { PlanFile } from '../api/types'
 import { StatusBadge } from './StatusBadge'
 import { TabBtn } from './TabBtn'
 import { formatBytes } from '../utils/format'
-import { sortNodes } from '../utils/tree'
+import { buildPathTree } from '../utils/tree'
 import { useContextMenu } from '../hooks/useContextMenu'
 
 export type TreeFile = { type: 'file'; name: string; remote_path: string; size_bytes: number; mtime: string; action: 'copy' | 'skip' | 'error' }
@@ -12,37 +12,14 @@ type TreeNode = TreeFile | TreeFolder
 
 
 function buildTree(files: PlanFile[], remotePath: string): TreeNode[] {
-  const base = remotePath.replace(/\/+$/, '')
-  const root: TreeFolder = { type: 'folder', name: '', children: [] }
-
-  for (const file of files) {
-    const rel = file.remote_path.startsWith(base + '/')
-      ? file.remote_path.slice(base.length + 1)
-      : file.remote_path
-
-    const segments = rel.split('/').filter(Boolean)
-    if (segments.length === 0) continue
-
-    let cur = root
-    for (let i = 0; i < segments.length - 1; i++) {
-      const seg = segments[i]
-      let child = cur.children.find((c): c is TreeFolder => c.type === 'folder' && c.name === seg)
-      if (!child) {
-        child = { type: 'folder', name: seg, children: [] }
-        cur.children.push(child)
-      }
-      cur = child
-    }
-    cur.children.push({ type: 'file', name: segments[segments.length - 1], remote_path: file.remote_path, size_bytes: file.size_bytes, mtime: file.mtime, action: file.action })
-  }
-
-  function sortFolder(folder: TreeFolder) {
-    folder.children = sortNodes(folder.children)
-    folder.children.forEach((c) => { if (c.type === 'folder') sortFolder(c) })
-  }
-  sortFolder(root)
-
-  return root.children
+  return buildPathTree(files, remotePath, (file, name) => ({
+    type: 'file' as const,
+    name,
+    remote_path: file.remote_path,
+    size_bytes: file.size_bytes,
+    mtime: file.mtime,
+    action: file.action,
+  })) as TreeNode[]
 }
 
 function collectFiles(folder: TreeFolder): TreeFile[] {

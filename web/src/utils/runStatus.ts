@@ -15,3 +15,14 @@ export function isTerminalStatus(status: string): boolean {
 export function resolveTransferStatus(status: string, runEnded: boolean): string {
   return runEnded && status === 'pending' ? 'not_copied' : status
 }
+
+export function getStatusFlags(status: string) {
+  return {
+    isFailed:     status === 'failed',
+    isRetrying:   status === 'retrying',
+    isInProgress: status === 'in_progress',
+    isDone:       status === 'done',
+    isNotCopied:  status === 'not_copied',
+    isCanceled:   status === 'canceled',
+  }
+}

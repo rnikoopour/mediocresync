@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isTerminalStatus, resolveTransferStatus } from './runStatus'
+import { isTerminalStatus, resolveTransferStatus, getStatusFlags } from './runStatus'
 
 describe('isTerminalStatus', () => {
   it.each([
@@ -28,5 +28,26 @@ describe('resolveTransferStatus', () => {
     { status: 'skipped',     runEnded: true,  expected: 'skipped'    },
   ])('$status + runEnded=$runEnded → $expected', ({ status, runEnded, expected }) => {
     expect(resolveTransferStatus(status, runEnded)).toBe(expected)
+  })
+})
+
+describe('getStatusFlags', () => {
+  it.each([
+    { status: 'failed',      flag: 'isFailed',     expected: true  },
+    { status: 'retrying',    flag: 'isRetrying',   expected: true  },
+    { status: 'in_progress', flag: 'isInProgress', expected: true  },
+    { status: 'done',        flag: 'isDone',        expected: true  },
+    { status: 'not_copied',  flag: 'isNotCopied',  expected: true  },
+    { status: 'canceled',    flag: 'isCanceled',   expected: true  },
+  ] as const)('$status sets $flag=true, all others false', ({ status, flag }) => {
+    const flags = getStatusFlags(status)
+    expect(flags[flag]).toBe(true)
+    const others = Object.entries(flags).filter(([k]) => k !== flag)
+    expect(others.every(([, v]) => v === false)).toBe(true)
+  })
+
+  it('returns all false for an unrecognised status', () => {
+    const flags = getStatusFlags('pending')
+    expect(Object.values(flags).every((v) => v === false)).toBe(true)
   })
 })
