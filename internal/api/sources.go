@@ -47,8 +47,8 @@ func toSourceResponse(s *db.Source) sourceResponse {
 		SkipTLSVerify: s.SkipTLSVerify,
 		EnableEPSV:    s.EnableEPSV,
 		AuthType:      s.AuthType,
-		CreatedAt:     s.CreatedAt.Format("2006-01-02T15:04:05Z"),
-		UpdatedAt:     s.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+		CreatedAt:     s.CreatedAt.Format(apiTimeFormat),
+		UpdatedAt:     s.UpdatedAt.Format(apiTimeFormat),
 	}
 }
 
@@ -251,36 +251,34 @@ func (h *sourcesHandler) browse(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
+func dialFTPESAndLogin(host string, port int, skipTLS, enableEPSV bool, user, pass string) error {
+	client, err := ftpes.Dial(host, port, skipTLS, enableEPSV)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+	return client.Login(user, pass)
+}
+
 func (h *sourcesHandler) test(w http.ResponseWriter, r *http.Request) {
 	src, err := h.repo.Get(chi.URLParam(r, "id"))
 	if err != nil || src == nil {
 		writeError(w, http.StatusNotFound, "source not found")
 		return
 	}
-
 	if src.Type != db.SourceTypeFTPES {
 		writeError(w, http.StatusBadRequest, "test is only supported for ftpes sources")
 		return
 	}
-
 	password, err := crypto.Decrypt(h.encKey, src.Password)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to decrypt password")
 		return
 	}
-
-	client, err := ftpes.Dial(src.Host, src.Port, src.SkipTLSVerify, src.EnableEPSV)
-	if err != nil {
+	if err := dialFTPESAndLogin(src.Host, src.Port, src.SkipTLSVerify, src.EnableEPSV, src.Username, password); err != nil {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}
-	defer client.Close()
-
-	if err := client.Login(src.Username, password); err != nil {
-		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "error": err.Error()})
-		return
-	}
-
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
@@ -324,17 +322,9 @@ func (h *sourcesHandler) testDirect(w http.ResponseWriter, r *http.Request) {
 		req.Port = 21
 	}
 
-	client, err := ftpes.Dial(req.Host, req.Port, req.SkipTLSVerify, req.EnableEPSV)
-	if err != nil {
+	if err := dialFTPESAndLogin(req.Host, req.Port, req.SkipTLSVerify, req.EnableEPSV, req.Username, password); err != nil {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}
-	defer client.Close()
-
-	if err := client.Login(req.Username, password); err != nil {
-		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "error": err.Error()})
-		return
-	}
-
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }

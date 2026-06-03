@@ -48,7 +48,7 @@ func toRunResponse(run *db.Run, transfers []*db.Transfer) runResponse {
 		ID:             run.ID,
 		JobID:          run.JobID,
 		Status:         run.Status,
-		StartedAt:      run.StartedAt.Format("2006-01-02T15:04:05Z"),
+		StartedAt:      run.StartedAt.Format(apiTimeFormat),
 		TotalFiles:     run.TotalFiles,
 		CopiedFiles:    run.CopiedFiles,
 		SkippedFiles:   run.SkippedFiles,
@@ -58,14 +58,8 @@ func toRunResponse(run *db.Run, transfers []*db.Transfer) runResponse {
 		ErrorMsg:       run.ErrorMsg,
 		Transfers:      []transferResponse{},
 	}
-	if run.FinishedAt != nil {
-		s := run.FinishedAt.Format("2006-01-02T15:04:05Z")
-		r.FinishedAt = &s
-	}
-	if run.TransfersStartedAt != nil {
-		s := run.TransfersStartedAt.Format("2006-01-02T15:04:05Z")
-		r.TransfersStartedAt = &s
-	}
+	r.FinishedAt = formatTimePtr(run.FinishedAt)
+	r.TransfersStartedAt = formatTimePtr(run.TransfersStartedAt)
 	for _, t := range transfers {
 		tr := transferResponse{
 			ID:                 t.ID,
@@ -79,14 +73,8 @@ func toRunResponse(run *db.Run, transfers []*db.Transfer) runResponse {
 			PreviousCommitHash: t.PreviousCommitHash,
 			CurrentCommitHash:  t.CurrentCommitHash,
 		}
-		if t.StartedAt != nil {
-			s := t.StartedAt.Format("2006-01-02T15:04:05Z")
-			tr.StartedAt = &s
-		}
-		if t.FinishedAt != nil {
-			s := t.FinishedAt.Format("2006-01-02T15:04:05Z")
-			tr.FinishedAt = &s
-		}
+		tr.StartedAt = formatTimePtr(t.StartedAt)
+		tr.FinishedAt = formatTimePtr(t.FinishedAt)
 		r.Transfers = append(r.Transfers, tr)
 	}
 	return r
@@ -133,17 +121,10 @@ func (h *runsHandler) get(w http.ResponseWriter, r *http.Request) {
 func (h *runsHandler) progress(w http.ResponseWriter, r *http.Request) {
 	runID := chi.URLParam(r, "id")
 
-	flusher, ok := w.(http.Flusher)
+	flusher, ok := setupSSE(w)
 	if !ok {
-		writeError(w, http.StatusInternalServerError, "streaming not supported")
 		return
 	}
-
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("X-Accel-Buffering", "no") // disable nginx buffering
-	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
 
 	ch, unsub := h.broker.Subscribe(runID)

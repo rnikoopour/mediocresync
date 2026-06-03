@@ -154,14 +154,8 @@ func scanTransfer(s scanner) (*Transfer, error) {
 	if errMsg.Valid {
 		t.ErrorMsg = &errMsg.String
 	}
-	if startedAt.Valid {
-		ts, _ := time.Parse(time.RFC3339, startedAt.String)
-		t.StartedAt = &ts
-	}
-	if finishedAt.Valid {
-		ts, _ := time.Parse(time.RFC3339, finishedAt.String)
-		t.FinishedAt = &ts
-	}
+	t.StartedAt = parseNullTime(startedAt)
+	t.FinishedAt = parseNullTime(finishedAt)
 	if prevHash.Valid {
 		t.PreviousCommitHash = &prevHash.String
 	}

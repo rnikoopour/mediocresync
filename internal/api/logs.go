@@ -13,17 +13,10 @@ type logsHandler struct {
 }
 
 func (h *logsHandler) stream(w http.ResponseWriter, r *http.Request) {
-	flusher, ok := w.(http.Flusher)
+	flusher, ok := setupSSE(w)
 	if !ok {
-		writeError(w, http.StatusInternalServerError, "streaming not supported")
 		return
 	}
-
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("X-Accel-Buffering", "no")
-	w.WriteHeader(http.StatusOK)
 
 	// Send buffered history first.
 	if h.buf != nil {

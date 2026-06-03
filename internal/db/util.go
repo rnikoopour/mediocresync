@@ -1,6 +1,9 @@
 package db
 
-import "time"
+import (
+	"database/sql"
+	"time"
+)
 
 // scanner is satisfied by both *sql.Row and *sql.Rows.
 type scanner interface {
@@ -16,5 +19,21 @@ func boolToInt(b bool) int {
 
 func formatTime(t time.Time) string {
 	return t.UTC().Format(time.RFC3339)
+}
+
+func parseTimePtr(s *string) *time.Time {
+	if s == nil {
+		return nil
+	}
+	t, _ := time.Parse(time.RFC3339, *s)
+	return &t
+}
+
+func parseNullTime(s sql.NullString) *time.Time {
+	if !s.Valid {
+		return nil
+	}
+	t, _ := time.Parse(time.RFC3339, s.String)
+	return &t
 }
 
