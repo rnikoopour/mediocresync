@@ -293,10 +293,15 @@ export function JobFormModal({ editing, onClose }: Props) {
 function RepoList({ repos, onChange }: { repos: GitRepoRequest[]; onChange: (v: GitRepoRequest[]) => void }) {
   const [draftUrl, setDraftUrl] = useState('')
   const [draftBranch, setDraftBranch] = useState('')
+  const [duplicateWarning, setDuplicateWarning] = useState(false)
 
   function add() {
     const url = draftUrl.trim()
     if (!url) return
+    if (repos.some((r) => r.url === url)) {
+      setDuplicateWarning(true)
+      return
+    }
     onChange([...repos, { url, branch: draftBranch.trim() || 'main' }])
     setDraftUrl('')
     setDraftBranch('')
@@ -321,7 +326,7 @@ function RepoList({ repos, onChange }: { repos: GitRepoRequest[]; onChange: (v: 
         <input
           className="input flex-1 text-xs font-mono"
           value={draftUrl}
-          onChange={(e) => setDraftUrl(e.target.value)}
+          onChange={(e) => { setDraftUrl(e.target.value); setDuplicateWarning(false) }}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add() } }}
           placeholder="https://github.com/org/repo"
         />
@@ -334,6 +339,9 @@ function RepoList({ repos, onChange }: { repos: GitRepoRequest[]; onChange: (v: 
         />
         <button type="button" onClick={add} className="btn-secondary text-xs shrink-0">Add</button>
       </div>
+      {duplicateWarning && (
+        <p className="text-xs text-amber-600 dark:text-amber-400">This repo is already in the list.</p>
+      )}
     </div>
   )
 }
