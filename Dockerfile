@@ -1,19 +1,21 @@
-FROM node:25.8.1-alpine AS web
+FROM --platform=$BUILDPLATFORM node:25.8.1-alpine AS web
 WORKDIR /app/web
 COPY web/package*.json ./
 RUN npm ci
 COPY web/ ./
 RUN npm run build
 
-FROM golang:1.25-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS builder
 ARG VERSION=dev
+ARG TARGETOS
+ARG TARGETARCH
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 COPY --from=web /app/ui/dist ui/dist/
 RUN touch ui/dist/.gitkeep
-RUN GOOS=linux GOARCH=amd64 go build -ldflags "-X main.version=${VERSION}" -o bin/mediocresync ./cmd/server
+RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -ldflags "-X main.version=${VERSION}" -o bin/mediocresync ./cmd/server
 
 FROM alpine:3.21
 RUN apk add --no-cache ca-certificates
